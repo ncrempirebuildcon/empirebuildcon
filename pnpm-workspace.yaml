@@ -1,0 +1,10 @@
+# Workspace packages (handbook/ARCHITECTURE.md §2)
+packages:
+  - apps/web
+  - packages/*
+  - qa
+
+# Dependency install scripts that may run (pnpm blocks all others).
+# SECURITY: review before adding an entry; build scripts run arbitrary code on every machine.
+allowBuilds:
+  unrs-resolver: true # picks the prebuilt native resolver used by eslint-import-resolver-typescript

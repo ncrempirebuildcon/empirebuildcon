@@ -1,0 +1,24 @@
+{
+  "name": "empire",
+  "private": true,
+  "description": "Empire website and CMS — pnpm workspace root (see handbook/README.md)",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @empire/web dev",
+    "build": "pnpm --recursive --filter ./apps/* --filter ./packages/* build",
+    "lint": "pnpm --recursive lint",
+    "typecheck": "pnpm --recursive typecheck",
+    "test": "pnpm --recursive --filter ./packages/* --filter ./apps/* test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "api:openapi": "uv --directory apps/api run empire-api openapi --out ../../packages/api-client/openapi.json",
+    "api:client": "pnpm --filter @empire/api-client generate",
+    "e2e": "pnpm --filter @empire/qa e2e"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
+  }
+}

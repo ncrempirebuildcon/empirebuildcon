@@ -26,6 +26,8 @@ __pycache__/
 htmlcov/
 
 # QA output
+qa/test-results/
+qa/playwright-report/
 qa/**/test-results/
 qa/**/playwright-report/
 .lighthouseci/
@@ -40,3 +42,7 @@ desktop.ini
 
 # Logs
 *.log
+
+# Local databases and tool caches
+*.sqlite3
+.pnpm-store/

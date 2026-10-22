@@ -1,0 +1,15 @@
+# Secret scan settings (SECURITY.md §7). Uses gitleaks' default rules plus a narrow allowlist.
+# WHY: CI and .env.example carry obviously fake placeholder values ("ci-only-…", "change-me…")
+# so the app can start in tests; they are not secrets and must not fail the scan.
+# DO NOT CHANGE: never allowlist a whole file or a real-looking value — rotate real secrets instead.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder values used by CI and the env example"
+regexes = [
+  '''ci-only-[a-z0-9-]+''',
+  '''change-me[a-z0-9-]*''',
+  '''Y2ktb25seS1mZXJuZXQta2V5LTAxMjM0NTY3ODlhYmM=''',
+  '''test-internal-key-0123456789-abcdefghijklmnop''',
+]

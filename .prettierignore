@@ -1,0 +1,22 @@
+# Generated or vendored files: never reformat (handbook/CONTRIBUTING.md §9)
+pnpm-lock.yaml
+packages/api-client/openapi.json
+packages/api-client/src/schema.d.ts
+handbook/api/openapi-v1.yaml
+handbook/diagrams/
+brand/logo-draft/
+holding-page/
+apps/api/
+**/.next/
+**/node_modules/
+qa/test-results/
+qa/playwright-report/
+packages/ui/src/theme.css
+packages/ui/src/tokens.ts
+**/next-env.d.ts
+qa/.auth/
+qa/.lighthouseci/
+# WHY: Markdown is prose with hand-aligned tables; Prettier would reflow every handbook table.
+*.md
+# Generated from brand/tokens/empire-noir.json (handbook/DESIGN_SYSTEM.md)
+brand/tokens/
