@@ -16,6 +16,16 @@ export function sqftToSqm(sqft: number): number {
   return Math.round(sqft * SQM_PER_SQFT * 10) / 10;
 }
 
+/**
+ * Square feet to square metres for **storage**, kept to 4 decimals: 980 → 91.0449.
+ * WHY: the API stores area once, in square metres (ARCHITECTURE §6). Rounding to one decimal
+ * before saving could turn a typed 1,000 sq ft into 999 sq ft when read back; 4 decimals always
+ * round-trips through `sqmToSqft` to the same whole square feet.
+ */
+export function sqftToSqmStored(sqft: number): number {
+  return Math.round(sqft * SQM_PER_SQFT * 10_000) / 10_000;
+}
+
 /** Square metres to whole square feet: 91.04 → 980. */
 export function sqmToSqft(sqm: number): number {
   return Math.round(sqm / SQM_PER_SQFT);
