@@ -5,6 +5,13 @@ export { Button, buttonClasses, type ButtonProps, type ButtonVariant } from "./c
 export { Checkbox, type CheckboxProps } from "./components/Checkbox";
 export { Chip, type ChipProps, type ChipVariant } from "./components/Chip";
 export { ConfirmDialog, type ConfirmDialogProps } from "./components/ConfirmDialog";
+export { Dialog, type DialogProps } from "./components/Dialog";
+export {
+  FileButton,
+  FileDropZone,
+  type FileButtonProps,
+  type FileDropZoneProps,
+} from "./components/FilePicker";
 export {
   NumberField,
   formatNumberInput,
@@ -20,8 +27,15 @@ export {
   type ReorderButtonsProps,
   type ReorderListProps,
 } from "./components/Reorder";
+export { ProgressBar, type ProgressBarProps } from "./components/ProgressBar";
+export {
+  SegmentedControl,
+  type SegmentedControlProps,
+  type SegmentedOption,
+} from "./components/SegmentedControl";
 export { Select, type SelectOption, type SelectProps } from "./components/Select";
 export { Skeleton } from "./components/Skeleton";
+export { Switch, type SwitchProps } from "./components/Switch";
 export { Table, type TableColumn, type TableProps } from "./components/Table";
 export {
   TabPanel,

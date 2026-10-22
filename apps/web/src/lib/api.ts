@@ -10,6 +10,21 @@ import { SIGN_IN_PATH } from "./routes";
 
 export const api = createApiClient();
 
+// SECURITY: memory only, never localStorage (SECURITY.md §1). The XHR uploads (lib/media/upload.ts)
+// need the token too, because they send multipart bodies with progress, which fetch can't report.
+let csrfToken: string | null = null;
+
+/** Remember the session's CSRF token for every write (the shell sets it from /auth/me). */
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
+  api.setCsrfToken(token);
+}
+
+/** The CSRF token for a write made outside the generated client (XHR uploads). */
+export function currentCsrfToken(): string | null {
+  return csrfToken;
+}
+
 /** The signed-in staff member, as returned by GET /api/v1/auth/me. */
 export type SessionUser =
   paths["/api/v1/auth/me"]["get"]["responses"][200]["content"]["application/json"];

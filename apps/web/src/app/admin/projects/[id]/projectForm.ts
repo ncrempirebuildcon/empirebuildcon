@@ -33,6 +33,7 @@ export interface ProjectForm {
   rera_bank_name: string;
   rera_account_name: string;
   rera_account_number: string;
+  brochure_gated: boolean;
   price_on_request: boolean;
   price_min_inr: number | null;
   price_max_inr: number | null;
@@ -53,6 +54,8 @@ export interface ProjectForm {
   seo_description: string;
   seo_canonical_path: string;
   seo_noindex: boolean;
+  /** The share image's media id, "" for none (picked in the SEO tab). */
+  seo_og_image_id: string;
 }
 
 export const DEFAULT_RERA_AUTHORITY = "UP-RERA";
@@ -81,6 +84,7 @@ export function toForm(p: ProjectAdmin): ProjectForm {
     rera_bank_name: text(p.rera_account?.bank_name),
     rera_account_name: text(p.rera_account?.account_name),
     rera_account_number: text(p.rera_account?.account_number),
+    brochure_gated: p.brochure_gated ?? false,
     price_on_request: p.price.on_request ?? false,
     price_min_inr: p.price.min_inr ?? null,
     price_max_inr: p.price.max_inr ?? null,
@@ -101,14 +105,15 @@ export function toForm(p: ProjectAdmin): ProjectForm {
     seo_description: text(p.seo?.description),
     seo_canonical_path: text(p.seo?.canonical_path),
     seo_noindex: p.seo?.noindex ?? false,
+    seo_og_image_id: p.seo?.og_image_id ?? "",
   };
 }
 
 /**
  * The PATCH body for the form. Only fields the editor owns are sent, so values edited elsewhere
- * (translations, land area, the share image) are left as they are.
+ * (translations, land area) are left as they are.
  */
-export function toInput(form: ProjectForm, project: ProjectAdmin): ProjectUpdate {
+export function toInput(form: ProjectForm): ProjectUpdate {
   const hasAccount = Boolean(
     form.rera_bank_name.trim() || form.rera_account_name.trim() || form.rera_account_number.trim(),
   );
@@ -134,6 +139,7 @@ export function toInput(form: ProjectForm, project: ProjectAdmin): ProjectUpdate
           account_number: orNull(form.rera_account_number),
         }
       : null,
+    brochure_gated: form.brochure_gated,
     price: {
       // WHY: `display` is read-only and ignored by the API; the generated type still lists it.
       display: "",
@@ -161,7 +167,7 @@ export function toInput(form: ProjectForm, project: ProjectAdmin): ProjectUpdate
       description: orNull(form.seo_description),
       canonical_path: orNull(form.seo_canonical_path),
       noindex: form.seo_noindex,
-      og_image_id: project.seo?.og_image_id ?? null,
+      og_image_id: form.seo_og_image_id || null,
     },
   };
 }
@@ -170,7 +176,7 @@ export function toInput(form: ProjectForm, project: ProjectAdmin): ProjectUpdate
 export function tabForField(field: string): string {
   if (field.startsWith("location.")) return "location";
   if (field.startsWith("seo.")) return "seo";
-  if (field.startsWith("rera_account")) return "documents";
+  if (field.startsWith("rera_account") || field === "brochure_gated") return "documents";
   return "details";
 }
 
@@ -192,6 +198,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "rera_account.bank_name": "Bank",
   "rera_account.account_name": "Account name",
   "rera_account.account_number": "Account number",
+  brochure_gated: "Brochure gated",
   "price.min_inr": "Price from",
   "price.max_inr": "Price up to",
   "price.rate_inr": "Rate",
@@ -210,6 +217,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "seo.title": "Search title",
   "seo.description": "Search description",
   "seo.canonical_path": "Canonical path",
+  "seo.og_image_id": "Share image",
 };
 
 /** Checks made before saving, so obvious mistakes show without a round trip. */

@@ -1,17 +1,34 @@
 "use client";
 /**
  * SEO tab (board NoirCmsProject, "SEO"): search title and description with character counts,
- * the canonical path, noindex, and a preview of the search result. Saved with "Save draft".
- * The share image comes with the media manager.
+ * the canonical path, noindex, the share image (ShareImagePicker.tsx) and a preview of the search
+ * result. Saved with "Save draft".
  */
 import { CharacterCount, Checkbox, TextField, Textarea } from "@empire/ui";
-import { MediaPlaceholder, Panel } from "@/components/admin/states";
+import { Panel } from "@/components/admin/states";
 import type { FormTabProps } from "./DetailsTab";
+import type { ProjectAdmin } from "./projectForm";
+import { ShareImagePicker } from "./ShareImagePicker";
+
+export interface SeoTabProps extends FormTabProps {
+  project: ProjectAdmin;
+  /** False without `media.upload`: the share image can be picked but not uploaded. */
+  canUpload: boolean;
+  reportDirty: (key: string, dirty: boolean) => void;
+}
 
 const TITLE_LIMIT = 60;
 const DESCRIPTION_LIMIT = 160;
 
-export function SeoTab({ form, setForm, errors, canWrite }: FormTabProps) {
+export function SeoTab({
+  form,
+  setForm,
+  errors,
+  canWrite,
+  project,
+  canUpload,
+  reportDirty,
+}: SeoTabProps) {
   const slug = form.slug.trim() || "[web-address]";
   const previewTitle = form.seo_title.trim() || `${form.name.trim() || "[Project name]"} | Empire`;
   const previewDescription =
@@ -56,10 +73,15 @@ export function SeoTab({ form, setForm, errors, canWrite }: FormTabProps) {
             />
           </div>
           <div className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-small font-semibold text-ivory">Share image (1200 × 630)</span>
-              <MediaPlaceholder what="The image shown when the page is shared is chosen in the media manager." />
-            </div>
+            <ShareImagePicker
+              project={project}
+              value={form.seo_og_image_id}
+              onChange={(id) => setForm({ seo_og_image_id: id })}
+              canWrite={canWrite}
+              canUpload={canUpload}
+              reportDirty={reportDirty}
+              error={errors["seo.og_image_id"]}
+            />
             <figure className="flex flex-col gap-1 rounded-tile border border-line bg-noir-900 p-3.5">
               <figcaption className="text-xs font-bold tracking-[0.08em] text-muted">
                 SEARCH PREVIEW

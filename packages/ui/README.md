@@ -6,7 +6,7 @@ Black & gold design system for the Empire website and CMS: generated design toke
 |---|---|
 | `src/theme.css` | **Generated** Tailwind v4 `@theme` from `brand/tokens/empire-noir.json`. Never edit by hand. |
 | `src/tokens.ts` | **Generated** typed copy of the same tokens |
-| `src/components/` | `Button`, `TextField`, `Checkbox`, `Chip`, `Alert`, and for the CMS: `Select`, `Textarea` (+ `CharacterCount`), `NumberField`, `Tabs`/`TabPanel`, `Table`, `ConfirmDialog`, `ReorderList`/`ReorderButtons` (+ `moveItem`, `LiveRegion`), `Skeleton` |
+| `src/components/` | `Button`, `TextField`, `Checkbox`, `Chip`, `Alert`, and for the CMS: `Select`, `Textarea` (+ `CharacterCount`), `NumberField`, `Tabs`/`TabPanel`, `Table`, `ConfirmDialog`, `Dialog`, `ReorderList`/`ReorderButtons` (+ `moveItem`, `LiveRegion`), `Skeleton`, and for the media manager: `Switch`, `ProgressBar`, `FileDropZone`/`FileButton`, `SegmentedControl` |
 | `src/format/` | `formatInr`, `formatInrRange`, `formatInrFull`, `sqftToSqm`, `sqftToSqmStored`, `sqmToSqft`, `formatArea`, `formatAreaRange` |
 
 ### Components
@@ -21,6 +21,11 @@ Black & gold design system for the Empire website and CMS: generated design toke
 | `Table` | Data tables | Caption (visible or screen-reader only), `scope`d headers, optional row-header column, `empty` message, focusable scroll region. |
 | `ConfirmDialog` | Delete, archive, unpublish | Native `<dialog>` with `showModal()`: focus trapped, Cancel focused first, Escape cancels, blocked while `busy`; shows an `error`. Never use `confirm()`. |
 | `ReorderList`, `ReorderButtons`, `moveItem`, `LiveRegion` | Ordering | Move up/Move down buttons (`aria-disabled` at the ends so focus stays) and a polite announcement "Tower B moved to position 1 of 2." Drag handles may be added on top, never instead. |
+| `Dialog` | Short forms in a modal ("Photo details") | Native `<dialog>` with `showModal()`, labelled by its title, first field focused, Escape closes (not while `busy`), Enter submits. Yes/no questions use `ConfirmDialog`. |
+| `Switch` | On/off that saves at once ("Show on website · Shown") | `<button role="switch">` with `aria-checked`, the state also in words, `context` adds the item's name for screen readers only; `busy`/`disabled` use `aria-disabled`. 44 px tall. |
+| `ProgressBar` | Upload progress | `role="progressbar"` with `aria-valuenow` 0–100, a name and `aria-valuetext`; `value={null}` is indeterminate. Gold hairline gradient. Announce start/end in a `LiveRegion`, not every percent. |
+| `FileDropZone`, `FileButton` | Choosing files | A real button opens the file chooser (hidden `<input type="file">`), so keyboard and screen-reader users never drag. The drop zone also takes dropped files; its hint is linked with `aria-describedby`. `accept` only steers the chooser: callers still check type and size. |
+| `SegmentedControl` | A few views of one list ("Photos · 8 / Videos · 1") | `role="radiogroup"` with `role="radio"` pills, roving tab stop, arrow keys, Home/End. |
 | `Chip` | Status labels | Always text. Variants include `upcoming`, `ongoing`, `completed`, `available`, `soldOut`, `offMarket`, `draft`, `published`, `archived`, `sample`. |
 | `Skeleton` | Loading placeholders | `noir-700`, no pulse with reduced motion; decorative (pair with `aria-busy` and a text). |
 

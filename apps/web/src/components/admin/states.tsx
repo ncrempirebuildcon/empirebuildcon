@@ -1,8 +1,8 @@
 "use client";
 /**
  * Page states for CMS screens (handbook/DESIGN_SYSTEM.md §8 "States"): loading skeletons,
- * "Couldn't load" with Try again, an honest empty message with a next step, and the placeholder
- * for features that arrive in a later update.
+ * "Couldn't load" with Try again, an honest empty message with a next step, and the CMS card
+ * (Panel).
  */
 import type { ReactNode } from "react";
 import { Alert, Button, Skeleton } from "@empire/ui";
@@ -46,20 +46,6 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
   );
 }
 
-/**
- * Placeholder for media features (uploads, floor plans, the RERA QR image, share images), which
- * arrive with the media manager.
- * TODO(phase-4): replace every use with the media manager in part 2.
- */
-export function MediaPlaceholder({ what }: { what?: string }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-tile border border-dashed border-gold-line-strong bg-noir-700 px-4 py-3 text-small">
-      <strong className="text-ivory">Media manager arrives in the next update</strong>
-      {what ? <span className="text-muted">{what}</span> : null}
-    </div>
-  );
-}
-
 /** A CMS card with a heading, optional description and optional actions on the right. */
 export function Panel({
   title,
@@ -85,7 +71,9 @@ export function Panel({
       className={`flex flex-col gap-4 rounded-card border border-line bg-noir-800 p-4.5 ${className ?? ""}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        {/* WHY a 240 px basis: on a phone the actions (e.g. the Photos/Videos/Documents
+            switcher) wrap below the title instead of squeezing it into a narrow column. */}
+        <div className="min-w-0 flex-[1_1_240px]">
           <Heading id={id ? `${id}-title` : undefined} className="text-[17px] font-bold">
             {title}
           </Heading>

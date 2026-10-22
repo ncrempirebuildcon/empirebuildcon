@@ -13,8 +13,10 @@
  *   3. Leaving with unsaved fields or an open item form asks first (useUnsavedChanges).
  *
  * Permissions: without projects.write every section is read-only (fieldsets disabled, no
- * buttons); Publish/Unpublish need projects.publish; Delete needs projects.delete. The API checks
- * all of them again (SECURITY: hiding is not the protection).
+ * buttons); Publish/Unpublish need projects.publish; Delete needs projects.delete. Media
+ * (uploads, order, cover, show/hide, floor plans, the RERA QR) needs media.upload instead, which
+ * marketing staff have without projects.write (ARCHITECTURE §11). The API checks all of them
+ * again (SECURITY: hiding is not the protection).
  */
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -37,8 +39,9 @@ import { useAdminHeading, useAdminSession } from "../../session-context";
 import { AmenitiesTab } from "./AmenitiesTab";
 import { ConfigurationsTab } from "./ConfigurationsTab";
 import { DetailsTab, type OffMarketLock } from "./DetailsTab";
-import { DocumentsTab, MediaTab } from "./DocumentsTab";
+import { DocumentsTab } from "./DocumentsTab";
 import { LocationTab } from "./LocationTab";
+import { MediaTab } from "./MediaTab";
 import { PaymentPlansTab } from "./PaymentPlansTab";
 import { ProgressTab } from "./ProgressTab";
 import { PublishPanel, useProjectActions } from "./PublishPanel";
@@ -75,7 +78,9 @@ const isTab = (value: string | null): value is TabId => TABS.some((t) => t.id ==
 const tabLabel = (id: string) => TABS.find((t) => t.id === id)?.label ?? "Details";
 
 const NOTICES: Record<string, string> = {
-  duplicated: "This is the copy, saved as a draft. Media was not copied.",
+  // COMPLIANCE: Duplicate never copies media, so the copy can't inherit another project's RERA QR.
+  duplicated:
+    "This is the copy, saved as a draft. Photos, documents and the RERA QR code were not copied: upload this project's own.",
 };
 
 export function ProjectEditor({ id }: { id: string }) {
@@ -118,6 +123,7 @@ function EditorBody({
   const params = useSearchParams();
   const canWrite = can("projects.write");
   const canPublish = can("projects.publish");
+  const canUpload = can("media.upload");
   const [tab, setTabState] = useState<TabId>(() => {
     const fromUrl = params.get("tab");
     return isTab(fromUrl) ? fromUrl : "details";
@@ -193,7 +199,7 @@ function EditorBody({
       const updated = await call(
         api.PATCH("/api/v1/admin/projects/{id}", {
           params: { path: { id: project.id } },
-          body: toInput(sent, project),
+          body: toInput(sent),
         }),
       );
       replace(updated);
@@ -331,7 +337,7 @@ function EditorBody({
             <TowersTab {...childProps} />
           </TabPanel>
           <TabPanel idPrefix="project" tabId="configurations" selected={tab === "configurations"}>
-            <ConfigurationsTab {...childProps} />
+            <ConfigurationsTab {...childProps} canUpload={canUpload} />
           </TabPanel>
           <TabPanel idPrefix="project" tabId="amenities" selected={tab === "amenities"}>
             <AmenitiesTab {...childProps} />
@@ -340,22 +346,39 @@ function EditorBody({
             <SpecificationsTab {...childProps} />
           </TabPanel>
           <TabPanel idPrefix="project" tabId="media" selected={tab === "media"}>
-            <MediaTab />
+            <MediaTab
+              project={project}
+              canUpload={canUpload}
+              onChanged={refresh}
+              reportDirty={reportDirty}
+              onGoToTab={setTab}
+            />
           </TabPanel>
           <TabPanel idPrefix="project" tabId="location" selected={tab === "location"}>
             <LocationTab {...formProps} {...childProps} />
           </TabPanel>
           <TabPanel idPrefix="project" tabId="progress" selected={tab === "progress"}>
-            <ProgressTab {...childProps} />
+            <ProgressTab {...childProps} canUpload={canUpload} />
           </TabPanel>
           <TabPanel idPrefix="project" tabId="payment-plans" selected={tab === "payment-plans"}>
             <PaymentPlansTab {...childProps} />
           </TabPanel>
           <TabPanel idPrefix="project" tabId="documents" selected={tab === "documents"}>
-            <DocumentsTab {...formProps} hasQr={Boolean(project.rera.qr)} />
+            <DocumentsTab
+              {...formProps}
+              project={project}
+              canUpload={canUpload}
+              onChanged={refresh}
+              reportDirty={reportDirty}
+            />
           </TabPanel>
           <TabPanel idPrefix="project" tabId="seo" selected={tab === "seo"}>
-            <SeoTab {...formProps} />
+            <SeoTab
+              {...formProps}
+              project={project}
+              canUpload={canUpload}
+              reportDirty={reportDirty}
+            />
           </TabPanel>
         </section>
         <PublishPanel

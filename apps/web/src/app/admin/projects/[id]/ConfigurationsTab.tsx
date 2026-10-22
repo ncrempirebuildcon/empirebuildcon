@@ -3,6 +3,9 @@
  * Configurations (board NoirCmsProject, "Configurations"): the table of homes on offer, each a
  * property page on the website. Add, edit, remove and reorder; each change saves straight away.
  *
+ * Floor plans (one image or PDF per configuration) are uploaded and replaced in the table's
+ * Floor plan column (FloorPlanCell.tsx); they save straight away, like the rest of the media.
+ *
  * COMPLIANCE: carpet area is typed in sq ft and stored once in square metres; sq m is shown
  * "auto" with the shared helpers, so the two figures can never disagree (AGENTS.md "Carpet area
  * comes first, in sq ft and sq m"; ARCHITECTURE §6).
@@ -23,6 +26,7 @@ import { CollectionForm, DiscardDialog, RemoveDialog } from "@/components/admin/
 import { EmptyState, Panel } from "@/components/admin/states";
 import { useCollection } from "@/components/admin/useCollection";
 import { ConfigurationFields } from "./ConfigurationFields";
+import { FloorPlanCell } from "./FloorPlanCell";
 import {
   emptyDraft,
   sqftRange,
@@ -36,7 +40,13 @@ import { useReportDirty, type ChildTabProps, type Configuration } from "./editor
 
 const STICKY = "sticky left-0 z-[1] min-w-40 bg-noir-800 shadow-[inset_-1px_0_0_var(--color-line)]";
 
-export function ConfigurationsTab({ project, canWrite, onChanged, reportDirty }: ChildTabProps) {
+export function ConfigurationsTab({
+  project,
+  canWrite,
+  canUpload,
+  onChanged,
+  reportDirty,
+}: ChildTabProps & { canUpload: boolean }) {
   const id = project.id;
   const towers = project.towers ?? [];
   const configurations = useCollection<Configuration, ConfigurationDraft>({
@@ -143,8 +153,15 @@ export function ConfigurationsTab({ project, canWrite, onChanged, reportDirty }:
     {
       key: "plan",
       header: "Floor plan",
-      className: "min-w-36 text-xs text-muted",
-      cell: () => "Media manager arrives in the next update",
+      className: "min-w-44",
+      cell: (row) => (
+        <FloorPlanCell
+          configuration={row}
+          canUpload={canUpload}
+          onChanged={onChanged}
+          reportDirty={reportDirty}
+        />
+      ),
     },
     {
       key: "availability",

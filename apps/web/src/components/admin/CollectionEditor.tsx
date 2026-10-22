@@ -36,6 +36,11 @@ export interface CollectionEditorProps<T, D> {
   canWrite: boolean;
   /** Text under the list, e.g. the "approximate road distances" note. */
   footnote?: ReactNode;
+  /**
+   * Content under an item that stays mounted while the item is edited (e.g. an update's photos
+   * with their uploads), because the summary is swapped for the form.
+   */
+  renderExtra?: (item: T) => ReactNode;
   /** Id prefix for headings and buttons, e.g. "towers". */
   id: string;
 }
@@ -62,52 +67,67 @@ export function CollectionEditor<T, D>(props: CollectionEditorProps<T, D>) {
         <EmptyState title={props.emptyText} />
       ) : (
         <ol aria-label={props.title} className="flex flex-col gap-2">
-          {items.map((item, index) =>
-            c.editingId === getId(item) && c.draft ? (
-              <li key={getId(item)}>
-                <CollectionForm
-                  title={`Edit ${getLabel(item)}`}
-                  collection={c}
-                  returnFocusTo={`${id}-edit-${getId(item)}`}
-                >
-                  {props.renderForm(c.draft, c.setDraft, c.errors)}
-                </CollectionForm>
-              </li>
-            ) : (
+          {items.map((item, index) => {
+            const editing = c.editingId === getId(item) && c.draft !== null;
+            // WHY one <li> with keyed parts: the form replaces only the summary row, so
+            // `renderExtra` (keyed) keeps its state, e.g. an upload that is still running.
+            return (
               <li
                 key={getId(item)}
-                className="flex flex-wrap items-center gap-3 rounded-tile border border-line bg-noir-900 px-3.5 py-2.5"
+                className={
+                  editing
+                    ? "flex flex-col gap-3"
+                    : "flex flex-col gap-2 rounded-tile border border-line bg-noir-900 px-3.5 py-2.5"
+                }
               >
-                <div className="min-w-0 flex-[1_1_240px]">{props.renderSummary(item)}</div>
-                {canWrite ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ReorderButtons
-                      index={index}
-                      count={items.length}
-                      itemLabel={getLabel(item)}
-                      onMove={c.move}
-                      disabled={c.moving}
-                    />
-                    <Button
-                      id={`${id}-edit-${getId(item)}`}
-                      variant="secondary"
-                      aria-label={`Edit ${getLabel(item)}`}
-                      onClick={() => c.startEdit(item)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="danger"
-                      aria-label={`Remove ${getLabel(item)}`}
-                      onClick={() => c.askRemove(item)}
-                    >
-                      Remove
-                    </Button>
+                {editing && c.draft ? (
+                  <CollectionForm
+                    key="form"
+                    title={`Edit ${getLabel(item)}`}
+                    collection={c}
+                    returnFocusTo={`${id}-edit-${getId(item)}`}
+                  >
+                    {props.renderForm(c.draft, c.setDraft, c.errors)}
+                  </CollectionForm>
+                ) : (
+                  <div key="summary" className="flex flex-wrap items-center gap-3">
+                    <div className="min-w-0 flex-[1_1_240px]">{props.renderSummary(item)}</div>
+                    {canWrite ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ReorderButtons
+                          index={index}
+                          count={items.length}
+                          itemLabel={getLabel(item)}
+                          onMove={c.move}
+                          disabled={c.moving}
+                        />
+                        <Button
+                          id={`${id}-edit-${getId(item)}`}
+                          variant="secondary"
+                          aria-label={`Edit ${getLabel(item)}`}
+                          onClick={() => c.startEdit(item)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="danger"
+                          aria-label={`Remove ${getLabel(item)}`}
+                          onClick={() => c.askRemove(item)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+                {props.renderExtra ? (
+                  <div key="extra" className="min-w-0">
+                    {props.renderExtra(item)}
                   </div>
                 ) : null}
               </li>
-            ),
-          )}
+            );
+          })}
         </ol>
       )}
       {c.editing === "new" && c.draft ? (

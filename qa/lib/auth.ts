@@ -1,6 +1,7 @@
 /**
  * Helpers for CMS journeys: sign in as the throwaway super-admin from global-setup.ts, call the
- * API as that user (with the session cookie and CSRF token, exactly like the CMS does), and run axe.
+ * API as that user (with the session cookie and CSRF token, exactly like the CMS does), upload a
+ * file the same way, and run axe.
  *
  * CMS specs reuse one signed-in session (`CMS_STATE`, saved by specs/auth.setup.ts) because the API
  * allows only 10 sign-in attempts per network per 15 minutes (SECURITY.md §1).
@@ -57,6 +58,21 @@ export async function apiCall(
     data,
     headers: { "X-CSRF-Token": csrf },
   });
+}
+
+/**
+ * Uploads a file through a multipart API endpoint as the signed-in user (e.g. a photo to
+ * POST /api/v1/admin/media/images), for setting up a screen without clicking through it.
+ */
+export async function apiUpload(
+  page: Page,
+  path: string,
+  fields: Record<string, string | { name: string; mimeType: string; buffer: Buffer }>,
+): Promise<APIResponse> {
+  const me = await page.request.get("/api/v1/auth/me");
+  expect(me.status()).toBe(200);
+  const { csrf_token: csrf } = (await me.json()) as { csrf_token: string };
+  return page.request.post(path, { multipart: fields, headers: { "X-CSRF-Token": csrf } });
 }
 
 /** axe (WCAG 2.1 A/AA): the serious and critical violations on the page, as "id: help" lines. */

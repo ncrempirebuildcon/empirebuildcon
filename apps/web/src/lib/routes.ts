@@ -2,6 +2,7 @@
 export const SIGN_IN_PATH = "/admin/login";
 export const PROJECTS_PATH = "/admin/projects";
 export const CATALOGUE_PATH = "/admin/catalogue";
+export const MEDIA_PATH = "/admin/media";
 
 /** The editor for one project. */
 export const projectPath = (id: string) => `${PROJECTS_PATH}/${id}`;
