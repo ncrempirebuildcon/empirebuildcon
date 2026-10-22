@@ -1,0 +1,16 @@
+sequenceDiagram
+  autonumber
+  actor E as Staff (CMS)
+  participant A as FastAPI
+  participant DB as PostgreSQL
+  participant W as Worker
+  participant N as Next.js
+  participant X as Webhooks / AI index
+  E->>A: POST /admin/projects/{id}/publish
+  A->>A: Permission check, RERA number + QR present, no sample flag in production
+  A->>DB: one transaction: publish_state, audit_log, outbox(project.published)
+  A-->>E: 200
+  W->>DB: claim event
+  W->>N: POST /_internal/revalidate (signed) tags: project:slug, projects, sitemap
+  N-->>W: 200, pages rebuilt on next request
+  W->>X: webhooks, knowledge index refresh (Phase 7)

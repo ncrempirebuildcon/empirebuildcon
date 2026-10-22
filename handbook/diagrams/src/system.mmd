@@ -1,0 +1,32 @@
+flowchart TB
+  B["Browser<br/>public site + /admin CMS"]
+  subgraph DNS["Cloudflare DNS"]
+    D1["empirebuildcon.com<br/>(canonical, apex)"]
+    D2["www + empirebuildcon.in<br/>+ empirebuildcon.co.in"]
+  end
+  subgraph WEB["Web host"]
+    N["apps/web · Next.js<br/>static + ISR pages, CMS UI"]
+    RW["rewrite /api/* to API<br/>(no redirects)"]
+    RV["/_internal/revalidate<br/>(signed)"]
+  end
+  subgraph APIH["API host"]
+    A["apps/api · FastAPI<br/>/api/v1 (OpenAPI)"]
+    W["apps/worker<br/>outbox drain, schedules"]
+  end
+  PG[("PostgreSQL<br/>+ pgvector, pg_trgm")]
+  CL[("Cloudinary<br/>images, video, documents")]
+  EXT["Email · WhatsApp alerts<br/>CRM webhooks<br/>Meta CAPI · Google Ads"]
+  OBS["Sentry · uptime checks"]
+
+  B --> D1 --> N
+  D2 -. "308 same path" .-> D1
+  N --> RW --> A
+  A --> PG
+  A -- "photos, upload signatures,<br/>verify upload replies" --> CL
+  B -- "signed direct upload<br/>(video, documents)" --> CL
+  N -. "optimised images" .-> CL
+  W -- "claims outbox events" --> PG
+  W --> EXT
+  W -- "revalidate tags" --> RV --> N
+  A -.-> OBS
+  N -.-> OBS

@@ -1,0 +1,133 @@
+{
+  "$meta": {
+    "name": "Empire Black & gold",
+    "version": "1.0.0",
+    "date": "2026-10-20",
+    "source": "docs/DESIGN_SYSTEM.md (D-023, D-024)"
+  },
+  "color": {
+    "noir-950": "#0A0908",
+    "noir-900": "#0E0C0A",
+    "noir-800": "#171411",
+    "noir-700": "#1F1A15",
+    "line": "#2A241D",
+    "line-strong": "#3A3127",
+    "field-line": "#7A6C5B",
+    "ivory": "#F5EEDF",
+    "body": "#D9CFBF",
+    "muted": "#A89A86",
+    "gold-300": "#F1D990",
+    "gold-400": "#E2B65A",
+    "gold-500": "#D9A441",
+    "gold-700": "#B07A2A",
+    "gold-line": "rgba(217,164,65,0.28)",
+    "gold-line-strong": "rgba(217,164,65,0.45)",
+    "gold-tint": "rgba(217,164,65,0.18)",
+    "palm": "#B6D9A6",
+    "palm-line": "#5E8A4E",
+    "palm-bg": "#1F2A1B",
+    "danger": "#E3907E",
+    "danger-bg": "#5A2A20",
+    "danger-on-bg": "#F8DCD3",
+    "ivory-tile": "#FAF7F1",
+    "ink": "#2B2118"
+  },
+  "stage": {
+    "new": {
+      "text": "#F1D990",
+      "border": "rgba(217,164,65,0.6)"
+    },
+    "contacted": {
+      "text": "#F5EEDF",
+      "border": "#6B5E4E"
+    },
+    "site_visit": {
+      "text": "#B6D9A6",
+      "border": "#5E8A4E"
+    },
+    "negotiation": {
+      "text": "#F1D990",
+      "bg": "rgba(217,164,65,0.18)"
+    },
+    "booked": {
+      "text": "#CFE8C3",
+      "bg": "#24361E"
+    },
+    "lost": {
+      "text": "#F8DCD3",
+      "bg": "#3A1F19"
+    }
+  },
+  "gradient": {
+    "metallic": "linear-gradient(180deg, #F8E7B0 0%, #E2B65A 55%, #C08A2E 100%)",
+    "hairline": "linear-gradient(90deg, #B07A2A, #E2B65A)"
+  },
+  "font": {
+    "display": "Cinzel, Georgia, serif",
+    "sans": "Manrope, 'Segoe UI', system-ui, sans-serif"
+  },
+  "fontSize": {
+    "display-xl": "74px",
+    "display-lg": "58px",
+    "display-md": "50px",
+    "display-sm": "38px",
+    "h2": "34px",
+    "h2-mobile": "26px",
+    "h3": "22px",
+    "lede": "18px",
+    "body": "16px",
+    "cms-body": "15px",
+    "small": "14px",
+    "table": "14px",
+    "caption": "13px",
+    "eyebrow": "13px"
+  },
+  "lineHeight": {
+    "display": "1.05",
+    "heading": "1.1",
+    "body": "1.55"
+  },
+  "letterSpacing": {
+    "eyebrow": "0.28em",
+    "table-head": "0.08em"
+  },
+  "space": {
+    "1": "4px",
+    "2": "8px",
+    "3": "12px",
+    "4": "16px",
+    "5": "20px",
+    "6": "24px",
+    "8": "32px",
+    "10": "40px",
+    "14": "56px",
+    "18": "72px"
+  },
+  "radius": {
+    "pill": "999px",
+    "card-lg": "22px",
+    "card": "18px",
+    "tile": "14px",
+    "input": "12px",
+    "tag": "8px",
+    "arch-card": "999px 999px 10px 10px",
+    "arch-hero": "999px 28px 18px 18px"
+  },
+  "layout": {
+    "container": "1280px",
+    "gutter-desktop": "32px",
+    "gutter-mobile": "16px",
+    "cms-sidebar": "248px",
+    "cms-topbar": "64px",
+    "touch-min": "44px"
+  },
+  "focus": {
+    "ring": "2px solid #F1D990",
+    "offset": "2px"
+  },
+  "motion": {
+    "fast": "150ms",
+    "base": "200ms",
+    "easing": "cubic-bezier(0.2, 0, 0, 1)"
+  }
+}

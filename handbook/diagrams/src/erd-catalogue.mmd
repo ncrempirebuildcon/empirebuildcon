@@ -1,0 +1,114 @@
+erDiagram
+  CITY ||--o{ LOCALITY : has
+  LOCALITY ||--o{ LOCATION : "used by"
+  CITY ||--o{ LOCATION : "used by"
+  LOCATION ||--o{ PROJECT : pins
+  PROJECT ||--o{ TOWER : "towers / phases"
+  PROJECT ||--o{ UNIT_CONFIGURATION : offers
+  TOWER |o--o{ UNIT_CONFIGURATION : "optional"
+  UNIT_CONFIGURATION ||--o{ UNIT : "future, flag"
+  PROJECT ||--o{ PROJECT_AMENITY : lists
+  AMENITY ||--o{ PROJECT_AMENITY : "used in"
+  PROJECT ||--o{ SPECIFICATION : has
+  PROJECT ||--o{ LOCATION_ADVANTAGE : has
+  PROJECT ||--o{ CONSTRUCTION_UPDATE : posts
+  TOWER |o--o{ CONSTRUCTION_UPDATE : "optional"
+  PROJECT ||--o{ PAYMENT_PLAN : has
+  PAYMENT_PLAN ||--o{ PAYMENT_PLAN_STAGE : stages
+  PROJECT ||--o{ FAQ : "project FAQs"
+  LOCATION ||--o{ LISTING : "future, flag"
+  MEDIA ||--o{ MEDIA_LINK : "attached via"
+  PROJECT ||--o{ MEDIA_LINK : "gallery, brochure, QR"
+  UNIT_CONFIGURATION ||--o{ MEDIA_LINK : "floor plans"
+  CONSTRUCTION_UPDATE ||--o{ MEDIA_LINK : photos
+
+  PROJECT {
+    uuid id PK
+    text slug UK
+    text name
+    enum status "upcoming|ongoing|completed"
+    enum publish_state "draft|published|archived"
+    enum sales_status "available|sold_out|off_market"
+    text rera_authority "e.g. UP-RERA"
+    text rera_number
+    text rera_url
+    date possession_date
+    bigint price_min_inr
+    bigint price_max_inr
+    bool price_on_request
+    jsonb seo
+    jsonb translations "hi overlay"
+    bool is_sample
+  }
+  UNIT_CONFIGURATION {
+    uuid id PK
+    uuid project_id FK
+    text slug
+    text name "2 BHK Premium"
+    enum property_type "apartment|villa|plot|shop|office"
+    numeric bhk
+    numeric size_min_sqm "canonical"
+    numeric size_max_sqm
+    enum area_basis "carpet|builtup|super|plot"
+    enum display_unit "sqft|sqyd|sqm"
+    bigint price_min_inr
+    bigint price_max_inr
+    bigint rate_inr
+    enum rate_unit "sqft|sqyd|sqm"
+    bool price_on_request
+    enum sales_status "available|sold_out|off_market"
+  }
+  TOWER {
+    uuid id PK
+    uuid project_id FK
+    text name
+    enum kind "tower|phase|block|wing"
+    int floors
+    text rera_number "if phase-wise"
+    date possession_date
+  }
+  LOCATION {
+    uuid id PK
+    text address_line
+    uuid city_id FK
+    uuid locality_id FK
+    text state
+    text pincode
+    numeric lat
+    numeric lng
+    text google_maps_url
+    text plus_code
+    enum pin_source "url|plus_code|manual"
+  }
+  MEDIA {
+    uuid id PK
+    enum kind "image|video|document"
+    text cloudinary_public_id
+    text format
+    bigint bytes
+    int width
+    int height
+    text title
+    text alt_text
+  }
+  MEDIA_LINK {
+    uuid id PK
+    uuid media_id FK
+    uuid project_id FK "exactly one owner FK set"
+    uuid configuration_id FK
+    uuid construction_update_id FK
+    uuid post_id FK
+    uuid page_id FK
+    enum role "gallery|floor_plan|brochure|rera_qr|video|document|hero|og"
+    int sort_order
+    bool is_cover
+    bool is_visible
+  }
+  CONSTRUCTION_UPDATE {
+    uuid id PK
+    uuid project_id FK
+    uuid tower_id FK
+    date update_date
+    int progress_percent
+    text title
+  }

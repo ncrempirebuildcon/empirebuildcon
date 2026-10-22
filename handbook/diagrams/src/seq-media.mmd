@@ -1,0 +1,24 @@
+sequenceDiagram
+  autonumber
+  actor E as Staff (CMS)
+  participant N as Next.js (CMS)
+  participant A as FastAPI
+  participant C as Cloudinary
+  participant DB as PostgreSQL
+  Note over E,DB: Photos go through the API
+  E->>N: Drop photos
+  N->>N: Resize in browser (long edge 2560 px)
+  N->>A: POST /admin/media/images (multipart)
+  A->>A: Magic-byte type check, size limit
+  A->>C: Upload (server-side, signed)
+  A->>DB: media + media_link (order, cover, visible) + outbox(media.added)
+  A-->>N: 201 media
+  Note over E,DB: Video and documents go direct to Cloudinary
+  E->>N: Drop video / PDF / DOCX / PPTX
+  N->>A: POST /admin/media/upload-signature (kind, name, size)
+  A-->>N: signature, timestamp, folder, public_id
+  N->>C: Direct upload with signature
+  C-->>N: Upload reply (includes Cloudinary signature)
+  N->>A: POST /admin/media/confirm (reply)
+  A->>A: Verify reply signature, re-check type and size via Admin API
+  A->>DB: media + media_link + outbox(media.added)

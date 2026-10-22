@@ -1,0 +1,27 @@
+# Line endings: LF in the repo and on every OS (Windows contributors included).
+# WHY: mixed CRLF/LF causes whole-file diffs and breaks shell scripts in CI.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files: never touch line endings, never diff as text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.avif binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp4 binary
+
+# Lockfiles: keep them out of GitHub diff views (still versioned)
+pnpm-lock.yaml linguist-generated=true -diff
+uv.lock linguist-generated=true -diff

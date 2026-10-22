@@ -1,0 +1,42 @@
+# Owner's private notes stay on the owner's computer only (D-003, D-025).
+# Developer docs live in handbook/ and ARE committed.
+docs/
+
+# Environment and secrets — only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# QA output
+qa/**/test-results/
+qa/**/playwright-report/
+.lighthouseci/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log

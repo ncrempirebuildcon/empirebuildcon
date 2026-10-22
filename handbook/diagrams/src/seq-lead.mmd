@@ -1,0 +1,19 @@
+sequenceDiagram
+  autonumber
+  actor V as Visitor
+  participant N as Next.js (site)
+  participant A as FastAPI
+  participant DB as PostgreSQL
+  participant W as Worker
+  participant S as Sales (email / WhatsApp)
+  V->>N: Fill enquiry form, tick consent
+  N->>A: POST /api/v1/public/leads (proxied, UTM + click IDs)
+  A->>DB: rate-limit bucket (IP + phone)
+  A->>A: honeypot check, validate, normalise phone to +91
+  A->>DB: one transaction: lead + consent snapshot + activity + assignment + outbox(lead.created)
+  A-->>N: 201 {reference}
+  N-->>V: Thank-you state
+  W->>DB: claim pending outbox events (SKIP LOCKED)
+  W->>S: new-lead alert to assigned person / sales inbox
+  W->>W: CRM webhooks, ad conversions (only with consent)
+  W->>DB: mark event done, or retry with backoff

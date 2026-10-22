@@ -1,0 +1,95 @@
+erDiagram
+  PROJECT ||--o{ LEAD : "enquiries (optional)"
+  UNIT_CONFIGURATION |o--o{ LEAD : "optional"
+  LEAD ||--|| LEAD_CONSENT : "consent record"
+  CONSENT_TEXT ||--o{ LEAD_CONSENT : "version shown"
+  LEAD ||--o{ LEAD_NOTE : notes
+  LEAD ||--o{ LEAD_ACTIVITY : timeline
+  LEAD ||--o{ SITE_VISIT : visits
+  PROJECT ||--o{ SITE_VISIT : at
+  USER |o--o{ LEAD : "assigned to"
+  USER |o--o{ SITE_VISIT : "handled by"
+  USER ||--o{ LEAD_NOTE : writes
+  ROLE ||--o{ USER : grants
+  USER ||--o{ SESSION : "signed-in sessions"
+  USER |o--o{ AUDIT_LOG : "actor"
+  LEAD ||--o{ NOTIFICATION : "alerts sent"
+
+  LEAD {
+    uuid id PK
+    timestamptz created_at
+    text name
+    text phone_e164 "normalised +91"
+    text email
+    text message
+    uuid project_id FK "null = general lead"
+    enum source "project_form|contact|brochure|site_visit|campaign|chat"
+    enum status "new|contacted|site_visit|negotiation|booked|lost"
+    uuid owner_user_id FK
+    timestamptz read_at
+    text page_url
+    text utm_source
+    text utm_medium
+    text utm_campaign
+    text utm_term
+    text utm_content
+    text gclid
+    text fbclid
+    text ip_hash
+    bool is_spam
+    bool is_test
+  }
+  LEAD_CONSENT {
+    uuid lead_id PK
+    uuid consent_text_id FK
+    int consent_version
+    timestamptz consented_at
+    text page_url
+    text checkbox_label "snapshot"
+  }
+  CONSENT_TEXT {
+    uuid id PK
+    enum kind "lead_form|cookies|brochure|chat"
+    int version
+    text body
+    timestamptz published_at
+  }
+  SITE_VISIT {
+    uuid id PK
+    uuid lead_id FK
+    uuid project_id FK
+    date preferred_date
+    enum preferred_slot "morning|afternoon|evening"
+    timestamptz confirmed_for
+    enum status "requested|confirmed|completed|no_show|cancelled"
+  }
+  USER {
+    uuid id PK
+    citext email UK
+    text name
+    text password_hash "argon2id"
+    uuid role_id FK
+    bool is_active
+    int failed_logins
+    timestamptz locked_until
+  }
+  ROLE {
+    uuid id PK
+    text key UK "super_admin|admin|sales|marketing|content_editor"
+    text_array permissions
+  }
+  SESSION {
+    uuid id PK
+    uuid user_id FK
+    timestamptz expires_at
+    timestamptz revoked_at
+  }
+  AUDIT_LOG {
+    bigint id PK
+    uuid actor_user_id FK
+    text action "project.published"
+    text entity_type
+    text entity_id
+    jsonb changes
+    timestamptz created_at
+  }

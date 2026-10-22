@@ -1,0 +1,117 @@
+erDiagram
+  PAGE ||--o{ BLOCK : "built from"
+  PAGE ||--o{ MEDIA_LINK : images
+  POST ||--o{ MEDIA_LINK : images
+  PROJECT |o--o{ OFFER : "optional"
+  PROJECT |o--o{ TESTIMONIAL : "optional"
+  OUTBOX_EVENT ||--o{ WEBHOOK_DELIVERY : "delivered as"
+  WEBHOOK_ENDPOINT ||--o{ WEBHOOK_DELIVERY : receives
+  CHAT_CONVERSATION ||--o{ CHAT_MESSAGE : contains
+  CHAT_CONVERSATION |o--o| LEAD : "may create"
+
+  PAGE {
+    uuid id PK
+    text slug UK
+    enum kind "standard|landing|legal|system"
+    enum publish_state "draft|published|archived"
+    timestamptz publish_at
+    timestamptz unpublish_at
+    bool show_in_nav
+    jsonb seo
+    jsonb translations
+  }
+  BLOCK {
+    uuid id PK
+    uuid page_id FK
+    text type "hero|rich_text|project_grid|lead_form|faq|cta|..."
+    jsonb data "validated per type"
+    int sort_order
+    bool is_visible
+  }
+  POST {
+    uuid id PK
+    text slug UK
+    text title
+    text body
+    timestamptz published_at
+  }
+  OFFER {
+    uuid id PK
+    text title
+    enum placement "banner|home|project"
+    timestamptz starts_at
+    timestamptz ends_at
+    bool is_active
+  }
+  TESTIMONIAL {
+    uuid id PK
+    text person_name
+    text quote
+    text source "required"
+    text source_url
+    date consent_date "required to publish"
+  }
+  FAQ {
+    uuid id PK
+    uuid project_id FK "null = site-wide"
+    text question
+    text answer
+  }
+  REDIRECT {
+    uuid id PK
+    text from_path UK
+    text to_path
+    int status_code "301|308"
+  }
+  SETTING {
+    text key PK "company, contacts, social, tracking, lead_routing"
+    jsonb value
+  }
+  FEATURE_FLAG {
+    text key PK
+    bool enabled
+  }
+  OUTBOX_EVENT {
+    bigint id PK
+    text event_type "lead.created ..."
+    text aggregate_id
+    jsonb payload
+    enum status "pending|processing|done|failed|dead"
+    int attempts
+    timestamptz available_at
+  }
+  WEBHOOK_ENDPOINT {
+    uuid id PK
+    text url
+    text_array event_types
+    text secret_encrypted
+    bool is_active
+  }
+  WEBHOOK_DELIVERY {
+    bigint id PK
+    int attempt
+    int status_code
+    text error
+  }
+  RATE_LIMIT_BUCKET {
+    text key PK "login:ip, lead:ip ..."
+    timestamptz window_start
+    int count
+  }
+  KNOWLEDGE_CHUNK {
+    uuid id PK
+    text source_type
+    text source_id
+    text content
+    vector embedding "Phase 7"
+  }
+  CHAT_CONVERSATION {
+    uuid id PK
+    timestamptz started_at
+    text page_url
+  }
+  CHAT_MESSAGE {
+    uuid id PK
+    enum role "user|assistant|tool"
+    text content
+  }
