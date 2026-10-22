@@ -131,6 +131,7 @@ Envelope: `{id, type, occurred_at, actor_id, aggregate: {type, id, slug}, data}`
 | `configuration.changed` | Any configuration edit on a published project | Revalidate project + properties |
 | `construction_update.published` | Update goes live | Revalidate project · webhooks |
 | `media.added` / `media.updated` / `media.removed` | Upload, reorder, cover, show/hide, delete | Revalidate the owner if published |
+| `media.upload_discarded` | A direct upload was refused or never confirmed | Destroy the file at the store (retried) |
 | `lead.created` | Lead saved | Email alert · WhatsApp alert (flag) · CRM webhooks · Meta Conversions API + Google Ads conversion (only with marketing consent and flag on) |
 | `lead.status_changed` / `lead.assigned` | Pipeline move / owner change | CRM webhooks · email to new owner |
 | `site_visit.requested` / `site_visit.updated` | Visit form / CMS change | Sales alert · webhooks |
@@ -193,12 +194,37 @@ Every create, update, delete, publish, export, login and permission change write
 
 ![Media upload](diagrams/seq-media.svg)
 
-- **Photos** go through the API: browser resizes (long edge 2560 px, JPEG/WebP), API checks magic bytes (JPEG, PNG, WebP, AVIF only; no SVG uploads) and size (≤ 10 MB), uploads to Cloudinary, saves the row.
-- **Videos and documents** (PDF, DOC/DOCX, PPT/PPTX) go **directly from the browser to Cloudinary** with a short-lived signature from the API; the API then verifies Cloudinary's signed reply and re-checks type and size through the Cloudinary Admin API before saving anything. Limits on the free plan: 10 MB images/raw files, 100 MB video (to re-verify when the account is created).
-- One drop zone sends each file to the right path by type.
-- Staff set the order; the first photo is the cover unless another is pinned. Each item can be shown or hidden on the website and renamed.
-- Delivery uses Cloudinary transformations (`f_auto,q_auto`, width steps) through `next/image` with a custom loader.
-- New Cloudinary accounts block PDF delivery until **Settings → Security → "Allow delivery of PDF and ZIP files"** is on (owner action).
+- **One storage interface, two stores (D-033).**
+  - `CloudinaryStore`, using the official SDK, is used in staging and production. Those environments refuse to start without `CLOUDINARY_URL`.
+  - `FakeStore` is for development, tests and the browser suite. It keeps files on disk and mimics Cloudinary's signed direct upload, so the whole flow runs offline. Its `/api/v1/dev-media/**` routes exist only when it is active.
+- **Photos go through the API.**
+  - The browser resizes and re-encodes them first: long edge 2560 px, WebP or else JPEG at about 0.85 quality. The RERA QR is kept as lossless PNG.
+  - The web proxy is allowed bodies of 10 MB + 64 KB (`experimental.proxyClientMaxBodySize` in `apps/web/next.config.ts`). Next.js would otherwise cut larger bodies off silently, instead of the API answering 413.
+  - The API checks magic bytes (JPEG, PNG, WebP or AVIF only; no SVG), size (≤ 10 MB) and pixels (≤ 25 MP).
+  - It strips EXIF/GPS and other metadata, uploads to the store under a generated public id `empire/<env>/<kind>/<uuid>`, and saves the row. The uploaded filename is never used.
+- **Videos and documents** (PDF, DOC/DOCX, PPT/PPTX) go **directly from the browser to Cloudinary**:
+  1. The API creates an `upload_intent` and signs the upload for that one public id. The intent is valid for 60 minutes, belongs to the user and can be used once. `overwrite=false` is signed too.
+  2. The browser uploads and sends Cloudinary's reply to `confirm`.
+  3. The API checks the reply signature, matches the intent, re-reads the asset from the Admin API (type, bytes) and only then saves it.
+  - Anything refused or never confirmed is destroyed through the outbox.
+  - Free-plan limits (checked 23 Oct 2026): 10 MB images and raw files, 100 MB video, 25 MP. Only 40 MB of video can be transformed on the fly, so the video poster is made eagerly at upload.
+- **What files can be attached to.** A `media_link` attaches library items to one owner: a project, configuration or construction update (pages and posts come in part 4).
+  - **Project roles:** `gallery`, `video`, `document`, `brochure` (PDF) and `rera_qr`. `hero` and `og_image` are reserved: the share image is `seo.og_image_id`, and the hero waits for Phase 5.
+  - **Configuration role:** `floor_plan` (image or PDF).
+  - **Construction update role:** `gallery` (progress photos).
+  - Single-valued roles (brochure, RERA QR, floor plan) replace the previous item.
+- **Order, cover and visibility.**
+  - Staff set the order. The first *visible* photo is the cover unless another is pinned.
+  - Each item can be shown or hidden on the website and renamed.
+  - Photos carry an honest label: artist's impression, actual photo, or progress photo with its month. Gallery and hero photos can't be shown on the website without one.
+  - A library item can't be deleted while it is attached or used as a share image.
+- **RERA QR.** The project's visible `rera_qr` image is what clears the publish blocker. It can't be hidden or removed while the project is live; replace it instead.
+- **One drop zone** in the CMS sends each file to the right uploader by type.
+- **Delivery** uses Cloudinary transformations (`f_auto,q_auto`, width steps). Every delivered image URL carries a transformation, which also strips metadata.
+  - PDFs are stored as images, so they open in the browser and get a page-1 thumbnail.
+  - Office files are stored as raw files and download.
+  - Public pages use `next/image` with a custom loader (Phase 5).
+- **Owner action:** new Cloudinary accounts block PDF delivery until **Settings → Security → "Allow delivery of PDF and ZIP files"** is on.
 
 ## 13. Maps
 

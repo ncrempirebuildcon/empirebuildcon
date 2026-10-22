@@ -41,7 +41,7 @@ Set by the web app (pages) and the API (JSON responses):
 | Header | Value |
 |---|---|
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` (add `preload` one month after go-live if nothing breaks) |
-| `Content-Security-Policy` | Nonce-based `script-src` for Next.js; `img-src 'self' res.cloudinary.com data: *.tile.openstreetmap.org`; `connect-src 'self'` plus analytics hosts only when consented tools are enabled; `frame-ancestors 'none'`; `form-action 'self'`; `object-src 'none'`; `base-uri 'self'`. Report-only for one week on staging first. |
+| `Content-Security-Policy` | Nonce-based `script-src` for Next.js; `img-src 'self' res.cloudinary.com data: *.tile.openstreetmap.org`; `connect-src 'self' https://api.cloudinary.com` (the CMS uploads videos and documents straight to Cloudinary; add `api-eu`/`api-ap` only if the account lives there) plus analytics hosts only when consented tools are enabled; `frame-ancestors 'none'`; `form-action 'self'`; `object-src 'none'`; `base-uri 'self'`. Report-only for one week on staging first. |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | camera, microphone, geolocation, payment all `()` |
@@ -65,10 +65,30 @@ Tested by a Playwright check and a header assertion in API tests.
 
 ## 6. Uploads
 
-- Photos: magic-byte check (JPEG, PNG, WebP, AVIF), ≤ 10 MB, filename discarded (Cloudinary public id is generated), EXIF GPS stripped by Cloudinary transformation on delivery.
-- SVG uploads are refused (script risk). The logo kit SVGs ship in the code, not through uploads.
-- Video/documents: signature valid 10 minutes, scoped to one `public_id` and folder; the API verifies Cloudinary's reply signature and re-reads the asset (type, bytes) from the Admin API before saving. Allowed: MP4, MOV, WebM; PDF, DOC, DOCX, PPT, PPTX.
-- Documents are delivered with `Content-Disposition: attachment` except PDFs, which open in a new tab.
+- **Photos:**
+  - Magic-byte check: JPEG, PNG, WebP and AVIF only. SVG, HEIC, GIF and anything else get 415.
+  - Size: at most 10 MB, counted while streaming, not just from Content-Length.
+  - Pixels: at most 25 MP. The image is decoded with Pillow.
+  - The filename is discarded; the public id is generated.
+  - EXIF, GPS, XMP, IPTC and comments are stripped on the server before upload, so the stored original carries no location data (D-033, `media/scrub.py`).
+    - A photo with no metadata passes through byte for byte.
+    - Otherwise the orientation is applied and the file is re-encoded in the same format. The ICC colour profile is kept, because it describes colours, not people.
+  - Animated images are refused.
+  - Data appended after the image's real end is cut off.
+- **Videos:** container metadata (phones can record GPS) isn't stripped yet. This is checked on staging in Phase 9 (D-033).
+- **SVG uploads are refused** (script risk). The logo kit SVGs ship in the code, not through uploads.
+- **Videos and documents:**
+  - Allowed types: MP4, MOV and WebM; PDF, DOC, DOCX, PPT and PPTX.
+  - The upload signature is scoped to one public id and folder, and signs `overwrite=false`.
+  - The API's `upload_intent` limits it to 60 minutes (Cloudinary's own signature lifetime), the requesting user and one use.
+  - Refused, expired and never-confirmed uploads are destroyed under every resource type, and again after the hour has passed, so nothing is left behind at the store.
+  - The reply signature covers only `public_id` and `version`. That is why the API also re-reads the asset from the Admin API (type, bytes, format) before saving, and destroys it if anything is off.
+- **Delivery:**
+  - PDFs open in the browser.
+  - Office files download.
+  - Cloudinary strips metadata from transformed images, and every image URL we build carries a transformation.
+- **Rate limit:** uploads and signatures share one budget of 120 per 10 minutes per user.
+- **Fake store:** only `FakeStore` serves `/api/v1/dev-media/**`. Staging and production refuse to start with it.
 
 ## 7. Secrets
 
