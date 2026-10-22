@@ -13,17 +13,20 @@ Applies from Phase 3. Each item lists where it is enforced and how it is tested.
 | Session | Signed JWT (HS256, `SESSION_SECRET` ≥ 32 random bytes) carrying `sub` (user id), `sid` (session id), `iat`, `exp`. The `session` table is checked on every request, so logout, password change and "sign out everywhere" take effect at once. | API tests: revoked session → 401 |
 | Cookie | `__Host-empire_session`; `HttpOnly; Secure; SameSite=Lax; Path=/`; no `Domain`. Nothing in localStorage or sessionStorage. | Playwright checks cookie flags |
 | Lifetime | 8 hours idle, 7 days absolute; rotated (new `sid`) at login and on privilege change. | API tests |
-| Lockout | 5 failed logins on an account → locked 15 minutes (counter in PostgreSQL). Super-admin can unlock. Same error message for unknown email and wrong password. | API tests |
+| Lockout | Every sign-in attempt is counted per **account and network (IP)** before the password is checked; the 6th attempt in a 15-minute window gets 429 until the window ends. A stranger can't lock the owner out from another network, parallel requests can't get past 5 guesses, and unknown emails behave exactly like real ones (same 401, same 429). Super-admin unlock clears every network's counter. Same error message for unknown email and wrong password. (D-027) | API tests incl. parallel guesses |
 | Rate limits | Login: 10 per 15 min per IP; password-reset requests: 3 per hour per email and 10 per hour per IP. Counters in PostgreSQL (`rate_limit_bucket`), shared by every API instance. | API tests incl. two app instances |
-| Password reset | Single-use random token (32 bytes), stored hashed, valid 30 minutes; reset revokes all sessions. | API tests |
+| Client IP and edge key | Only our web proxy may call the API: it adds `X-Empire-Edge-Key` (`EDGE_PROXY_KEY`, required in staging and production) and the visitor's IP as seen by the host in `X-Empire-Client-IP`, after removing any `X-Empire-*` header the visitor sent. The API refuses calls without the key (403), except health checks and the scheduler's internal calls, and never reads `X-Forwarded-For`. `/api/v1/internal/*` is not reachable through the website. (D-027) | API tests, Playwright |
+| Password reset | Single-use random token (32 bytes), stored hashed, valid 30 minutes, claimed with one conditional update so two requests can't both use it; a reset or password change burns every other open link and revokes all sessions. | API tests |
 | Super-admin bootstrap | First super-admin is created by a one-time CLI command (`empire-api create-superadmin --email admin@empirebuildcon.com`) that prints a one-time setup link, never a password. No default credentials exist. | Manual check at deploy |
-| Two-factor | TOTP for super-admin and admin accounts, behind flag `admin_2fa` (built in Phase 4, switched on before go-live if the owner agrees). | API tests |
+| Two-factor | TOTP for super-admin and admin accounts, behind flag `admin_2fa` (built in Phase 4, switched on before go-live if the owner agrees). Only a super-admin can switch this flag. | API tests |
 
 ## 2. Authorisation
 
 - Every staff route declares its permission (`x-permission` in the OpenAPI spec). A test walks all routes and fails if one has no permission or public marker.
 - Object-level checks: sales users without `leads.read_all` only see their own leads, in lists, detail, exports and reports.
 - The CMS hides controls a role cannot use, but the API is the only gate.
+- A route's permission marker and its check come from one helper (`staff()`), so a route can't advertise a permission it doesn't enforce.
+- There is always at least one active super-admin who can sign in; demoting or deactivating the last one is refused (rows locked against races).
 
 ## 3. CSRF and CORS
 
@@ -51,7 +54,7 @@ Tested by a Playwright check and a header assertion in API tests.
 
 - Pydantic models with strict types and length limits on every request body; unknown fields rejected on staff routes.
 - SQL only through SQLAlchemy with bound parameters; no string-built SQL.
-- Formatted text is parsed by our own renderer into React elements; `dangerouslySetInnerHTML` is banned by lint rule except for JSON-LD, which is serialised with escaping.
+- Formatted text is parsed by our own renderer into React elements; `dangerouslySetInnerHTML` is banned by lint rules (on DOM elements, components and `createElement`) in the web app and the UI package, except for JSON-LD, which is serialised with escaping.
 - Slugs, redirects: `to_path` must be a site path or an allow-listed host; no open redirects.
 - **SSRF:** the maps resolver only follows `maps.app.goo.gl`, `goo.gl/maps` and `*.google.com` and stops after 3 hops, 5 s timeout. Webhook URLs must be `https://`, and are refused if they resolve to private, loopback or link-local addresses (checked at save and at each delivery).
 
@@ -89,7 +92,8 @@ India's Digital Personal Data Protection Act applies to lead data. The design su
 - Access limited by role; CSV export only for admin and super-admin, and every export is audited.
 - Erasure on request: `leads.erase` replaces personal fields with a stub and keeps the audit trail.
 - Retention: leads inactive for 3 years are anonymised by the daily clean-up job (default; owner can change in Settings).
-- Logs mask phone numbers and never contain form bodies.
+- Logs and audit diffs mask phone numbers and never contain form bodies.
+- Error reports (Sentry) never include local variables, request bodies or cookies, so a crash during sign-in can't send a password; password fields are hidden from `repr`.
 
 ## 9. Dependencies and code
 

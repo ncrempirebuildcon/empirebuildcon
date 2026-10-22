@@ -13,7 +13,8 @@ This file is for AI assistants (Claude Code and others) working in this reposito
 - **Secrets:** never print, store, commit or ask for passwords, API keys, tokens or connection strings. Only `.env.example` with names is committed. If a secret appears, don't repeat it; tell the owner to rotate it.
 - **Git:**
   - Never push to `main`, never merge your own pull request, and never force-push a branch you did not create.
-  - Until the owner allows otherwise, commit on a branch and ask the owner to push.
+  - Claude has no GitHub access (owner's decision, 22 Oct 2026, D-029). Claude commits on its own feature branch in the owner's working copy. The owner pushes it, opens the pull request and merges.
+  - Other AI assistants work the same way, unless the owner gives them their own access.
 - **Accounts:** never sign in, type passwords or accept terms for the owner. Ask them to do it.
 - **Tagged code:** code marked `DO NOT CHANGE:` or `COMPLIANCE:` changes only with the owner's approval. Explain the change and the risk in the pull request.
 - **Honest content:**

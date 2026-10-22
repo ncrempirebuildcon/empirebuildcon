@@ -19,8 +19,8 @@ Diagram sources are in `diagrams/src/*.mmd` (Mermaid); the `.svg` files next to 
 empire/                      (repo root = A:\Adarsh\Empire_RealEstate)
 ├─ apps/
 │  ├─ web/        Next.js (App Router, TypeScript, Tailwind) — public site + CMS UI
-│  ├─ api/        FastAPI — /api/v1, SQLAlchemy 2, Alembic migrations
-│  └─ worker/     Background jobs (same Python package as api, separate entry point)
+│  └─ api/        FastAPI — /api/v1, SQLAlchemy 2, Alembic migrations; the background worker is the
+│                 `empire-worker` entry point of the same package (D-010, D-026)
 ├─ packages/
 │  ├─ ui/         Design system components built from brand/tokens (Phase 3; spec in handbook/DESIGN_SYSTEM.md)
 │  └─ api-client/ Typed TypeScript client generated from the API's OpenAPI spec
@@ -40,7 +40,7 @@ One PostgreSQL database. Each API module owns its tables, schemas, routes and ev
 
 1. Visitor opens `empirebuildcon.com` (DNS at Cloudflare). `www`, `empirebuildcon.in`, `empirebuildcon.co.in` and their `www` forms answer **308 → same path on `https://empirebuildcon.com`**, query string kept (D-008).
 2. The web app serves pages. Public pages are pre-rendered and cached (§5).
-3. The browser only ever calls **`/api/*` on the same site**. Next.js rewrites those calls to the API host. The browser never talks to the API host directly, so there is no CORS in production and the session cookie is first-party.
+3. The browser only ever calls **`/api/*` on the same site**. Next.js rewrites those calls to the API host. The browser never talks to the API host directly, so there is no CORS in production and the session cookie is first-party. The web app's proxy (`apps/web/src/proxy.ts`) adds a shared edge key and the visitor's IP; the API refuses calls without the key, so its host can't be used directly (D-027).
 4. **No redirects on the API, ever.** FastAPI runs with `redirect_slashes=False` and a small ASGI middleware that strips a trailing slash before routing, so `/api/v1/admin/projects` and `/api/v1/admin/projects/` hit the same handler. Next.js sets `skipTrailingSlashRedirect: true` so the web host does not add its own 307/308 to `/api/*`. (This is the Current Investor production bug, fixed by design.) A CI test calls every route both ways and fails on any 3xx.
 5. Server-side fetches from the web app to the API use a **3-second timeout**. On timeout the page renders its cached/static data and the client refetches (the API host can be slow to wake on free hosting).
 
@@ -54,11 +54,11 @@ One PostgreSQL database. Each API module owns its tables, schemas, routes and ev
 | `leads` | Lead, LeadConsent, LeadNote, LeadActivity, SiteVisit, Notification | `/public/leads`, `/public/site-visits`, `/public/brochure-requests`, `/admin/leads/**`, `/admin/site-visits/**`, `/admin/reports/utm` | `lead.*`, `site_visit.*` |
 | `content` | Page, Block, Post, Faq, Offer, Testimonial, ConsentText | `/public/pages`, `/public/posts`, `/public/faqs`, `/public/testimonials`, `/admin/pages/**` … | `page.*`, `post.*`, `faq.changed`, `offer.*`, `testimonial.changed`, `consent_text.published` |
 | `seo` | Redirect; `seo` JSON on content rows; sitemap feed | `/public/redirects`, `/public/sitemap`, `/admin/redirects` | `redirect.changed` |
-| `users` | User, Role, Session, PasswordResetToken, AuditLog | `/auth/**`, `/admin/users/**`, `/admin/roles`, `/admin/audit-log` | `user.*` |
+| `users` | User, Session, PasswordResetToken (roles are a code matrix, §11) | `/auth/**`, `/admin/users/**`, `/admin/roles`, `/admin/audit-log` | `user.*` |
 | `settings` | Setting, FeatureFlag | `/public/site`, `/admin/settings/**`, `/admin/flags/**` | `settings.updated`, `flag.changed` |
-| `integrations` | OutboxEvent, WebhookEndpoint, WebhookDelivery, integration config | `/admin/integrations/**`, `/admin/webhooks/**`, `/internal/outbox/drain` | — (delivers events) |
+| `integrations` | WebhookEndpoint, WebhookDelivery, integration config; outbox handlers and the drain | `/admin/integrations/**`, `/admin/webhooks/**`, `/internal/outbox/drain` | — (delivers events) |
 | `ai` | KnowledgeChunk (pgvector), ChatConversation, ChatMessage | `/ai/chat` (**flag `chat_widget` off**) | — |
-| `platform` (shared) | RateLimitBucket, outbox writer, audit writer, i18n helpers | `/api/health` | — |
+| `platform` (shared) | RateLimitBucket, AuditLog, OutboxEvent (tables and writers), crypto helpers, i18n helpers | `/api/health` | — |
 
 Full list: [api/ENDPOINTS.md](api/ENDPOINTS.md) (159 operations).
 
@@ -208,7 +208,7 @@ Every create, update, delete, publish, export, login and permission change write
 ## 14. Search
 
 - PostgreSQL full-text search (generated `tsvector` over name, locality, city, tagline) plus `pg_trgm` for typos, and structured filters (status, city, locality, type, BHK, budget). Filters live in the URL.
-- The `vector` extension (pgvector) is enabled from the first migration so Phase 7 needs no database change (D-013).
+- The `vector` extension (pgvector) is enabled by the first migration wherever the server has it (Neon, CI and the Docker image do), so Phase 7 needs no database change (D-013). A bare local PostgreSQL without pgvector still works until Phase 7 (D-026).
 
 ## 15. Languages
 
@@ -239,7 +239,7 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 
 | Environment | Purpose | Where |
 |---|---|---|
-| Local / Claude's workspace | Development and tests | Cloud workspace with PostgreSQL; `docker-compose.yml` provided for any future developer (D-019) |
+| Local / Claude's workspace | Development and tests | Any machine with PostgreSQL, or `docker compose up -d db` (PostgreSQL 18 + pgvector); see [SETUP.md](SETUP.md) (D-019, D-026) |
 | Staging | Owner review at milestones and gates | Netlify (web) + Cloud Run (API) + Neon branch `staging` |
 | Production | Live site | Same providers, separate Neon branch/project and Cloud Run service; free first, step-ups listed in D-007 |
 

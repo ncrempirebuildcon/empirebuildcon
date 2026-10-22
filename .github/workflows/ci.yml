@@ -1,0 +1,196 @@
+# CI for every push and pull request (handbook/CONTRIBUTING.md §6–§7, SECURITY.md §7 and §9).
+#
+# Jobs:
+#   secrets   gitleaks secret scan — blocks the build on any hit
+#   api       ruff, mypy, migrations from empty on PostgreSQL 18 + pgvector, pytest, pip-audit
+#   web       prettier, eslint, tsc, unit tests, production build, pnpm audit
+#   contract  the committed OpenAPI file and generated TS client match the API code (D-020)
+#   e2e       Playwright smoke, login journey and axe accessibility checks against the built app
+#   lighthouse  mobile Lighthouse on main only (scores ≥ 0.9; see qa/README.md for the noindex exception)
+#
+# DO NOT CHANGE: the PostgreSQL major version must match production (Neon, PostgreSQL 18; D-006/D-007).
+# WHY: astral-sh/setup-uv publishes only full version tags (there is no moving `v10` tag), so it is
+# pinned to a release commit with the version in a comment. Dependabot keeps the pin up to date (D-030).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24"
+  UV_VERSION: "0.13.5"
+  PYTHON_VERSION: "3.14"
+  # Throwaway values for CI only — not secrets, never used outside this workflow.
+  APP_ENV: test
+  SITE_URL: http://localhost:3000
+  DATABASE_URL: postgresql+psycopg://empire:empire@localhost:5432/empire_test
+  SESSION_SECRET: ci-only-session-secret-0123456789abcdef0123456789
+  DATA_ENCRYPTION_KEY: Y2ktb25seS1mZXJuZXQta2V5LTAxMjM0NTY3ODlhYmM=
+  INTERNAL_API_KEY: ci-only-internal-key-0123456789
+  IP_HASH_SALT: ci-only-ip-salt-0123456789
+  REVALIDATE_SECRET: ci-only-revalidate-secret
+  API_ORIGIN: http://localhost:8000
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    # WHY: on pull requests the action lists the PR's commits through the API, which needs
+    # pull-requests: read (the first CI run failed with 403 "Resource not accessible by integration").
+    # Comments stay off, so the token never needs write access.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          # Pinned: the action's built-in default (8.24.3) is older than the version used for local scans.
+          GITLEAKS_VERSION: "8.28.0"
+
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: empire
+          POSTGRES_PASSWORD: empire
+          POSTGRES_DB: empire_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U empire -d empire_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+      - run: uv run mypy src
+      - name: Migrations from an empty database
+        run: uv run alembic upgrade head
+      - name: Downgrade and upgrade again (every migration must be reversible)
+        run: uv run alembic downgrade base && uv run alembic upgrade head
+      - run: uv run pytest -q
+        env:
+          TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
+      - name: Dependency audit
+        # WHY: audit the exported lockfile, not the environment — the local empire-api package
+        # isn't on PyPI, and --strict would fail on it.
+        run: |
+          uv export --frozen --no-emit-project --all-groups -o "$RUNNER_TEMP/requirements.txt"
+          uv run pip-audit -r "$RUNNER_TEMP/requirements.txt" --disable-pip --strict
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm -r lint
+      - run: pnpm -r typecheck
+      - run: pnpm --filter @empire/ui test
+      - run: pnpm --filter @empire/web build
+      - name: Dependency audit (production dependencies)
+        run: pnpm audit --prod --audit-level high
+
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: uv --directory apps/api sync --locked
+      - name: Regenerate the OpenAPI file and the typed client
+        run: pnpm api:openapi && pnpm api:client
+      - name: Fail if anything changed (commit the regenerated files)
+        run: git diff --exit-code -- packages/api-client
+
+  e2e:
+    needs: [api, web]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: empire
+          POSTGRES_PASSWORD: empire
+          POSTGRES_DB: empire_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U empire -d empire_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: uv --directory apps/api sync --locked
+      - run: uv --directory apps/api run alembic upgrade head
+      - run: uv --directory apps/api run empire-api seed
+      - run: pnpm --filter @empire/web build
+      - run: pnpm --filter @empire/qa exec playwright install --with-deps chromium
+      - run: pnpm e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: qa/playwright-report
+          retention-days: 7
+
+  lighthouse:
+    if: github.ref == 'refs/heads/main'
+    needs: [web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @empire/web build
+      - run: pnpm --filter @empire/qa exec lhci autorun --config=lighthouserc.json

@@ -141,12 +141,13 @@ The owner decides at the Phase 9 gate. Claude's view: at minimum, budget the Net
 **Consequences:** The owner creates accounts at Netlify, Google Cloud (with billing), Neon, Cloudinary, Resend, Sentry and Cloudflare; the app code stays portable (a plain container and a plain Next.js app), so moving to Vercel Pro or Render later is configuration, not a rewrite.
 **Verified / assumed:** Provider pricing, limits and terms pages read 18 Oct 2026 (sources listed in the Phase 1 report). Assumed: GitHub free Actions minutes cover the backup job; small Google Cloud egress/storage charges are possible.
 
-## D-008 · Domains: apex canonical, DNS on Cloudflare (Accepted, 2026-10-18)
+## D-008 · Domains: apex canonical, DNS on Cloudflare (Accepted, 2026-10-18; status updated 2026-10-22)
 
 **Context:** Owner accepted apex (may change later). Checked 18 Oct: `empirebuildcon.com` is registered at BigRock (created 23 Sep 2026, expires 23 Sep 2029) with Cloudflare nameservers (`kanye`, `susan`), but Cloudflare refuses queries for it (lame delegation), so `.com` does not resolve anywhere yet. `.in` and `.co.in` are delegated to BigRock nameservers and are present in the `.in` registry (a domain on serverHold drops out of it).
 **Decision:** `https://empirebuildcon.com` is canonical. All three domains use **Cloudflare DNS (free)**. `www.empirebuildcon.com`, both `.in` forms and both `.co.in` forms send **308 to the same path and query on `https://empirebuildcon.com`**, set up on the web host where it supports redirect domains, otherwise with Cloudflare redirect rules. Canonical tags, sitemap and Open Graph URLs always use `.com`. Changing to `www` later is one setting plus redirects.
 **Consequences:** Owner must activate the `.com` zone in Cloudflare (or fix the nameservers) and add `.in` / `.co.in` to Cloudflare. HTTPS must work on every variant; checked with `curl -I` in Phase 9.
 **Verified / assumed:** RDAP for `.com` (Verisign) and DNS lookups through Google Public DNS, 18 Oct 2026. The `.in` registry's RDAP refused automated reading, so registrar details for `.in`/`.co.in` come from their nameservers only.
+**Status 22 Oct 2026:** all three zones answer from Cloudflare (`.com` nameservers are now `keyla` and `amit`), the holding page is live on all three, and Cloudflare Email Routing MX records are in place for `.com`. Still to do by the owner: the 308 redirects for `.in`, `.co.in` and `www` (Cloudflare Bulk Redirects).
 
 ## D-009 · Authentication and sessions (Accepted, 2026-10-18)
 
@@ -200,7 +201,7 @@ The owner decides at the Phase 9 gate. Claude's view: at minimum, budget the Net
 **Context:** Owner accepted the default page set but wants to remove or change pages later.
 **Decision:** Blog/news, NRI, channel-partner enquiry and careers are CMS pages (and the blog a CMS section) that staff can edit, unpublish or remove from the menu. Unpublished pages return 404 and drop out of the sitemap.
 
-## D-019 · How development happens (Accepted, 2026-10-18)
+## D-019 · How development happens (Accepted, 2026-10-18; superseded in part by D-026)
 
 **Context:** The code lives in `A:\Adarsh\Empire_RealEstate` on the owner's computer. Claude works from a cloud workspace and can reach that folder through the desktop app link (a Linux shell with git 2.34, Node 22, Python 3.10; no Docker).
 **Decision:** Claude builds and tests in the cloud workspace (full toolchain, PostgreSQL), then writes the files into the owner's folder and makes the git commit there. The owner pushes to GitHub. A `docker-compose.yml` for PostgreSQL is still provided for any future developer. Git in the owner's folder needs permission to delete its own lock files, so Claude will ask for delete permission on that folder at the start of Phase 3.
@@ -243,3 +244,76 @@ The owner decides at the Phase 9 gate. Claude's view: at minimum, budget the Net
 **Git workflow:** `main` is protected and always deployable; all work happens on short-lived branches and reaches `main` only through a reviewed pull request with green CI (squash merge). Details in `handbook/CONTRIBUTING.md`. Claude follows the same rules; until the owner says otherwise, Claude commits on a branch and the owner pushes (brief §10), and Claude never pushes to `main` or merges its own pull request.
 **Consequences:** Every change that alters behaviour updates the matching handbook page in the same pull request. Complex code carries the comment tags from `handbook/CODE_STYLE.md` (`WHY`, `INVARIANT`, `DO NOT CHANGE`, `COMPLIANCE`, `SECURITY`), so a newcomer knows what must not be changed and why. The repository must stay private, since the handbook names the owner's accounts and business rules.
 
+## D-026 · Phase 3 working setup: GitHub is the source of truth, Claude pushes its own branches (Accepted, 2026-10-22; who pushes superseded by D-029)
+
+**Context:** The owner approved the designs and the gold logo (Phase 2 gate, 22 Oct 2026), created the GitHub, Netlify, Google Cloud, Neon and Sentry accounts, and allowed Claude to push its own branches and open pull requests. D-019 had Claude committing inside the owner's folder with the owner pushing.
+**Decision:**
+- The private GitHub repository is the source of truth. Claude works in a clone in its cloud workspace, pushes feature branches and opens pull requests; the owner (or a reviewer) merges. `main` is protected (PR, one approval, green CI, no force pushes).
+- One-time exception: the first commit (handbook and brand files only, no code) was pushed to `main` so that pull requests have a base.
+- The owner's folder `A:\Adarsh\Empire_RealEstate` keeps `docs/` (private). The owner can clone the repo there with GitHub Desktop. Until then Claude also copies the files there as a backup.
+- The background worker is the `empire-worker` entry point of the API package, not a separate `apps/worker` folder; one codebase, two entry points (D-010).
+- pgvector is created by the first migration wherever the server has it (Neon, CI, the Docker image), so a bare local PostgreSQL still works until Phase 7.
+- Fonts are self-hosted from npm (`@fontsource`), so pages make no Google Fonts requests: simpler CSP and no visitor data sent to Google.
+- The nonce-based Content-Security-Policy arrives with the public pages in Phase 5; the other security headers ship in Phase 3.
+- Dependabot (built into GitHub) opens dependency updates instead of Renovate, so no extra app needs installing.
+**Verified / assumed:** Versions re-read from npm and PyPI on 22 Oct 2026. Changes since D-006: FastAPI 0.159.1, SQLAlchemy 2.1.6, Alembic 1.20.1, pydantic-settings 2.16.1, sentry-sdk 2.73.0, typescript-eslint 8.72.0 (still requires TypeScript < 6.1, so TypeScript stays 6.0.3), uv 0.13.5. GitHub Action majors read from their tags: checkout v7, setup-node v7, pnpm/action-setup v6, setup-uv v10, gitleaks-action v3, upload-artifact v7. The `pgvector/pgvector:pg18` image tag is listed in pgvector's README.
+
+## D-027 · Security review fixes before the first pull request (Accepted, 2026-10-22)
+
+**Context:** An independent review of the Phase 3 code (sessions, CSRF, brute force, permissions, tokens, errors, web) found issues that the tests didn't cover. None had reached any server.
+**Decision:**
+- **Edge key and client IP.** Only our web proxy may call the API. The proxy adds `X-Empire-Edge-Key` (`EDGE_PROXY_KEY`, required in staging and production) and `X-Empire-Client-IP` (taken from the host's header, `CLIENT_IP_SOURCE_HEADER`), after stripping any `X-Empire-*` header the visitor sent. The API refuses calls without the key (403), except health checks and internal scheduler calls, and never reads `X-Forwarded-For`. `/api/v1/internal/*` answers 404 on the website. This replaces the "trusted proxy hops" setting, which couldn't be right on Cloud Run.
+- **Lockout.** Every attempt is counted per account and network before the password is checked: no parallel guessing past 5, no locking the owner out from another network, and identical answers for unknown and real emails. `failed_login_count` is removed; `locked_until` stays only as a CMS note.
+- **Errors and reports.** Sentry runs with `include_local_variables=False` and password fields are hidden from `repr`. Unexpected errors are caught inside the middleware stack, so 500s keep the security headers, `no-store` and the request id.
+- **Accounts and permissions.** Reset links are claimed atomically, and every other open link is burned on reset or password change. The last *usable* super-admin can't be demoted or deactivated (rows locked). Phones are masked in audit diffs. `staff()` both marks and enforces a permission. Only a super-admin can switch `admin_2fa`. The raw-HTML lint ban now also covers components and the UI package.
+**Consequences:** The deploy (Phase 9) sets the same `EDGE_PROXY_KEY` on Netlify and Cloud Run and confirms the client-IP header on Netlify staging. The nonce-based CSP stays in Phase 5 (D-026).
+
+
+## D-028 · Protecting `main` depends on the GitHub plan (Accepted, 2026-10-22)
+
+**Context:** D-026 assumes a protected `main` (PR, one approval, green CI, no force pushes). The repository is private, and the owner's GitHub account is on the free plan.
+**Options:**
+1. Stay on GitHub Free and follow the rules by hand. Costs nothing, but GitHub doesn't stop a direct push to `main`.
+2. GitHub Pro on the owner's personal account. Protection is enforced on private repos.
+3. A GitHub organisation on GitHub Team. Protection is enforced, and seats suit more developers later.
+4. Make the repo public. Protection is free, but the code becomes public. Not wanted.
+**Decision:** The owner chose option 1 on 22 Oct 2026; a paid plan needs management approval. Stay on Free until a second developer joins or the Phase 9 go-live gate, whichever comes first; then the owner picks 2 or 3. Claude doesn't push to `main` either way (D-026), so the risk until then is mostly human error. The settings to apply are listed in CONTRIBUTING §12.
+**Consequences:** Until the upgrade, the owner checks that CI is green before merging. The CI workflow already runs on every pull request.
+**Verified / assumed:**
+- Checked 22 Oct 2026 in GitHub Docs ("About protected branches", "GitHub's plans") and on github.com/pricing:
+  - Protected branches on private repos need Pro, Team or Enterprise.
+  - The Free plan lists repository rules for public repos only.
+  - Free includes 2,000 Actions minutes a month; Pro and Team include 3,000.
+  - Team costs $4 USD per user per month for the first 12 months.
+- The Pro price wasn't shown on the pages read.
+
+## D-029 · The owner pushes; Claude has no GitHub access (Accepted, 2026-10-22)
+
+**Context:** D-026 had Claude pushing its own branches through the GitHub account connected to Claude. The owner created the repository `ncrempirebuildcon/empirebuildcon` and decided not to give that account access.
+**Decision:**
+- This goes back to the D-019 flow:
+  - Claude builds and tests in its cloud workspace.
+  - Claude then commits on a feature branch in the owner's working copy, `A:\Adarsh\Empire_RealEstate`. That folder is now a git repository whose `origin` is the GitHub repository.
+  - The owner pushes with the Empire GitHub account, opens the pull request and merges.
+- The owner pushes the one-time bootstrap commit on `main` first, so GitHub makes `main` the default branch.
+- The rest of D-026 stands: the worker entry point, conditional pgvector, self-hosted fonts, the CSP in Phase 5, Dependabot and the versions.
+**Consequences:**
+- Claude can't see CI results or review comments on GitHub. When CI fails, the owner shares the failing job's log or a screenshot.
+- Pull request auto-fix isn't available.
+- Before new work, the owner fetches `origin`, so Claude starts from the latest `main`.
+
+## D-030 · Fixes after the first CI run on GitHub (Accepted, 2026-10-22)
+
+**Context:** The first run of the CI workflow on pull request #1 failed in two places:
+- The `api` and `contract` jobs failed with "Unable to resolve action `astral-sh/setup-uv@v10`, unable to find version `v10`". D-026 assumed a moving `v10` tag, but setup-uv publishes only full version tags.
+- The `secrets` job failed with 403 "Resource not accessible by integration". On pull requests, gitleaks-action reads the PR's commits through the API, which needs `pull-requests: read`.
+
+The `web` job passed.
+**Decision:**
+- setup-uv is pinned to the commit of release v10.3.2 (`07a047e…`), with the version in a comment. That release includes the checksums for uv 0.13.5. Dependabot updates the pin.
+- The `secrets` job gets `pull-requests: read`. PR comments are turned off, so the token stays read-only.
+- gitleaks is pinned to 8.28.0, the version used for the local scans. The action's own default is 8.24.3.
+**Verified / assumed:** Checked 22 Oct 2026:
+- The setup-uv releases page lists v10.3.2 (22 Oct) at commit `07a047e608db84b3d8c06cd9a7c7dcc9c355c18e`, "update known checksums for 0.13.5". Its README pins by SHA.
+- The 403 response named the needed permission (`x-accepted-github-permissions: pull_requests=read`).
+- gitleaks-action's README lists `GITLEAKS_ENABLE_COMMENTS` and `GITLEAKS_VERSION`.

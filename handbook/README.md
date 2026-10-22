@@ -12,6 +12,7 @@
   1. Show every project honestly: UP-RERA number and QR code, carpet area, prices and possession date.
   2. Capture leads with recorded consent.
   3. Let staff run content and leads without a developer.
+- **Code:** the private GitHub repository `ncrempirebuildcon/empirebuildcon`. Ask the owner for access.
 - **Stack:** Next.js (web and CMS UI), FastAPI (API and background worker), PostgreSQL and Cloudinary. Hosting starts on free tiers ([D-007](DECISIONS.md)). Versions are in [D-006](DECISIONS.md).
 
 ## Status
@@ -20,8 +21,8 @@
 |---|---|---|
 | 0 | Discovery, questions, tracker | Done |
 | 1 | Architecture, data model, API contract, security plan | Done |
-| 2 | Brand, design system, page and CMS templates | Templates done (Black & gold); waiting for owner approval |
-| 3 | Foundation: monorepo, CI, auth, roles, outbox | Next |
+| 2 | Brand, design system, page and CMS templates | Done; approved by the owner on 22 Oct 2026 |
+| 3 | Foundation: monorepo, CI, auth, roles, outbox | In progress |
 | 4–10 | CMS core, public site, marketing, AI layer, QA, go-live, handover | Planned |
 
 The owner keeps the live task list (a private tracker page). Ask the owner for access.
@@ -49,7 +50,12 @@ The owner keeps the live task list (a private tracker page). Ask the owner for a
 │  ├─ logo-draft/       Vector logo kit; *-noir.svg = metallic gold for dark backgrounds
 │  └─ tokens/           empire-noir.json + .css — the design tokens (source for packages/ui)
 ├─ holding-page/        Static "coming soon" page used to check the domain
-├─ apps/  packages/  qa/  .github/workflows/   ← created in Phase 3 (see ARCHITECTURE §2)
+├─ apps/api/            FastAPI API, worker and admin CLI (see its README)
+├─ apps/web/            Next.js website and CMS
+├─ packages/ui/         Shared UI components, theme from brand/tokens
+├─ packages/api-client/ Typed API client, generated from the API's OpenAPI
+├─ qa/                  Playwright journeys, axe and Lighthouse
+├─ .github/             CI workflow, Dependabot, pull request template
 └─ docs/                Owner's private notes (brief, handover with accounts, research) — git-ignored, never committed
 ```
 
@@ -81,7 +87,7 @@ These are the short versions. Details are in the linked pages.
    - Leads are never hard-deleted; erasure goes through `leads.erase` ([ARCHITECTURE.md](ARCHITECTURE.md) §8, [SECURITY.md](SECURITY.md)).
 4. **Permissions are checked in the API on every call.** Hiding a button in the UI is not security.
 5. **Accessibility is WCAG 2.1 AA.** That means real buttons and labels, a visible focus ring, 44 px touch targets and colour never used as the only signal.
-6. **`main` is protected.** Everything reaches it through a reviewed pull request with green CI ([CONTRIBUTING.md](CONTRIBUTING.md)).
+6. **`main` is protected.** Everything reaches it through a reviewed pull request with green CI ([CONTRIBUTING.md](CONTRIBUTING.md)). On a private repo with GitHub Free, GitHub can't enforce this, so follow it by hand (CONTRIBUTING §12, D-028).
 
 ## Glossary
 
