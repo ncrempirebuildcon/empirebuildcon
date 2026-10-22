@@ -139,9 +139,12 @@ Some files are generated, such as the typed API client from the OpenAPI spec ([D
 AI assistants follow every rule above, plus these:
 
 - Always pull the latest `main` before starting, and work on a branch.
-- **Pushing:** Claude pushes its **own** feature branches and opens PRs; the owner allowed this on 22 Oct 2026 (D-026). Other AI assistants ask the owner to push unless the owner allows them the same.
-  - Claude never pushes to `main`, never merges its own PR, and never force-pushes a branch it did not create.
-  - The only exception was the one-time bootstrap commit that created `main` (handbook and brand files, no code), so that pull requests have a base (D-026).
+- **Pushing:** Claude has no GitHub access (D-029).
+  - Claude builds and tests in its own workspace, then commits on a feature branch in the owner's working copy.
+  - The owner pushes the branch, opens the PR and merges.
+  - Other AI assistants work the same way, unless the owner gives them their own access.
+- **Before new work,** the owner fetches from GitHub (GitHub Desktop: **Fetch origin**), so Claude starts from the latest `main`.
+- Claude never commits on `main`. The only exception is the one-time bootstrap commit that created it (handbook and brand files, no code), so that pull requests have a base.
 - Never type, store or ask for passwords or tokens. The owner does account and sign-in steps.
 - Leave the handbook and the code comments good enough that the next person, human or AI, can continue without asking.
 
@@ -160,5 +163,6 @@ The owner sets these once, after the first push. They turn the rules above into 
 
 **GitHub plan (checked 22 Oct 2026, D-028):**
 - On **GitHub Free**, protected branches and rulesets work only on *public* repositories. On a *private* repository they need GitHub Pro (personal account) or GitHub Team (organisation).
-- Until the owner upgrades, nothing above is enforced. Everyone follows the rules by hand, and the owner checks that CI is green before merging.
+- The owner chose to stay on Free for now (22 Oct 2026). A paid plan needs management approval.
+- Until then, GitHub enforces none of the protection settings above. Everyone follows the rules by hand, and the owner checks that CI is green before merging. The merge settings (squash only, delete head branches) do work on Free.
 - GitHub Free includes 2,000 Actions minutes a month for private repositories. After the first few CI runs, check the real use under Settings → Billing and plans. Concurrent runs on the same branch cancel each other (`concurrency` in `ci.yml`), which saves minutes.

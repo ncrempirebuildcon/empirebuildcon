@@ -18,7 +18,7 @@ You don't need a cloud account to work locally. Shared services (Neon, Cloudinar
 ## First run
 
 ```bash
-git clone <repo URL from the owner> empire && cd empire
+git clone https://github.com/ncrempirebuildcon/empirebuildcon.git empire && cd empire   # private: ask the owner to add you
 
 # 1. Settings: copy the example, then replace every "change-me" with fresh values
 cp .env.example .env

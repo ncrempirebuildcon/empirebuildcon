@@ -12,6 +12,7 @@
   1. Show every project honestly: UP-RERA number and QR code, carpet area, prices and possession date.
   2. Capture leads with recorded consent.
   3. Let staff run content and leads without a developer.
+- **Code:** the private GitHub repository `ncrempirebuildcon/empirebuildcon`. Ask the owner for access.
 - **Stack:** Next.js (web and CMS UI), FastAPI (API and background worker), PostgreSQL and Cloudinary. Hosting starts on free tiers ([D-007](DECISIONS.md)). Versions are in [D-006](DECISIONS.md).
 
 ## Status
@@ -49,7 +50,12 @@ The owner keeps the live task list (a private tracker page). Ask the owner for a
 │  ├─ logo-draft/       Vector logo kit; *-noir.svg = metallic gold for dark backgrounds
 │  └─ tokens/           empire-noir.json + .css — the design tokens (source for packages/ui)
 ├─ holding-page/        Static "coming soon" page used to check the domain
-├─ apps/  packages/  qa/  .github/workflows/   ← created in Phase 3 (see ARCHITECTURE §2)
+├─ apps/api/            FastAPI API, worker and admin CLI (see its README)
+├─ apps/web/            Next.js website and CMS
+├─ packages/ui/         Shared UI components, theme from brand/tokens
+├─ packages/api-client/ Typed API client, generated from the API's OpenAPI
+├─ qa/                  Playwright journeys, axe and Lighthouse
+├─ .github/             CI workflow, Dependabot, pull request template
 └─ docs/                Owner's private notes (brief, handover with accounts, research) — git-ignored, never committed
 ```
 

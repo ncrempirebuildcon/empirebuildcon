@@ -244,7 +244,7 @@ The owner decides at the Phase 9 gate. Claude's view: at minimum, budget the Net
 **Git workflow:** `main` is protected and always deployable; all work happens on short-lived branches and reaches `main` only through a reviewed pull request with green CI (squash merge). Details in `handbook/CONTRIBUTING.md`. Claude follows the same rules; until the owner says otherwise, Claude commits on a branch and the owner pushes (brief §10), and Claude never pushes to `main` or merges its own pull request.
 **Consequences:** Every change that alters behaviour updates the matching handbook page in the same pull request. Complex code carries the comment tags from `handbook/CODE_STYLE.md` (`WHY`, `INVARIANT`, `DO NOT CHANGE`, `COMPLIANCE`, `SECURITY`), so a newcomer knows what must not be changed and why. The repository must stay private, since the handbook names the owner's accounts and business rules.
 
-## D-026 · Phase 3 working setup: GitHub is the source of truth, Claude pushes its own branches (Accepted, 2026-10-22)
+## D-026 · Phase 3 working setup: GitHub is the source of truth, Claude pushes its own branches (Accepted, 2026-10-22; who pushes superseded by D-029)
 
 **Context:** The owner approved the designs and the gold logo (Phase 2 gate, 22 Oct 2026), created the GitHub, Netlify, Google Cloud, Neon and Sentry accounts, and allowed Claude to push its own branches and open pull requests. D-019 had Claude committing inside the owner's folder with the owner pushing.
 **Decision:**
@@ -269,7 +269,7 @@ The owner decides at the Phase 9 gate. Claude's view: at minimum, budget the Net
 **Consequences:** The deploy (Phase 9) sets the same `EDGE_PROXY_KEY` on Netlify and Cloud Run and confirms the client-IP header on Netlify staging. The nonce-based CSP stays in Phase 5 (D-026).
 
 
-## D-028 · Protecting `main` depends on the GitHub plan (Proposed, 2026-10-22)
+## D-028 · Protecting `main` depends on the GitHub plan (Accepted, 2026-10-22)
 
 **Context:** D-026 assumes a protected `main` (PR, one approval, green CI, no force pushes). The repository is private, and the owner's GitHub account is on the free plan.
 **Options:**
@@ -277,7 +277,7 @@ The owner decides at the Phase 9 gate. Claude's view: at minimum, budget the Net
 2. GitHub Pro on the owner's personal account. Protection is enforced on private repos.
 3. A GitHub organisation on GitHub Team. Protection is enforced, and seats suit more developers later.
 4. Make the repo public. Protection is free, but the code becomes public. Not wanted.
-**Decision (proposed):** Option 1 until a second developer joins or the Phase 9 go-live gate, whichever comes first; then the owner picks 2 or 3. Claude doesn't push to `main` either way (D-026), so the risk until then is mostly human error. The settings to apply are listed in CONTRIBUTING §12.
+**Decision:** The owner chose option 1 on 22 Oct 2026; a paid plan needs management approval. Stay on Free until a second developer joins or the Phase 9 go-live gate, whichever comes first; then the owner picks 2 or 3. Claude doesn't push to `main` either way (D-026), so the risk until then is mostly human error. The settings to apply are listed in CONTRIBUTING §12.
 **Consequences:** Until the upgrade, the owner checks that CI is green before merging. The CI workflow already runs on every pull request.
 **Verified / assumed:**
 - Checked 22 Oct 2026 in GitHub Docs ("About protected branches", "GitHub's plans") and on github.com/pricing:
@@ -286,3 +286,18 @@ The owner decides at the Phase 9 gate. Claude's view: at minimum, budget the Net
   - Free includes 2,000 Actions minutes a month; Pro and Team include 3,000.
   - Team costs $4 USD per user per month for the first 12 months.
 - The Pro price wasn't shown on the pages read.
+
+## D-029 · The owner pushes; Claude has no GitHub access (Accepted, 2026-10-22)
+
+**Context:** D-026 had Claude pushing its own branches through the GitHub account connected to Claude. The owner created the repository `ncrempirebuildcon/empirebuildcon` and decided not to give that account access.
+**Decision:**
+- This goes back to the D-019 flow:
+  - Claude builds and tests in its cloud workspace.
+  - Claude then commits on a feature branch in the owner's working copy, `A:\Adarsh\Empire_RealEstate`. That folder is now a git repository whose `origin` is the GitHub repository.
+  - The owner pushes with the Empire GitHub account, opens the pull request and merges.
+- The owner pushes the one-time bootstrap commit on `main` first, so GitHub makes `main` the default branch.
+- The rest of D-026 stands: the worker entry point, conditional pgvector, self-hosted fonts, the CSP in Phase 5, Dependabot and the versions.
+**Consequences:**
+- Claude can't see CI results or review comments on GitHub. When CI fails, the owner shares the failing job's log or a screenshot.
+- Pull request auto-fix isn't available.
+- Before new work, the owner fetches `origin`, so Claude starts from the latest `main`.
