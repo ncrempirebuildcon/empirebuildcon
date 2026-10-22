@@ -2,7 +2,8 @@
 
 Collaborators: service.py (create and update), schemas.py (ProjectInput, ProjectUpdate).
 Implements: ARCHITECTURE §6 (money in whole rupees, area in square metres, min ≤ max), §13
-(pin source), D-002 (RERA number while published).
+(pin source), §16 (the SEO share image is a library image), D-002 (RERA number while
+published).
 
 WHY validation runs on merged values: a PATCH may send only `{"price": {"min_inr": …}}`, so
 "min ≤ max" can only be checked against the stored maximum. Everything is checked before any
@@ -19,6 +20,7 @@ from typing import Any, Final
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from empire_api.media import queries as media_queries
 from empire_api.projects.common import (
     FieldError,
     check_area,
@@ -140,6 +142,7 @@ def validate(db: Session, state: Mapping[str, Any]) -> None:
     if state.get("pin_source") and lat is None:
         errors.append(FieldError("location.pin_source", "Set the pin before its source."))
     errors += _city_and_locality(db, state.get("city_id"), state.get("locality_id"))
+    errors += _share_image(db, (state.get("seo") or {}).get("og_image_id"))
     if state.get("publish_state") == "published" and not (state.get("rera_number") or "").strip():
         # COMPLIANCE: a live project page must always show its RERA number (D-002).
         errors.append(
@@ -168,6 +171,33 @@ def _city_and_locality(
         return [FieldError("location.locality_id", "No locality with this id.")]
     if locality.city_id != city_id:
         return [FieldError("location.locality_id", "This locality is not in the chosen city.")]
+    return []
+
+
+def drop_dangling_share_image(
+    db: Session, project: Project, sent: Mapping[str, Any], changes: dict[str, Any]
+) -> str | None:
+    """Clear a stored share image that is no longer in the library, unless this edit sets one.
+
+    WHY: the library refuses to delete a share image, but a project saved one in the same
+    moment as a delete could still end up pointing at a deleted row; every later edit would
+    then fail validation. Returns the cleared id (for the audit note), else None.
+    """
+    if "og_image_id" in (sent.get("seo") or {}):
+        return None  # this request chooses the share image; validate() checks it
+    current = (project.seo or {}).get("og_image_id")
+    if not current or media_queries.is_library_image(db, uuid.UUID(str(current))):
+        return None
+    changes["seo"] = {**changes.get("seo", project.seo), "og_image_id": None}
+    return str(current)
+
+
+def _share_image(db: Session, og_image_id: object) -> list[FieldError]:
+    """The SEO share image must be an image in the media library (media/queries.py)."""
+    if not og_image_id:
+        return []
+    if not media_queries.is_library_image(db, uuid.UUID(str(og_image_id))):
+        return [FieldError("seo.og_image_id", "Choose an image from the media library.")]
     return []
 
 

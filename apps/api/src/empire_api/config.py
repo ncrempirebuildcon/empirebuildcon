@@ -1,11 +1,13 @@
 """Runtime settings, read once from environment variables (and a local .env file in development).
 
 Collaborators: every module reads settings through `get_settings()`; tests clear its cache.
-Implements: SECURITY.md §7 (secrets only in the environment), D-009 (session secret), D-019.
+Implements: SECURITY.md §7 (secrets only in the environment), D-009 (session secret), D-019,
+D-033 (media store).
 
 SECURITY: in staging and production the app refuses to start when a secret is missing, too short
-or still a `change-me` placeholder from `.env.example`. Development and test fall back to fixed,
-clearly-named insecure values so a new developer can run the app with no setup at all.
+or still a `change-me` placeholder from `.env.example`, without CLOUDINARY_URL, or with the fake
+media store. Development and test fall back to fixed, clearly-named insecure values (and the
+fake media store) so a new developer can run the app with no setup at all.
 """
 
 from __future__ import annotations
@@ -16,10 +18,11 @@ from functools import lru_cache
 from typing import Literal, Self
 
 from cryptography.fernet import Fernet
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from empire_api import __version__
+from empire_api.media.credentials import parse_cloudinary_url
 
 AppEnv = Literal["development", "test", "staging", "production"]
 
@@ -41,6 +44,9 @@ class Settings(BaseSettings):
         env_file=(".env", "../../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        # SECURITY: pydantic otherwise appends `input_value=` (the raw environment, secrets
+        # included, truncated) to validation errors, and start-up errors end up in logs.
+        hide_input_in_errors=True,
     )
 
     app_env: AppEnv = "development"
@@ -67,10 +73,32 @@ class Settings(BaseSettings):
     db_pool_size: int = Field(default=5, ge=1, le=50)
     worker_drain_interval_seconds: int = Field(default=30, ge=5, le=3600)
 
+    # Media (D-033, media/store.py). SECURITY: CLOUDINARY_URL holds the API secret; it stays on
+    # the server. MEDIA_STORE picks the store: "cloudinary", or "fake" (no network, files in
+    # MEDIA_DEV_DIR, default apps/api/.media-dev/) for development, tests and the browser suite.
+    # Left empty: cloudinary when CLOUDINARY_URL is set, otherwise fake. Staging and production
+    # refuse to start without CLOUDINARY_URL or with the fake store.
+    cloudinary_url: SecretStr = SecretStr("")
+    media_store: Literal["cloudinary", "fake"] | None = None
+    media_dev_dir: str = ""
+
     @property
     def is_production_like(self) -> bool:
         """Staging and production get the strict checks, HSTS and hidden API docs."""
         return self.app_env in ("staging", "production")
+
+    @field_validator("media_store", mode="before")
+    @classmethod
+    def _blank_store_is_unset(cls, value: object) -> object:
+        # WHY: `.env.example` lists `MEDIA_STORE=` empty; that means "choose for me".
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @property
+    def media_store_kind(self) -> Literal["cloudinary", "fake"]:
+        """The active media store (validated in `_check_media`)."""
+        if self.media_store is not None:
+            return self.media_store
+        return "cloudinary" if self.cloudinary_url.get_secret_value().strip() else "fake"
 
     @property
     def version(self) -> str:
@@ -97,10 +125,25 @@ class Settings(BaseSettings):
             derived = base64.urlsafe_b64encode(hashlib.sha256(raw.encode()).digest())
             return Fernet(derived)
 
-    @model_validator(mode="after")
-    def _check_secrets(self) -> Self:
-        if not self.is_production_like:
-            return self
+    def _media_problems(self) -> list[str]:
+        """SECURITY: a live site uses the real store with real credentials (D-033)."""
+        problems: list[str] = []
+        url = self.cloudinary_url.get_secret_value().strip()
+        if url:
+            try:
+                parse_cloudinary_url(url)
+            except ValueError as exc:
+                problems.append(str(exc))  # the message names the shape, never the value
+        if self.media_store == "cloudinary" and not url:
+            problems.append("MEDIA_STORE=cloudinary needs CLOUDINARY_URL")
+        if self.is_production_like:
+            if not url:
+                problems.append("CLOUDINARY_URL must be set")
+            if self.media_store == "fake":
+                problems.append("MEDIA_STORE=fake is for development and tests only")
+        return problems
+
+    def _secret_problems(self) -> list[str]:
         problems: list[str] = []
         if len(self.edge_proxy_key.get_secret_value().encode()) < _MIN_SECRET_BYTES:
             problems.append(f"EDGE_PROXY_KEY must be set (at least {_MIN_SECRET_BYTES} bytes)")
@@ -114,6 +157,13 @@ class Settings(BaseSettings):
             Fernet(self.data_encryption_key.get_secret_value().encode())
         except ValueError:
             problems.append("DATA_ENCRYPTION_KEY must be a Fernet key (empire-api gen-secrets)")
+        return problems
+
+    @model_validator(mode="after")
+    def _check_secrets(self) -> Self:
+        problems = self._media_problems()
+        if self.is_production_like:
+            problems += self._secret_problems()
         if problems:
             # SECURITY: names only, never values, so the message is safe to log.
             raise ValueError("Unsafe configuration: " + "; ".join(sorted(set(problems))))

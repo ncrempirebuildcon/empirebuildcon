@@ -24,6 +24,8 @@ from sqlalchemy.orm import Session
 from empire_api.db import get_engine, get_sessionmaker, rows_affected
 from empire_api.integrations.handlers import handlers_for
 from empire_api.logs import get_logger
+from empire_api.media import handlers as media_handlers
+from empire_api.media.uploads import discard_stale_intents
 from empire_api.platform.models import OutboxEvent, RateLimitBucket
 from empire_api.site_settings.models import Setting
 from empire_api.timeutil import utcnow
@@ -46,6 +48,8 @@ CLEANUP_EVERY = timedelta(hours=24)
 _CLEANUP_SETTING = "system.cleanup"
 
 log = get_logger(__name__)
+# Modules whose outbox handlers register on import (handlers.on); listed so they always load.
+HANDLER_MODULES = (media_handlers,)
 
 
 @dataclass(frozen=True)
@@ -137,7 +141,8 @@ def drain_soon(background: BackgroundTasks, budget_seconds: float = 3.0) -> None
 
 
 def cleanup(now: datetime | None = None) -> dict[str, int]:
-    """Delete expired sessions, used/expired reset tokens and old rate-limit buckets."""
+    """Delete expired sessions, used/expired reset tokens and old rate-limit buckets, and send
+    unconfirmed direct uploads to be destroyed (media/uploads.discard_stale_intents)."""
     now = now or utcnow()
     old_sessions = delete(UserSession).where(
         or_(
@@ -153,7 +158,13 @@ def cleanup(now: datetime | None = None) -> dict[str, int]:
         sessions = rows_affected(db.execute(old_sessions))
         tokens = rows_affected(db.execute(old_tokens))
         buckets = rows_affected(db.execute(old_buckets))
-    counts = {"sessions": sessions, "reset_tokens": tokens, "rate_limit_buckets": buckets}
+        uploads = discard_stale_intents(db, now)
+    counts = {
+        "sessions": sessions,
+        "reset_tokens": tokens,
+        "rate_limit_buckets": buckets,
+        "unconfirmed_uploads": uploads,
+    }
     log.info("cleanup_done", **counts)
     return counts
 

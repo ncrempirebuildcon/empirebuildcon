@@ -9,7 +9,7 @@ sent, and optional fields that are left out keep their stored value. `sort_order
 create puts the item at the end.
 
 Additions to the contract: `sort_order` on ConstructionUpdate/PaymentPlan (both have a reorder
-endpoint), and media placeholders (`floor_plans`, `photos`) that part 2 fills.
+endpoint). `floor_plans` and `photos` are filled from media links (media/queries.py).
 """
 
 from __future__ import annotations
@@ -53,6 +53,7 @@ from empire_api.projects.vocab import (
     TowerKind,
     TowerStatus,
 )
+from empire_api.timeutil import today_ist
 
 CONFIGURATION_TRANSLATABLE: Final = frozenset({"name"})
 MAX_STAGES: Final = 30
@@ -111,8 +112,9 @@ class Configuration(OutModel):
     area: Area
     price: Price
     sales_status: SalesStatus
-    # TODO(phase-4): part 2 fills floor plans from media links (role floor_plan).
-    floor_plans: list[LinkedMedia]
+    floor_plans: list[LinkedMedia] = Field(
+        description="Media links with role floor_plan (image or PDF; at most one)"
+    )
     sort_order: int
     is_sample: bool = Field(description="Sample data — never shown in production")
     translations: Translations
@@ -183,16 +185,27 @@ class ConstructionUpdate(OutModel):
     update_date: date
     progress_percent: Percent | None
     body: str | None = Field(description="WhatsApp-style formatted text")
-    # TODO(phase-4): part 2 fills progress photos from media links.
-    photos: list[LinkedMedia]
+    photos: list[LinkedMedia] = Field(
+        description="Progress photos: media links with role gallery, in order"
+    )
     publish_state: PublishState
     sort_order: int
+
+
+def _not_in_the_future(value: date) -> date:
+    """COMPLIANCE (honest content): an update reports what has happened, so it can't be dated
+    after today (IST); its progress photos can't carry a future month either."""
+    if value > today_ist():
+        raise PydanticCustomError(
+            "update_date", "An update reports what has happened, so it can't be in the future."
+        )
+    return value
 
 
 class ConstructionUpdateInput(StrictModel):
     tower_id: uuid.UUID | None = None
     title: Line120
-    update_date: date
+    update_date: Annotated[date, AfterValidator(_not_in_the_future)]
     progress_percent: Percent | None = None
     body: Annotated[Text5000 | None, BlankIsNone] = None
     publish_state: PublishState = "draft"

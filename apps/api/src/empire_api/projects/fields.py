@@ -168,6 +168,11 @@ Line170 = Annotated[
     StringConstraints(strip_whitespace=True, min_length=1, max_length=170),
     AfterValidator(_single_line),
 ]
+Line250 = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=250),
+    AfterValidator(_single_line),
+]
 Line300 = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=300),

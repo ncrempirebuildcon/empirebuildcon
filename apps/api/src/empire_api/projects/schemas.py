@@ -8,9 +8,12 @@ Additions to the contract, each needed by the CMS (recorded in the Phase 4 repor
   - `ProjectAdminSummary`: list rows also carry publish_state, published_at and updated_at
     for the CMS list's columns.
   - `rera_account` (RERA designated account) and `featured_order` on ProjectAdmin.
+  - `og_image` on ProjectAdmin (part 2): the library image `seo.og_image_id` names, so the SEO
+    tab can show the share image.
 
-Media-backed fields (`cover`, `gallery`, `videos`, `documents`, `brochure`, `rera.qr`) stay
-empty until part 2, and `faqs` until part 4. TODO(phase-4) markers in present.py say where.
+Media-backed fields (`cover`, `gallery`, `videos`, `documents`, `brochure`, `rera.qr`, and
+`floor_plans` / `photos` on children) come from the media module (media/queries.py). `faqs`
+stays empty until part 4 (TODO in present.py).
 """
 
 from __future__ import annotations
@@ -155,6 +158,9 @@ class ProjectAdmin(ProjectDetail):
     )
     rera_account: ReraAccount | None
     featured_order: int | None
+    og_image: Media | None = Field(
+        description="The library image named by seo.og_image_id (read-only; set it via seo)"
+    )
 
 
 class ProjectInput(StrictModel):

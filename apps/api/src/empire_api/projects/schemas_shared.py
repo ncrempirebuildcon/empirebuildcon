@@ -84,7 +84,7 @@ class Price(StrictModel):
 class Seo(StrictModel):
     title: Annotated[Line70 | None, BlankIsNone] = None
     description: Annotated[Line170 | None, BlankIsNone] = None
-    # TODO(phase-4): part 2 checks that this is an image in the media library.
+    # Must be an image in the media library (project_input.validate; 422 otherwise).
     og_image_id: uuid.UUID | None = None
     noindex: bool = False
     canonical_path: Annotated[SitePath | None, BlankIsNone] = None
@@ -144,7 +144,7 @@ class Rera(OutModel):
     authority: str = Field(examples=["UP-RERA"])
     number: str | None
     url: str | None
-    # TODO(phase-4): part 2 fills this from the `rera_qr` media link.
+    # The project's visible `rera_qr` media link (media/queries.py); null until one is uploaded.
     qr: Media | None
 
 

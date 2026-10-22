@@ -415,6 +415,7 @@
             "title": "Bhk"
           },
           "floor_plans": {
+            "description": "Media links with role floor_plan (image or PDF; at most one)",
             "items": {
               "$ref": "#/components/schemas/LinkedMedia"
             },
@@ -654,6 +655,7 @@
             "type": "string"
           },
           "photos": {
+            "description": "Progress photos: media links with role gallery, in order",
             "items": {
               "$ref": "#/components/schemas/LinkedMedia"
             },
@@ -989,6 +991,57 @@
         "title": "Health",
         "type": "object"
       },
+      "ImageUpload": {
+        "properties": {
+          "alt_text": {
+            "maxLength": 250,
+            "type": "string"
+          },
+          "attach_to": {
+            "description": "owner_type:owner_id, e.g. project:<uuid>",
+            "pattern": "^(project|configuration|construction_update):[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "type": "string"
+          },
+          "file": {
+            "description": "JPEG, PNG, WebP or AVIF, at most 10 MB and 25 megapixels. Embedded metadata (EXIF with GPS, XMP, IPTC, comments) is removed on the server and the EXIF orientation applied, so width/height are as displayed.",
+            "format": "binary",
+            "type": "string"
+          },
+          "label": {
+            "enum": [
+              "artist_impression",
+              "actual_photo",
+              "progress_photo"
+            ],
+            "type": "string"
+          },
+          "label_month": {
+            "format": "date",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "gallery",
+              "floor_plan",
+              "brochure",
+              "rera_qr",
+              "video",
+              "document",
+              "hero",
+              "og_image"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 160,
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "type": "object"
+      },
       "LinkedMedia": {
         "description": "A media item as attached to an owner (project, configuration, construction update).",
         "properties": {
@@ -1002,6 +1055,12 @@
               }
             ],
             "title": "Alt Text"
+          },
+          "attached_count": {
+            "description": "How many projects, configurations or updates use it (delete needs 0)",
+            "readOnly": true,
+            "title": "Attached Count",
+            "type": "integer"
           },
           "bytes": {
             "title": "Bytes",
@@ -1024,6 +1083,11 @@
             "title": "Duration S"
           },
           "format": {
+            "examples": [
+              "jpg",
+              "mp4",
+              "pdf"
+            ],
             "title": "Format",
             "type": "string"
           },
@@ -1047,6 +1111,11 @@
             "title": "Is Cover",
             "type": "boolean"
           },
+          "is_sample": {
+            "description": "Sample placeholder from the seed — never shown live",
+            "title": "Is Sample",
+            "type": "boolean"
+          },
           "is_visible": {
             "title": "Is Visible",
             "type": "boolean"
@@ -1059,6 +1128,36 @@
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "enum": [
+                  "artist_impression",
+                  "actual_photo",
+                  "progress_photo"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Honest label: artist's impression, actual photo or progress photo",
+            "title": "Label"
+          },
+          "label_month": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "First day of the month the photo shows (required for progress photos)",
+            "title": "Label Month"
           },
           "link_id": {
             "format": "uuid",
@@ -1092,6 +1191,7 @@
                 "type": "null"
               }
             ],
+            "description": "Small image; a poster for videos and PDFs",
             "title": "Thumbnail Url"
           },
           "title": {
@@ -1099,6 +1199,7 @@
             "type": "string"
           },
           "url": {
+            "description": "Images: width-limited f_auto,q_auto copy. PDFs open in the browser; other documents download. Videos: the original file.",
             "title": "Url",
             "type": "string"
           },
@@ -1127,6 +1228,10 @@
           "height",
           "duration_s",
           "created_at",
+          "label",
+          "label_month",
+          "is_sample",
+          "attached_count",
           "link_id",
           "role",
           "sort_order",
@@ -1868,6 +1973,7 @@
         "type": "object"
       },
       "Media": {
+        "description": "A file in the media library, with delivery URLs built by the store (media/store.py).",
         "properties": {
           "alt_text": {
             "anyOf": [
@@ -1879,6 +1985,12 @@
               }
             ],
             "title": "Alt Text"
+          },
+          "attached_count": {
+            "description": "How many projects, configurations or updates use it (delete needs 0)",
+            "readOnly": true,
+            "title": "Attached Count",
+            "type": "integer"
           },
           "bytes": {
             "title": "Bytes",
@@ -1901,6 +2013,11 @@
             "title": "Duration S"
           },
           "format": {
+            "examples": [
+              "jpg",
+              "mp4",
+              "pdf"
+            ],
             "title": "Format",
             "type": "string"
           },
@@ -1920,6 +2037,11 @@
             "title": "Id",
             "type": "string"
           },
+          "is_sample": {
+            "description": "Sample placeholder from the seed — never shown live",
+            "title": "Is Sample",
+            "type": "boolean"
+          },
           "kind": {
             "enum": [
               "image",
@@ -1928,6 +2050,36 @@
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "enum": [
+                  "artist_impression",
+                  "actual_photo",
+                  "progress_photo"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Honest label: artist's impression, actual photo or progress photo",
+            "title": "Label"
+          },
+          "label_month": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "First day of the month the photo shows (required for progress photos)",
+            "title": "Label Month"
           },
           "thumbnail_url": {
             "anyOf": [
@@ -1938,6 +2090,7 @@
                 "type": "null"
               }
             ],
+            "description": "Small image; a poster for videos and PDFs",
             "title": "Thumbnail Url"
           },
           "title": {
@@ -1945,6 +2098,7 @@
             "type": "string"
           },
           "url": {
+            "description": "Images: width-limited f_auto,q_auto copy. PDFs open in the browser; other documents download. Videos: the original file.",
             "title": "Url",
             "type": "string"
           },
@@ -1972,9 +2126,168 @@
           "width",
           "height",
           "duration_s",
-          "created_at"
+          "created_at",
+          "label",
+          "label_month",
+          "is_sample",
+          "attached_count"
         ],
         "title": "Media",
+        "type": "object"
+      },
+      "MediaLinkInput": {
+        "additionalProperties": false,
+        "properties": {
+          "attach_to": {
+            "description": "owner_type:owner_id, e.g. project:<uuid>",
+            "maxLength": 80,
+            "pattern": "^(project|configuration|construction_update):[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Attach To",
+            "type": "string"
+          },
+          "is_visible": {
+            "default": true,
+            "title": "Is Visible",
+            "type": "boolean"
+          },
+          "media_id": {
+            "format": "uuid",
+            "title": "Media Id",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "gallery",
+              "floor_plan",
+              "brochure",
+              "rera_qr",
+              "video",
+              "document",
+              "hero",
+              "og_image"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "media_id",
+          "attach_to",
+          "role"
+        ],
+        "title": "MediaLinkInput",
+        "type": "object"
+      },
+      "MediaLinkUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "is_cover": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Cover"
+          },
+          "is_visible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Visible"
+          }
+        },
+        "title": "MediaLinkUpdate",
+        "type": "object"
+      },
+      "MediaList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Media"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "MediaList",
+        "type": "object"
+      },
+      "MediaUpdate": {
+        "additionalProperties": false,
+        "description": "PATCH a library item: send only what changes. Labels are checked together with the\nstored values (library.update_media).",
+        "properties": {
+          "alt_text": {
+            "anyOf": [
+              {
+                "maxLength": 250,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt Text"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "enum": [
+                  "artist_impression",
+                  "actual_photo",
+                  "progress_photo"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "label_month": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Any day of the month; stored as the first day",
+            "title": "Label Month"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "MediaUpdate",
         "type": "object"
       },
       "PageMeta": {
@@ -2582,6 +2895,17 @@
             "title": "Name",
             "type": "string"
           },
+          "og_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Media"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The library image named by seo.og_image_id (read-only; set it via seo)"
+          },
           "payment_plans": {
             "items": {
               "$ref": "#/components/schemas/PaymentPlan"
@@ -2808,7 +3132,8 @@
           "updated_by",
           "publish_blockers",
           "rera_account",
-          "featured_order"
+          "featured_order",
+          "og_image"
         ],
         "title": "ProjectAdmin",
         "type": "object"
@@ -4042,6 +4367,180 @@
           }
         },
         "title": "Translations",
+        "type": "object"
+      },
+      "UploadConfirm": {
+        "additionalProperties": false,
+        "properties": {
+          "attach_to": {
+            "anyOf": [
+              {
+                "description": "owner_type:owner_id, e.g. project:<uuid>",
+                "maxLength": 80,
+                "pattern": "^(project|configuration|construction_update):[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attach To"
+          },
+          "cloudinary_response": {
+            "additionalProperties": true,
+            "description": "The JSON the store returned to the browser, unmodified",
+            "title": "Cloudinary Response",
+            "type": "object"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "gallery",
+                  "floor_plan",
+                  "brochure",
+                  "rera_qr",
+                  "video",
+                  "document",
+                  "hero",
+                  "og_image"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "cloudinary_response"
+        ],
+        "title": "UploadConfirm",
+        "type": "object"
+      },
+      "UploadSignature": {
+        "description": "Everything the browser needs to POST the file straight to the store.",
+        "properties": {
+          "api_key": {
+            "title": "Api Key",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "Confirm before this time",
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Send every one of these form fields with `file`, unchanged",
+            "title": "Fields",
+            "type": "object"
+          },
+          "folder": {
+            "title": "Folder",
+            "type": "string"
+          },
+          "max_bytes": {
+            "title": "Max Bytes",
+            "type": "integer"
+          },
+          "public_id": {
+            "description": "Signed public id (inside `folder`)",
+            "title": "Public Id",
+            "type": "string"
+          },
+          "resource_type": {
+            "enum": [
+              "image",
+              "video",
+              "raw"
+            ],
+            "title": "Resource Type",
+            "type": "string"
+          },
+          "signature": {
+            "title": "Signature",
+            "type": "string"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "upload_url": {
+            "title": "Upload Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_url",
+          "api_key",
+          "timestamp",
+          "signature",
+          "folder",
+          "public_id",
+          "resource_type",
+          "max_bytes",
+          "fields",
+          "expires_at"
+        ],
+        "title": "UploadSignature",
+        "type": "object"
+      },
+      "UploadSignatureRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "bytes": {
+            "minimum": 1.0,
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "filename": {
+            "description": "Only its extension is used; never stored",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "video",
+              "document"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "mime_type": {
+            "description": "The browser's type for the file ('' if unknown)",
+            "maxLength": 200,
+            "title": "Mime Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "filename",
+          "bytes",
+          "mime_type"
+        ],
+        "title": "UploadSignatureRequest",
         "type": "object"
       },
       "User": {
@@ -5949,6 +6448,991 @@
         "x-permission": "projects.write"
       }
     },
+    "/api/v1/admin/media": {
+      "get": {
+        "description": "Newest first. `unattached=true` lists files nothing uses (safe to delete).",
+        "operationId": "list_media",
+        "parameters": [
+          {
+            "description": "Title or alt text contains",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Title or alt text contains",
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "image",
+                    "video",
+                    "document"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "description": "owner_type:owner_id, e.g. project:<uuid>",
+            "in": "query",
+            "name": "attached_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "owner_type:owner_id, e.g. project:<uuid>",
+              "title": "Attached To"
+            }
+          },
+          {
+            "description": "Only files nothing uses",
+            "in": "query",
+            "name": "unattached",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only files nothing uses",
+              "title": "Unattached",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "per_page",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Per Page",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Media library",
+        "tags": [
+          "Media"
+        ],
+        "x-permission": "media.upload"
+      }
+    },
+    "/api/v1/admin/media-links": {
+      "post": {
+        "description": "Single-valued roles (brochure, rera_qr, hero, og_image, floor_plan) replace the current\nlink; the old file stays in the library. Pages and posts arrive in part 4.",
+        "operationId": "attach_media",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaLinkInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedMedia"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Attach media to a project, configuration, update, page or post",
+        "tags": [
+          "Media"
+        ],
+        "x-permission": "media.upload"
+      }
+    },
+    "/api/v1/admin/media-links/order": {
+      "put": {
+        "description": "`ids`: every link of one owner and role, each once, in the new order.",
+        "operationId": "reorder_media_links",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Set order for one owner+role (first = cover unless pinned)",
+        "tags": [
+          "Media"
+        ],
+        "x-permission": "media.upload"
+      }
+    },
+    "/api/v1/admin/media-links/{id}": {
+      "delete": {
+        "operationId": "detach_media",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Detach (media stays in the library)",
+        "tags": [
+          "Media"
+        ],
+        "x-permission": "media.upload"
+      },
+      "patch": {
+        "description": "Hidden items can't be the cover; hiding the cover unpins it. A live project's RERA QR\ncan't be hidden (409).",
+        "operationId": "update_media_link",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaLinkUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedMedia"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Show/hide on website, make cover",
+        "tags": [
+          "Media"
+        ],
+        "x-permission": "media.upload"
+      }
+    },
+    "/api/v1/admin/media/confirm": {
+      "post": {
+        "description": "422 when the reply doesn't verify or match an upload you started in the last hour,\nor when the stored file isn't what was signed for. A refused file is destroyed by the\noutbox (the next sweep, at most 15 minutes later).",
+        "operationId": "media_confirm_upload",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Media"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service unavailable"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Save a direct upload after verifying Cloudinary's signed reply",
+        "tags": [
+          "Media"
+        ],
+        "x-permission": "media.upload"
+      }
+    },
+    "/api/v1/admin/media/images": {
+      "post": {
+        "description": "Multipart `ImageUpload`. Optional `attach_to` + `role` attach it in the same step.",
+        "operationId": "upload_image",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageUpload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Media"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too large"
+          },
+          "415": {
+            "description": "Not a JPEG, PNG, WebP or AVIF image"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service unavailable"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Upload a photo through the API (magic-byte check, 10 MB limit)",
+        "tags": [
+          "Media"
+        ],
+        "x-permission": "media.upload"
+      }
+    },
+    "/api/v1/admin/media/upload-signature": {
+      "post": {
+        "description": "Video ≤ 100 MB; documents (PDF, DOC/DOCX, PPT/PPTX) ≤ 10 MB on the Cloudinary free plan. POST the file to `upload_url` as multipart with every entry of `fields`, then send the store's JSON reply, unchanged, to `confirm` within an hour (expires_at).",
+        "operationId": "media_upload_signature",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadSignatureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSignature"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "413": {
+            "description": "File too large for the plan"
+          },
+          "415": {
+            "description": "File type not allowed"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Signed parameters for a direct video/document upload to Cloudinary",
+        "tags": [
+          "Media"
+        ],
+        "x-permission": "media.upload"
+      }
+    },
+    "/api/v1/admin/media/{id}": {
+      "delete": {
+        "operationId": "delete_media",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Delete from library and Cloudinary (refused while attached)",
+        "tags": [
+          "Media"
+        ],
+        "x-permission": "media.manage"
+      },
+      "patch": {
+        "description": "Title, alt text and the honest label (label_month: any day of the month).",
+        "operationId": "update_media",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Media"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Rename / alt text",
+        "tags": [
+          "Media"
+        ],
+        "x-permission": "media.upload"
+      }
+    },
     "/api/v1/admin/projects": {
       "get": {
         "description": "Projects, most recently edited first, with the CMS list's filters.",
@@ -6312,7 +7796,7 @@
         "x-permission": "projects.delete"
       },
       "get": {
-        "description": "The project with every child, the publish blockers and empty media placeholders.",
+        "description": "The project with every child, its media and the publish blockers.",
         "operationId": "get_project",
         "parameters": [
           {
@@ -7517,7 +9001,7 @@
     },
     "/api/v1/admin/projects/{id}/duplicate": {
       "post": {
-        "description": "A draft copy (slug `<slug>-copy`, `-copy-2`, …) with every child; media isn't copied.",
+        "description": "A draft copy (slug `<slug>-copy`, `-copy-2`, …) with every child. Media links are not\ncopied: the copy needs its own RERA QR and photos (duplicate.py).",
         "operationId": "duplicate_project",
         "parameters": [
           {
@@ -10764,6 +12248,90 @@
         "summary": "Password Reset",
         "tags": [
           "Auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/dev-media/files/{key}": {
+      "get": {
+        "operationId": "dev_media_file",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [],
+        "summary": "Serve a file from the fake media store (development only)",
+        "tags": [
+          "Dev media"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/dev-media/upload/{resource_type}": {
+      "post": {
+        "operationId": "dev_media_upload",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_type",
+            "required": true,
+            "schema": {
+              "pattern": "^(image|video|raw)$",
+              "title": "Resource Type",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Dev Media Upload",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [],
+        "summary": "Cloudinary-shaped signed direct upload to the fake media store (development only)",
+        "tags": [
+          "Dev media"
         ],
         "x-public": true
       }

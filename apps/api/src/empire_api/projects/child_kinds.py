@@ -4,7 +4,8 @@
 Kinds: towers, configurations, specifications, location advantages, construction updates and
 payment plans (design contract schemas *Input → *).
 
-Collaborators: children.py (operations), present.py (responses), common.py (price/area rules).
+Collaborators: children.py (operations), present.py (responses), common.py (price/area rules),
+media/queries.py (floor plans and progress photos in the responses).
 Implements: ARCHITECTURE §6 (area in square metres, whole rupees, min ≤ max), D-004 (a
 configuration is a property), D-015 (a sample project's configurations are samples too).
 """
@@ -21,6 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from empire_api.media import queries as media_queries
 from empire_api.projects import present
 from empire_api.projects.common import (
     FieldError,
@@ -188,6 +190,18 @@ def _present_towers(db: Session, project_id: uuid.UUID, rows: Sequence[Any]) -> 
     return [present.tower_out(row, progress.get(row.id)) for row in rows]
 
 
+def _present_configurations(
+    db: Session, project_id: uuid.UUID, rows: Sequence[Any]
+) -> list[BaseModel]:
+    plans = media_queries.floor_plans(db, (row.id for row in rows))
+    return [present.configuration_out(row, plans.get(row.id)) for row in rows]
+
+
+def _present_updates(db: Session, project_id: uuid.UUID, rows: Sequence[Any]) -> list[BaseModel]:
+    photos = media_queries.progress_photos(db, (row.id for row in rows))
+    return [present.update_out(row, photos.get(row.id)) for row in rows]
+
+
 def _each(fn: Callable[[Any], BaseModel]) -> PresentFn:
     def run(db: Session, project_id: uuid.UUID, rows: Sequence[Any]) -> list[BaseModel]:
         return [fn(row) for row in rows]
@@ -205,7 +219,7 @@ KINDS: Final = {
             "configuration",
             Configuration,
             _configuration_columns,
-            _each(present.configuration_out),
+            _present_configurations,
             {"uq_configuration_project_id_slug": ("slug", CONFIG_SLUG_TAKEN)},
         ),
         ChildKind(
@@ -230,7 +244,7 @@ KINDS: Final = {
             "construction update",
             ConstructionUpdate,
             _update_columns,
-            _each(present.update_out),
+            _present_updates,
         ),
         ChildKind(
             "payment_plan",
