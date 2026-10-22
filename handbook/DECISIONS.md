@@ -317,3 +317,66 @@ The `web` job passed.
 - The setup-uv releases page lists v10.3.2 (22 Oct) at commit `07a047e608db84b3d8c06cd9a7c7dcc9c355c18e`, "update known checksums for 0.13.5". Its README pins by SHA.
 - The 403 response named the needed permission (`x-accepted-github-permissions: pull_requests=read`).
 - gitleaks-action's README lists `GITLEAKS_ENABLE_COMMENTS` and `GITLEAKS_VERSION`.
+
+## D-031 · Phase 4 part 1: projects and catalogue in the CMS (Accepted, 2026-10-22)
+
+**Context:** Phase 4 (CMS core) is delivered in five pull requests:
+1. Projects and catalogue.
+2. Media.
+3. Leads.
+4. Content and SEO.
+5. Settings, users and email.
+
+Building part 1 against the design contract (D-020) needed some choices the contract doesn't make.
+**Decision:**
+- **Contract additions (no renames).** All 52 Projects and Catalogue operations keep their method, path, operationId and permission, and a test enforces this.
+  - `PATCH /admin/projects/{id}` takes `ProjectUpdate`, in which every field is optional. `publish_state: archived` archives the project and `draft` restores it. `published` is refused, because publishing goes through `…/publish`.
+  - List rows are `ProjectAdminSummary`.
+  - New fields:
+    - `rera_account` (bank name, account name, account number), which the approved design shows in the RERA section.
+    - `featured_order` on `ProjectAdmin`.
+    - `pin_source` on `LocationInput`.
+    - `sort_order` on construction updates and payment plans.
+    - `project_count` on localities.
+  - `MapsResolveRequest.input` allows 2,048 characters, because real Google Maps place links run past 500.
+  - `MapsResolveResult.plus_code` returns the normalised plus code, so the project stores only the code and never the place name typed after it.
+- **Publish blockers** are computed by one function:
+  - RERA number missing;
+  - RERA QR code missing (always shown until the media manager arrives in part 2);
+  - no configuration;
+  - sample data in production.
+- **Lifecycle:**
+  - Only drafts that were never published can be deleted. `published_at` is never cleared, so it records this.
+  - Archiving, or putting a live project back to draft, needs `projects.publish`. So does setting a live project's sales status to or from "off market", because that also hides it from the website. A configuration's own off-market status is ordinary sales work and needs only `projects.write`.
+  - Archiving a live project emits `project.unpublished`.
+  - `construction_update.published` fires only for live projects.
+  - Other child edits on a live project emit `project.updated`.
+- **Data:**
+  - Payment plan stages are a validated JSON array on the plan, not a separate table. They are always read and written with their plan, and the "stages total exactly 100%" rule needs the whole list.
+  - A database constraint keeps a project's locality inside its city.
+  - Area is stored in square metres with 2 decimals.
+- **Duplicate:** the copy is a draft named "(copy)". It does not carry the original's RERA registration: the project's and each tower/phase's registration number, the RERA link, the designated account and the SEO canonical path are cleared, because a copy must never go live under another project's registration.
+- **Plus codes:** decoded by our own small port of Open Location Code, tested against Google's official vectors. Short plus codes are refused.
+- **Map links:** coordinates are also read from `/maps/search/<lat>,<lng>` and `/maps/place/<lat>,<lng>`, the form a shared "dropped pin" usually redirects to.
+- **Maps resolver limits:** the SSRF limits are in SECURITY.md §5.
+- **Displayed prices and areas:** the API computes `display` with a Python twin of `packages/ui/src/format`. Both are tested with the same vectors, so the CMS preview and the API always agree.
+- **Units and listings:** still not built (D-004, D-005).
+**Verified / assumed:**
+- PyPI, checked 22 Oct 2026:
+  - `openlocationcode` 1.0.1 was last released on 20 Jul 2019, as a source package only.
+  - `pluscodes` 2022.1.3 was released on 27 Aug 2022.
+  - `httpx` 0.28.1 is the latest stable release. It moved from dev to main dependencies for the resolver.
+- The resolver hasn't been tried against a real `maps.app.goo.gl` link, because tests never use the network. Try one on staging in Phase 9.
+
+## D-032 · Hold TypeScript at 6.0 and the Node types at 24 (Accepted, 2026-10-22)
+
+**Context:** Dependabot opened two pull requests on 22 Oct 2026:
+- TypeScript 6.0.3 → 7.0.2 (PR #3). Its CI failed in two jobs:
+  - `web`: typescript-eslint 8.72 stops with "typescript-eslint does not support TS 7.0".
+  - `contract`: openapi-typescript 7.13 crashes on TypeScript 7 ("Cannot read properties of undefined (reading 'createKeywordTypeNode')").
+- `@types/node` 24 → 26. That would describe a Node version we don't run; `.nvmrc` pins Node 24.
+**Decision:**
+- Dependabot ignores TypeScript major and minor updates (patches still come) and `@types/node` major updates. The ignore rules and their reasons are in `.github/dependabot.yml`.
+- The owner closes both pull requests with the comment `@dependabot ignore this major version`.
+**Consequences:** We revisit TypeScript when typescript-eslint and openapi-typescript both support the newer version. The Node types move together with a Node upgrade.
+**Verified / assumed:** The failures were read from the CI logs of PR #3 on 22 Oct 2026. The other jobs passed (API 96 tests, secret scan). Ignore syntax and comment commands are as described in GitHub Docs ("Dependabot options reference" and "Dependabot pull request comment commands"), checked 22 Oct 2026.

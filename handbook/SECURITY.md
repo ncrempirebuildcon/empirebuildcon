@@ -56,7 +56,12 @@ Tested by a Playwright check and a header assertion in API tests.
 - SQL only through SQLAlchemy with bound parameters; no string-built SQL.
 - Formatted text is parsed by our own renderer into React elements; `dangerouslySetInnerHTML` is banned by lint rules (on DOM elements, components and `createElement`) in the web app and the UI package, except for JSON-LD, which is serialised with escaping.
 - Slugs, redirects: `to_path` must be a site path or an allow-listed host; no open redirects.
-- **SSRF:** the maps resolver only follows `maps.app.goo.gl`, `goo.gl/maps` and `*.google.com` and stops after 3 hops, 5 s timeout. Webhook URLs must be `https://`, and are refused if they resolve to private, loopback or link-local addresses (checked at save and at each delivery).
+- **SSRF:** the maps resolver (`apps/api/src/empire_api/projects/maps.py`) follows short links only:
+  - Hosts: an explicit list (google.com, www.google.com, maps.google.com, google.co.in, www.google.co.in, maps.google.co.in, goo.gl, maps.app.goo.gl). There are no wildcards.
+  - Paths: the `www.` and `goo.gl` hosts must also be on a `/maps` path, which keeps Google's open redirect out.
+  - Every hop must be `https://`, with at most 5 redirects. Only headers are read, never a body.
+  - The whole lookup has a hard 5 s limit, DNS included.
+  - Each user may make 30 lookups per 10 minutes (D-031). Webhook URLs must be `https://`, and are refused if they resolve to private, loopback or link-local addresses (checked at save and at each delivery).
 
 ## 6. Uploads
 

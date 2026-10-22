@@ -114,6 +114,7 @@ Formats:
 | States | Empty (honest message plus a next step), loading skeletons in `noir-700` (no shimmer when reduced motion is on), error ("Couldn't load" plus Try again), toasts with `role="status"`. |
 | Chat slot | A reserved bubble bottom-right, off until Phase 7 (feature flag). |
 | CMS shell | 248 px `noir-950` sidebar with a gold active bar, 64 px top bar with search, sample-data warning strip, cards in `noir-800`. Stage chips: New, Contacted, Site visit, Negotiation, Booked, Lost, all text-labelled. |
+| CMS form kit (`@empire/ui`) | `TextField`, `Select`, `Textarea` with a character count, and `NumberField` (whole rupees with Indian grouping; never `type=number`). They share one label, hint and error layout. Also: `Tabs`, `Table` (real headers), `ConfirmDialog` (native `<dialog>`, focus starts on Cancel), `ReorderList` with Move up/Move down buttons and an `aria-live` announcement (drag is optional, the buttons are required), and `Skeleton`. `Button` has a `danger` variant. `Chip` adds `upcoming`, `available` and `offMarket`. Details in `packages/ui/README.md`. |
 
 ## 9. Accessibility review (WCAG 2.1 AA)
 
