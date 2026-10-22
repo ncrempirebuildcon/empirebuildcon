@@ -10,7 +10,8 @@ Read [`../../handbook/README.md`](../../handbook/README.md) first. The rules for
 apps/api/
 ├─ pyproject.toml          pinned dependencies (D-006), ruff/mypy/pytest settings
 ├─ uv.lock                 exact versions; commit it
-├─ alembic.ini, migrations/   database migrations (0001_foundation = Phase 3 tables)
+├─ alembic.ini, migrations/   database migrations (0001_foundation = Phase 3 tables,
+│                          0002_catalogue = projects, their children, cities, localities, amenities)
 ├─ scripts/                make_common_passwords.py (regenerates the weak-password list)
 ├─ src/empire_api/
 │  ├─ main.py              create_app(): routers, middleware, error handlers, OpenAPI tweaks
@@ -23,6 +24,23 @@ apps/api/
 │  ├─ platform/            audit log, outbox writer, PostgreSQL rate limits, crypto helpers
 │  ├─ users/               sign-in, sessions, CSRF, passwords, roles matrix, staff admin
 │  ├─ site_settings/       feature flags, default settings groups
+│  ├─ projects/            projects, towers, configurations, … and the catalogue (Phase 4)
+│  │  ├─ models.py         tables (0002_catalogue); vocab.py = the allowed values (enums)
+│  │  ├─ schemas*.py       request/response shapes: shared values, project, children, catalogue
+│  │  ├─ fields.py         bounded string/number types for request bodies (SECURITY.md §5)
+│  │  ├─ common.py         audit diffs, outbox events, project lock, slugs, 409 on clashes
+│  │  ├─ service.py        list, create, update/archive, delete, publish, unpublish;
+│  │  │                    duplicate.py copies a project with its children
+│  │  ├─ project_input.py  body → columns and the rules across fields (ranges, pin, locality)
+│  │  ├─ children.py       the five operations for every child list; child_kinds.py = per kind
+│  │  ├─ catalogue.py      cities, localities, amenities ("used by N projects" guards)
+│  │  ├─ blockers.py       publish blockers: the one place that decides "ready to publish"
+│  │  ├─ present.py        rows → responses; display.py = ₹ and area strings (twin of
+│  │  │                    packages/ui/src/format, same test vectors)
+│  │  ├─ maps.py           Google Maps pin resolver (SSRF rules in its header); pluscode.py
+│  │  ├─ routes.py, routes_children.py, routes_catalogue.py   HTTP only
+│  │  └─ seed.py           amenity catalogue and `seed --sample` (D-015)
+│  ├─ media/               contract shapes Media and LinkedMedia (the module arrives in part 2)
 │  ├─ integrations/        outbox drain + handlers, internal drain endpoint
 │  ├─ worker.py            empire-worker loop (paid always-on hosting)
 │  └─ cli.py               empire-api commands
@@ -36,7 +54,8 @@ Run everything from `apps/api/`. The root `.python-version` makes uv use Python 
 ```bash
 uv sync                                        # install (creates .venv)
 uv run alembic upgrade head                    # migrate the database in DATABASE_URL
-uv run empire-api seed                         # feature flags + default settings (idempotent)
+uv run empire-api seed                         # flags, settings, amenity catalogue (idempotent)
+uv run empire-api seed --sample                # + "Sample — Project A/B" (dev/demo only; refused in production)
 uv run uvicorn empire_api.main:app --reload    # API on http://localhost:8000 (docs at /api/docs)
 uv run empire-worker                           # optional: worker loop (drain + daily clean-up)
 
@@ -60,6 +79,12 @@ Important guards:
 - `test_no_route_ever_redirects` calls every route with and without a trailing slash and fails on any 3xx. This is the Current Investor bug (ARCHITECTURE §3).
 - `test_every_route_declares_who_may_call_it` fails if a route has no permission marker.
 - `test_models_match_the_migrated_database` fails if a model changed without a migration.
+- `test_projects_and_catalogue_match_the_design_contract` fails if a Projects or Catalogue operation drifts from `handbook/api/openapi-v1.yaml` (method, path, operationId, permission).
+- `tests/test_display.py` runs the same money and area vectors as `packages/ui/test/format.test.ts`; change both together.
+
+Fixtures worth knowing (tests/conftest.py):
+- `no_network` (automatic): the maps resolver's real HTTP client fails any test that reaches it. Short-link tests inject a fake client (`httpx.MockTransport`).
+- `qr_present`: pretends every project has its RERA QR image, so publish can be tested before the media manager (part 2) exists. Without it, "RERA QR code missing" always blocks publishing.
 
 ## Adding a staff route
 
@@ -105,5 +130,7 @@ All settings are environment variables. They are listed in the repo's `.env.exam
 | `EDGE_PROXY_KEY` | empty | Shared secret with the web proxy (`apps/web/src/proxy.ts`). When set, calls without it get 403 (except health checks and `/api/v1/internal/*`), and only then is the client IP read from `X-Empire-Client-IP`. Empty locally; required in staging and production (D-027). `X-Forwarded-For` is never trusted. |
 | `DB_POOL_SIZE` | `5` | Connections per process |
 | `WORKER_DRAIN_INTERVAL_SECONDS` | `30` | Tick length of `empire-worker` |
+
+The maps resolver (`POST /api/v1/admin/maps/resolve`) needs outbound HTTPS to Google's short-link hosts only (`maps.app.goo.gl`, `goo.gl`); long links and plus codes are read without any network call.
 
 In development and test, missing secrets fall back to clearly insecure defaults so the app runs on a fresh clone. In staging and production, the app refuses to start without real values.

@@ -24,6 +24,8 @@ dependencies = [
     "cryptography==50.0.2",
     "typer==0.27.3",
     "uuid-utils==1.1.0",
+    # The maps resolver follows Google short links on the server (projects/maps.py).
+    "httpx==0.28.1",
 ]
 
 [project.scripts]
@@ -33,7 +35,6 @@ empire-worker = "empire_api.worker:main"
 [dependency-groups]
 dev = [
     "pytest==9.1.1",
-    "httpx==0.28.1",
     "ruff==0.17.1",
     "mypy==2.4.0",
     "pip-audit==2.10.1",
