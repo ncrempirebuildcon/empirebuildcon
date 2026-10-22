@@ -128,6 +128,7 @@ def gen_secrets() -> None:
     _out(f"INTERNAL_API_KEY={secrets.token_urlsafe(36)}")
     _out(f"IP_HASH_SALT={base64.urlsafe_b64encode(secrets.token_bytes(24)).decode()}")
     _out(f"REVALIDATE_SECRET={secrets.token_urlsafe(36)}")
+    _out(f"EDGE_PROXY_KEY={secrets.token_urlsafe(36)}")
 
 
 if __name__ == "__main__":

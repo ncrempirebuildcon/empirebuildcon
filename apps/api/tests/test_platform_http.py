@@ -115,9 +115,11 @@ def test_hsts_and_hidden_docs_in_production() -> None:
         internal_api_key=SecretStr("i" * 48),
         ip_hash_salt=SecretStr("p" * 48),
         data_encryption_key=SecretStr(Fernet.generate_key().decode()),
+        edge_proxy_key=SecretStr("e" * 48),
     )
     prod = create_app(settings)
     with TestClient(prod, base_url="https://testserver") as c:
+        c.headers.update({"X-Empire-Edge-Key": "e" * 48})  # as sent by our web proxy
         response = c.get("/api/health/live")
         assert response.headers["strict-transport-security"].startswith("max-age=31536000")
         assert c.get("/api/openapi.json").status_code == 404

@@ -96,4 +96,5 @@ def test_gen_secrets_prints_every_variable() -> None:
         "INTERNAL_API_KEY",
         "IP_HASH_SALT",
         "REVALIDATE_SECRET",
+        "EDGE_PROXY_KEY",
     ]

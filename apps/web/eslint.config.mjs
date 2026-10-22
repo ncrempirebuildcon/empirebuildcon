@@ -14,12 +14,23 @@ export default defineConfig([
   {
     rules: {
       "react/no-danger": "error",
+      // react/no-danger only sees DOM elements; this also catches <Component dangerouslySetInnerHTML>
+      // and createElement(..., { dangerouslySetInnerHTML }).
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "JSXAttribute[name.name='dangerouslySetInnerHTML'], Property[key.name='dangerouslySetInnerHTML']",
+          message:
+            "Raw HTML is banned (SECURITY.md §5). Use the formatted-text renderer or JsonLd.",
+        },
+      ],
       "@typescript-eslint/no-explicit-any": "error",
     },
   },
   {
     files: ["src/components/JsonLd.tsx"],
-    rules: { "react/no-danger": "off" },
+    rules: { "react/no-danger": "off", "no-restricted-syntax": "off" },
   },
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
 ]);

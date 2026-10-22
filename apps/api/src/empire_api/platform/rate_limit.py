@@ -59,22 +59,20 @@ def hit(key: str, *, limit: int, window_seconds: int, now: datetime | None = Non
     return RateResult(allowed=count <= limit, count=count, retry_after=retry_after)
 
 
-def current(key: str, *, window_seconds: int, now: datetime | None = None) -> RateResult:
-    """Read the count for `key` in the current window without adding to it.
+def clear(key: str) -> None:
+    """Forget every window of `key` (e.g. after a successful sign-in)."""
+    with get_engine().begin() as conn:
+        conn.execute(text("DELETE FROM rate_limit_bucket WHERE key = :key"), {"key": key})
 
-    `allowed` is not meaningful here (no limit given); callers compare `count` themselves.
-    """
-    now = now or utcnow()
-    start = _window_start(now, window_seconds)
-    ends = start + timedelta(seconds=window_seconds)
-    with get_engine().connect() as conn:
-        count = conn.execute(
-            text("SELECT count FROM rate_limit_bucket WHERE key = :key AND window_start = :ws"),
-            {"key": key, "ws": start},
-        ).scalar_one_or_none()
-    return RateResult(
-        allowed=True, count=int(count or 0), retry_after=max(1, int((ends - now).total_seconds()))
-    )
+
+def clear_prefix(prefix: str) -> None:
+    """Forget every key that starts with `prefix` (e.g. all networks of one account on unlock)."""
+    escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    with get_engine().begin() as conn:
+        conn.execute(
+            text("DELETE FROM rate_limit_bucket WHERE key LIKE :pattern ESCAPE '\\'"),
+            {"pattern": escaped + "%"},
+        )
 
 
 def enforce(key: str, *, limit: int, window_seconds: int, message: str) -> None:

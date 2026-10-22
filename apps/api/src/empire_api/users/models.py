@@ -26,7 +26,6 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(server_default=text("true"))
     password_hash: Mapped[str | None] = mapped_column(String(255))
     password_changed_at: Mapped[datetime | None] = mapped_column()
-    failed_login_count: Mapped[int] = mapped_column(server_default=text("0"))
     locked_until: Mapped[datetime | None] = mapped_column()
     last_login_at: Mapped[datetime | None] = mapped_column()
     created_at: Mapped[datetime] = created_at_column()

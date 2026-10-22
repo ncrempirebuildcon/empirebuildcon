@@ -56,10 +56,13 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = ""
     sentry_dsn_api: str = ""
 
-    # SECURITY: how many reverse proxies in front of the API append to X-Forwarded-For.
-    # 0 = use the socket address (local dev). Set per host so clients cannot spoof their IP
-    # to dodge per-IP rate limits (see `empire_api.platform.crypto.client_ip`).
-    trusted_proxy_hops: int = Field(default=0, ge=0, le=5)
+    # SECURITY: shared secret between the web app's proxy (apps/web/src/proxy.ts) and the API.
+    # When set, every request except health checks and internal calls must carry it in
+    # `X-Empire-Edge-Key`, so nobody can call the API host (e.g. *.run.app) directly, and only
+    # then is the client IP read from `X-Empire-Client-IP` (set by our proxy, never the visitor).
+    # Empty = local development: no edge check, client IP = socket address. Required in
+    # staging/production (see `_check_secrets`).
+    edge_proxy_key: SecretStr = SecretStr("")
 
     db_pool_size: int = Field(default=5, ge=1, le=50)
     worker_drain_interval_seconds: int = Field(default=30, ge=5, le=3600)
@@ -99,6 +102,8 @@ class Settings(BaseSettings):
         if not self.is_production_like:
             return self
         problems: list[str] = []
+        if len(self.edge_proxy_key.get_secret_value().encode()) < _MIN_SECRET_BYTES:
+            problems.append(f"EDGE_PROXY_KEY must be set (at least {_MIN_SECRET_BYTES} bytes)")
         for name in ("session_secret", "internal_api_key", "ip_hash_salt", "data_encryption_key"):
             value = getattr(self, name).get_secret_value()
             if value == _DEV_SECRETS[name] or value.startswith("change-me"):

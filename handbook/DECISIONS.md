@@ -258,3 +258,13 @@ The owner decides at the Phase 9 gate. Claude's view: at minimum, budget the Net
 - Dependabot (built into GitHub) opens dependency updates instead of Renovate, so no extra app needs installing.
 **Verified / assumed:** Versions re-read from npm and PyPI on 22 Oct 2026. Changes since D-006: FastAPI 0.159.1, SQLAlchemy 2.1.6, Alembic 1.20.1, pydantic-settings 2.16.1, sentry-sdk 2.73.0, typescript-eslint 8.72.0 (still requires TypeScript < 6.1, so TypeScript stays 6.0.3), uv 0.13.5. GitHub Action majors read from their tags: checkout v7, setup-node v7, pnpm/action-setup v6, setup-uv v10, gitleaks-action v3, upload-artifact v7. The `pgvector/pgvector:pg18` image tag is listed in pgvector's README.
 
+## D-027 · Security review fixes before the first pull request (Accepted, 2026-10-22)
+
+**Context:** An independent review of the Phase 3 code (sessions, CSRF, brute force, permissions, tokens, errors, web) found issues that the tests didn't cover. None had reached any server.
+**Decision:**
+- **Edge key and client IP.** Only our web proxy may call the API. The proxy adds `X-Empire-Edge-Key` (`EDGE_PROXY_KEY`, required in staging and production) and `X-Empire-Client-IP` (taken from the host's header, `CLIENT_IP_SOURCE_HEADER`), after stripping any `X-Empire-*` header the visitor sent. The API refuses calls without the key (403), except health checks and internal scheduler calls, and never reads `X-Forwarded-For`. `/api/v1/internal/*` answers 404 on the website. This replaces the "trusted proxy hops" setting, which couldn't be right on Cloud Run.
+- **Lockout.** Every attempt is counted per account and network before the password is checked: no parallel guessing past 5, no locking the owner out from another network, and identical answers for unknown and real emails. `failed_login_count` is removed; `locked_until` stays only as a CMS note.
+- **Errors and reports.** Sentry runs with `include_local_variables=False` and password fields are hidden from `repr`. Unexpected errors are caught inside the middleware stack, so 500s keep the security headers, `no-store` and the request id.
+- **Accounts and permissions.** Reset links are claimed atomically, and every other open link is burned on reset or password change. The last *usable* super-admin can't be demoted or deactivated (rows locked). Phones are masked in audit diffs. `staff()` both marks and enforces a permission. Only a super-admin can switch `admin_2fa`. The raw-HTML lint ban now also covers components and the UI package.
+**Consequences:** The deploy (Phase 9) sets the same `EDGE_PROXY_KEY` on Netlify and Cloud Run and confirms the client-IP header on Netlify staging. The nonce-based CSP stays in Phase 5 (D-026).
+

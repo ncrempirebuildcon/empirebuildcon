@@ -13,6 +13,15 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       "@typescript-eslint/no-explicit-any": "error",
+      // SECURITY.md §5: shared components never render raw HTML.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "JSXAttribute[name.name='dangerouslySetInnerHTML'], Property[key.name='dangerouslySetInnerHTML']",
+          message: "Raw HTML is banned in shared components (SECURITY.md §5).",
+        },
+      ],
     },
   },
   {

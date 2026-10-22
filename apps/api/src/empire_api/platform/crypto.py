@@ -17,28 +17,28 @@ from starlette.requests import Request
 
 from empire_api.config import get_settings
 
+CLIENT_IP_HEADER = "x-empire-client-ip"
+
 
 def client_ip(request: Request) -> str:
-    """The visitor's IP address as seen by the first proxy we trust.
+    """The visitor's IP address, for rate limits and audit rows.
 
-    SECURITY: X-Forwarded-For is client-controlled at its left end. We only trust the last
-    `TRUSTED_PROXY_HOPS` entries, which our own proxies appended. With 0 hops (local dev) we use
-    the socket peer. Getting this wrong lets an attacker rotate fake IPs to dodge rate limits.
+    SECURITY: X-Forwarded-For can be forged by the visitor, so we never read it. Our own web
+    proxy (apps/web/src/proxy.ts) puts the address the hosting platform saw into
+    `X-Empire-Client-IP`, and we believe that header only on requests that passed the edge-key
+    check (middleware/edge_guard.py). Without an edge key (local dev) we use the socket address.
+    Getting this wrong lets an attacker rotate fake IPs to dodge rate limits, or lets one
+    address block every staff login.
     """
-    hops = get_settings().trusted_proxy_hops
     peer = request.client.host if request.client else "0.0.0.0"  # noqa: S104 — placeholder only
-    if hops == 0:
+    if not request.scope.get("empire_edge_verified"):
         return peer
-    forwarded = request.headers.get("x-forwarded-for", "")
-    chain = [part.strip() for part in forwarded.split(",") if part.strip()]
-    if len(chain) >= hops:
-        candidate = chain[-hops]
-        try:
-            ipaddress.ip_address(candidate)
-        except ValueError:
-            return peer
-        return candidate
-    return peer
+    candidate = request.headers.get(CLIENT_IP_HEADER, "").strip()
+    try:
+        ipaddress.ip_address(candidate)
+    except ValueError:
+        return peer
+    return candidate
 
 
 def hash_ip(ip: str) -> str:

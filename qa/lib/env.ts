@@ -21,6 +21,8 @@ const defaults: Record<string, () => string> = {
   DATA_ENCRYPTION_KEY: () => `${generated(32)}=`,
   INTERNAL_API_KEY: () => generated(48),
   IP_HASH_SALT: () => generated(48),
+  // The web proxy and the API share this key, exactly as in production (apps/web/src/proxy.ts).
+  EDGE_PROXY_KEY: () => generated(48),
 };
 
 /** Settings for the API process and its CLI; fills any missing value once per test run. */

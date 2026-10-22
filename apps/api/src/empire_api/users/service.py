@@ -12,14 +12,15 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from empire_api.config import get_settings
 from empire_api.errors import ApiProblem
+from empire_api.logs import mask_phone
 from empire_api.platform import audit, outbox, rate_limit
 from empire_api.platform.crypto import hash_ip, hash_token, new_token
 from empire_api.timeutil import utcnow
@@ -34,7 +35,7 @@ LOCKED_MESSAGE = "Too many attempts. Try again in 15 minutes."
 INVALID_LINK = "This link is invalid or has expired. Ask for a new one."
 
 MAX_FAILED_LOGINS = 5
-LOCK_DURATION = timedelta(minutes=15)
+LOCK_WINDOW_SECONDS = 15 * 60
 RESET_TOKEN_TTL = timedelta(minutes=30)
 SETUP_TOKEN_TTL = timedelta(hours=24)
 
@@ -62,43 +63,41 @@ def login(db: Session, email: str, password: str, meta: RequestMeta) -> tuple[Us
     """Check credentials and start a session. Returns (user, signed token, session id).
 
     How it works:
-      1. Per-IP rate limit (10 per 15 minutes), counted even when the attempt fails.
-      2. Locked accounts get 429 until `locked_until` passes; unknown emails get the same 429
-         after the same number of failures (no enumeration).
-      3. Wrong password → failed count + 1; the 5th failure locks the account for 15 minutes.
-      4. Success → counters reset, a new session (new sid), audit row.
+      1. Per-network limit: 10 sign-in attempts per 15 minutes per IP, across all accounts.
+      2. Per account AND network: every attempt is counted (atomic UPSERT) BEFORE the password
+         is checked; the 6th attempt within the 15-minute window gets 429 until the window ends.
+      3. Wrong password → 401 with one generic message; the 5th failure records a "locked"
+         audit row and shows the account as recently locked in the CMS.
+      4. Success → the account/network counter is cleared, a new session (new sid), audit row.
+
+    SECURITY (why this shape):
+      - Counting before checking means parallel requests can't squeeze in extra guesses.
+        INVARIANT: at most 5 password checks per account, per network, per 15 minutes.
+      - Locking per account AND network means a stranger can't lock the owner out by typing
+        the owner's (public) email five times: only the stranger's network gets blocked.
+      - Unknown emails go through exactly the same steps and answers (401, then 429 with the
+        same Retry-After rule), so the responses can't reveal which emails have accounts.
     """
     ip_key = hash_ip(meta.ip)
     rate_limit.enforce(
         f"login:ip:{ip_key}",
         limit=10,
-        window_seconds=15 * 60,
+        window_seconds=LOCK_WINDOW_SECONDS,
         message="Too many sign-in attempts from this network. Try again in 15 minutes.",
     )
+    attempt_key = _attempt_key(email, ip_key)
+    attempt = rate_limit.hit(
+        attempt_key, limit=MAX_FAILED_LOGINS, window_seconds=LOCK_WINDOW_SECONDS
+    )
+    if not attempt.allowed:
+        raise ApiProblem(429, LOCKED_MESSAGE, headers={"Retry-After": str(attempt.retry_after)})
+
     now = utcnow()
     user = find_user_by_email(db, email)
-    # SECURITY: unknown emails "lock" too, after the same number of failures, so the 429 answer
-    # can't be used to discover which emails have staff accounts (no account enumeration).
-    unknown_key = f"login:unknown:{hash_token(normalise_email(email))}"
-
-    if user is not None and user.locked_until is not None and user.locked_until > now:
-        retry = max(1, int((user.locked_until - now).total_seconds()))
-        raise ApiProblem(429, LOCKED_MESSAGE, headers={"Retry-After": str(retry)})
-    if user is None:
-        seen = rate_limit.current(unknown_key, window_seconds=int(LOCK_DURATION.total_seconds()))
-        if seen.count >= MAX_FAILED_LOGINS:
-            raise ApiProblem(429, LOCKED_MESSAGE, headers={"Retry-After": str(seen.retry_after)})
-
     ok = passwords.verify_password(user.password_hash if user else None, password)
     if user is None or not ok or not user.is_active:
-        if user is not None and not ok:
-            _register_failure(db, user, meta)
-        elif user is None:
-            rate_limit.hit(
-                unknown_key,
-                limit=MAX_FAILED_LOGINS,
-                window_seconds=int(LOCK_DURATION.total_seconds()),
-            )
+        if user is not None and attempt.count == MAX_FAILED_LOGINS:
+            _record_lock(db, user, meta, until=now + timedelta(seconds=attempt.retry_after))
         audit.record(
             db,
             action="auth.login_failed",
@@ -113,7 +112,7 @@ def login(db: Session, email: str, password: str, meta: RequestMeta) -> tuple[Us
     assert user.password_hash is not None  # noqa: S101 — verify_password returned True
     if passwords.needs_rehash(user.password_hash):
         user.password_hash = passwords.hash_password(password)
-    user.failed_login_count = 0
+    rate_limit.clear(attempt_key)
     user.locked_until = None
     user.last_login_at = now
     session_row, token = start_session(db, user, ip_hash=ip_key, user_agent=meta.user_agent)
@@ -124,27 +123,33 @@ def login(db: Session, email: str, password: str, meta: RequestMeta) -> tuple[Us
     return user, token, session_row.id
 
 
-def _register_failure(db: Session, user: User, meta: RequestMeta) -> None:
-    user.failed_login_count += 1
-    if user.failed_login_count >= MAX_FAILED_LOGINS:
-        user.failed_login_count = 0
-        user.locked_until = utcnow() + LOCK_DURATION
-        audit.record(
-            db,
-            action="user.locked",
-            entity_type="user",
-            entity_id=user.id,
-            actor_id=None,
-            ip=meta.ip,
-            changes={"locked_until": user.locked_until.isoformat()},
-        )
-        outbox.emit(
-            db,
-            type_="user.locked",
-            aggregate_type="user",
-            aggregate_id=user.id,
-            data={"user_id": str(user.id), "locked_until": user.locked_until.isoformat()},
-        )
+def _attempt_key(email: str, ip_key: str) -> str:
+    return f"login:acct:{hash_token(normalise_email(email))}:{ip_key}"
+
+
+def _record_lock(db: Session, user: User, meta: RequestMeta, *, until: datetime) -> None:
+    """Note a lockout for the CMS and the security email (the 429 itself comes from the counter).
+
+    `locked_until` is informational: "locked from at least one network until …". Unlock in the
+    CMS clears it and every network's counter for this account.
+    """
+    user.locked_until = until
+    audit.record(
+        db,
+        action="user.locked",
+        entity_type="user",
+        entity_id=user.id,
+        actor_id=None,
+        ip=meta.ip,
+        changes={"locked_until": until.isoformat()},
+    )
+    outbox.emit(
+        db,
+        type_="user.locked",
+        aggregate_type="user",
+        aggregate_id=user.id,
+        data={"user_id": str(user.id), "locked_until": until.isoformat()},
+    )
 
 
 def logout(db: Session, user: User, session: UserSession, meta: RequestMeta) -> None:
@@ -183,6 +188,7 @@ def change_password(
     now = utcnow()
     user.password_hash = passwords.hash_password(new)
     user.password_changed_at = now
+    _burn_open_tokens(db, user.id, now)  # SECURITY: old reset emails stop working
     revoke_sessions(db, user.id, keep=session.id, now=now)
     audit.record(
         db,
@@ -270,26 +276,40 @@ def forgot_password(db: Session, email: str, meta: RequestMeta) -> None:
 
 
 def reset_password(db: Session, token: str, new: str, meta: RequestMeta) -> User:
-    """Use a reset or setup token: set the password, burn the token, sign out everywhere."""
-    row = db.scalar(
-        select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_token(token))
-    )
+    """Use a reset or setup token: set the password, burn the token, sign out everywhere.
+
+    SECURITY: the token is claimed with one conditional UPDATE (`used_at IS NULL`), so two
+    parallel requests can't both use it; every other unused link for the account is burned too,
+    so an older email can't be used after a newer reset.
+    """
     now = utcnow()
-    if row is None or row.used_at is not None or row.expires_at <= now:
+    _policy_or_422(new, _email_for_token(db, token) or "")
+    claimed = db.execute(
+        update(PasswordResetToken)
+        .where(
+            PasswordResetToken.token_hash == hash_token(token),
+            PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.expires_at > now,
+        )
+        .values(used_at=now)
+        .returning(PasswordResetToken.user_id, PasswordResetToken.purpose)
+    ).first()
+    if claimed is None:
+        db.rollback()
         raise ApiProblem(400, INVALID_LINK)
-    user = db.get(User, row.user_id)
+    user = db.get(User, claimed.user_id)
     if user is None or not user.is_active:
+        db.rollback()
         raise ApiProblem(400, INVALID_LINK)
-    _policy_or_422(new, user.email)
-    row.used_at = now
     user.password_hash = passwords.hash_password(new)
     user.password_changed_at = now
-    user.failed_login_count = 0
     user.locked_until = None
+    rate_limit.clear_prefix(_attempt_key(user.email, ""))
+    _burn_open_tokens(db, user.id, now)
     revoke_sessions(db, user.id, now=now)
     audit.record(
         db,
-        action=f"user.password_{'set' if row.purpose == 'setup' else 'reset'}",
+        action=f"user.password_{'set' if claimed.purpose == 'setup' else 'reset'}",
         entity_type="user",
         entity_id=user.id,
         actor_id=user.id,
@@ -299,14 +319,32 @@ def reset_password(db: Session, token: str, new: str, meta: RequestMeta) -> User
     return user
 
 
+def _email_for_token(db: Session, token: str) -> str | None:
+    """The email of a token's account, only to check the new password doesn't contain it."""
+    row = db.scalar(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_token(token))
+    )
+    user = db.get(User, row.user_id) if row else None
+    return user.email if user else None
+
+
+def _burn_open_tokens(db: Session, user_id: uuid.UUID, now: datetime) -> None:
+    db.execute(
+        update(PasswordResetToken)
+        .where(PasswordResetToken.user_id == user_id, PasswordResetToken.used_at.is_(None))
+        .values(used_at=now)
+    )
+
+
 # --- Staff accounts (users.manage) ------------------------------------------------------------
 
 
 def _snapshot(user: User) -> dict[str, Any]:
+    """Fields recorded in audit diffs. SECURITY: phone numbers are masked (audit.py rule)."""
     return {
         "email": user.email,
         "name": user.name,
-        "phone": user.phone,
+        "phone": mask_phone(user.phone) if user.phone else None,
         "role": user.role,
         "is_active": user.is_active,
     }
@@ -350,15 +388,22 @@ def create_user(
     return user, token
 
 
-def _super_admin_count(db: Session) -> int:
-    return int(
-        db.scalar(
-            select(func.count())
-            .select_from(User)
-            .where(User.role == "super_admin", User.is_active.is_(True))
+def _usable_super_admin_count(db: Session) -> int:
+    """Active super-admins who can actually sign in (password set), with their rows locked.
+
+    WHY FOR UPDATE: two admins demoting the last two super-admins at the same moment would
+    each see "one other is left" without the lock; with it, the second waits and sees zero.
+    """
+    rows = db.scalars(
+        select(User.id)
+        .where(
+            User.role == "super_admin",
+            User.is_active.is_(True),
+            User.password_hash.is_not(None),
         )
-        or 0
-    )
+        .with_for_update()
+    ).all()
+    return len(rows)
 
 
 def update_user(
@@ -366,7 +411,7 @@ def update_user(
 ) -> User:
     """Edit a staff account. A role change or deactivation signs the person out everywhere.
 
-    INVARIANT: there is always at least one active super-admin (the owner).
+    INVARIANT: there is always at least one active super-admin who can sign in (the owner).
     """
     before = _snapshot(user)
     if "email" in changes and changes["email"] is not None:
@@ -377,7 +422,8 @@ def update_user(
         changes["email"] = email
     demoting = changes.get("role") not in (None, "super_admin") and user.role == "super_admin"
     deactivating = changes.get("is_active") is False and user.role == "super_admin"
-    if (demoting or deactivating) and user.is_active and _super_admin_count(db) <= 1:
+    usable = user.is_active and user.password_hash is not None
+    if (demoting or deactivating) and usable and _usable_super_admin_count(db) <= 1:
         raise ApiProblem(409, "There must always be at least one active super-admin.")
     for field in ("email", "name", "phone", "role", "is_active"):
         if field in changes and (changes[field] is not None or field == "phone"):
@@ -413,8 +459,9 @@ def update_user(
 
 
 def unlock_user(db: Session, user: User, actor_id: uuid.UUID, meta: RequestMeta) -> None:
+    """Clear the lock note and every network's sign-in counter for this account."""
     user.locked_until = None
-    user.failed_login_count = 0
+    rate_limit.clear_prefix(_attempt_key(user.email, ""))
     audit.record(
         db,
         action="user.unlocked",

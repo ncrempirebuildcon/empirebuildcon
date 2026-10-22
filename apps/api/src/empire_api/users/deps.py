@@ -5,8 +5,9 @@ How to protect a route (also in apps/api/README.md):
     @router.get("/admin/things", **staff("things.read"))
     def list_things(actor: Annotated[SessionInfo, Depends(require("things.read"))]) -> ...
 
-`staff()` adds `x-permission` to the OpenAPI operation; `require()` enforces it. The route
-walker test fails if a route has neither `x-permission`, `x-auth`, `x-public` nor `x-internal`.
+`staff()` both enforces the permission and adds `x-permission` to the OpenAPI operation, so the
+two can't drift apart. The route walker test fails if a route has neither `x-permission`,
+`x-auth`, `x-public` nor `x-internal`.
 
 SECURITY: `require()` is the only gate. The CMS hiding a button is a convenience, not security
 (SECURITY.md §2). Unsafe methods (POST/PUT/PATCH/DELETE) also need a matching X-CSRF-Token.
@@ -30,26 +31,6 @@ _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 _COOKIE_SECURITY: list[dict[str, list[str]]] = [{"cookieAuth": []}]
 _COOKIE_CSRF_SECURITY: list[dict[str, list[str]]] = [{"cookieAuth": [], "csrfHeader": []}]
-
-
-def staff(permission: str, *, write: bool = False) -> dict[str, Any]:
-    """Route kwargs marking a staff route with its permission in the OpenAPI spec."""
-    return {
-        "openapi_extra": {
-            "x-permission": permission,
-            "security": _COOKIE_CSRF_SECURITY if write else _COOKIE_SECURITY,
-        }
-    }
-
-
-def signed_in_route(*, write: bool = False) -> dict[str, Any]:
-    """Route kwargs for routes any signed-in staff member may use (me, logout, own password)."""
-    return {
-        "openapi_extra": {
-            "x-auth": "signed_in",
-            "security": _COOKIE_CSRF_SECURITY if write else _COOKIE_SECURITY,
-        }
-    }
 
 
 PUBLIC: dict[str, Any] = {"openapi_extra": {"x-public": True, "security": []}}
@@ -92,3 +73,33 @@ def require(permission: str) -> Any:
 
 CurrentSession = Annotated[SessionInfo, Depends(current_session)]
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+def staff(permission: str, *, write: bool = False) -> dict[str, Any]:
+    """Route kwargs: enforce `permission` AND publish it as `x-permission` in the spec.
+
+    INVARIANT: the marker and the check come from this one call, so a route can't advertise a
+    permission it doesn't enforce. The route may still take `require(...)` as a parameter to get
+    the signed-in user; FastAPI runs the (cached) dependency once per request.
+    """
+    return {
+        "dependencies": [Depends(require(permission))],
+        "openapi_extra": {
+            "x-permission": permission,
+            "security": _COOKIE_CSRF_SECURITY if write else _COOKIE_SECURITY,
+        },
+    }
+
+
+def signed_in_route(*, write: bool = False) -> dict[str, Any]:
+    """Route kwargs for routes any signed-in staff member may use (me, logout, own password).
+
+    Like `staff()`, the marker and the sign-in (and CSRF) check come together.
+    """
+    return {
+        "dependencies": [Depends(current_session)],
+        "openapi_extra": {
+            "x-auth": "signed_in",
+            "security": _COOKIE_CSRF_SECURITY if write else _COOKIE_SECURITY,
+        },
+    }

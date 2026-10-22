@@ -91,23 +91,44 @@ def test_five_failures_lock_the_account_for_15_minutes(client: TestClient, db: S
     )
     assert locked.status_code == 429
     assert locked.json()["detail"] == LOCKED_MESSAGE
-    assert 800 < int(locked.headers["retry-after"]) <= 900
+    # The lock lasts until the end of the current 15-minute window.
+    assert 0 < int(locked.headers["retry-after"]) <= 900
     row = db.get(User, user.id)
     assert row is not None and row.locked_until is not None
     actions = set(db.scalars(select(AuditLog.action)).all())
     assert {"auth.login_failed", "user.locked"} <= actions
 
 
-def test_lock_expires(client: TestClient, db: Session) -> None:
+def test_unlock_lets_the_person_sign_in_again(app: FastAPI, client: TestClient) -> None:
     user = make_user("sales")
-    db.execute(
-        update(User).where(User.id == user.id).values(locked_until=utcnow() - timedelta(seconds=1))
+    for _ in range(5):
+        client.post("/api/v1/auth/login", json={"email": user.email, "password": "wrong password!"})
+    assert (
+        client.post(
+            "/api/v1/auth/login", json={"email": user.email, "password": GOOD_PASSWORD}
+        ).status_code
+        == 429
     )
-    db.commit()
+    owner_client = new_client(app)
+    owner = sign_in(owner_client, make_user("super_admin", email="owner@example.com"))
+    r = owner_client.post(f"/api/v1/admin/users/{user.id}/unlock", headers=owner.headers())
+    assert r.status_code == 204
     response = client.post(
         "/api/v1/auth/login", json={"email": user.email, "password": GOOD_PASSWORD}
     )
     assert response.status_code == 200
+
+
+def test_success_clears_the_failure_count(client: TestClient) -> None:
+    user = make_user("sales")
+    for _ in range(4):
+        client.post("/api/v1/auth/login", json={"email": user.email, "password": "wrong password!"})
+    assert sign_in(client, user)
+    for _ in range(4):
+        r = client.post(
+            "/api/v1/auth/login", json={"email": user.email, "password": "wrong password!"}
+        )
+        assert r.status_code == 401
 
 
 def test_login_rate_limit_per_ip(client: TestClient) -> None:

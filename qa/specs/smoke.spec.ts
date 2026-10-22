@@ -1,5 +1,6 @@
 // Smoke: the site answers, the 404 page works, and /api/* reaches the API without redirects.
 import { expect, test } from "@playwright/test";
+import { API_URL } from "../lib/env";
 
 test("home page loads with the holding message", async ({ page }) => {
   const response = await page.goto("/");
@@ -33,4 +34,24 @@ test("/api/* is proxied to the API", async ({ request }) => {
 test("API paths with a trailing slash are not redirected", async ({ request }) => {
   const response = await request.get("/api/health/live/", { maxRedirects: 0 });
   expect(response.status()).toBe(200);
+});
+
+// SECURITY: only our web proxy may call the API (edge key), and internal routes stay internal.
+test("the API refuses direct calls without the edge key", async ({ request }) => {
+  const direct = await request.get(`${API_URL}/api/v1/auth/me`);
+  expect(direct.status()).toBe(403);
+  const viaSite = await request.get("/api/v1/auth/me");
+  expect(viaSite.status()).toBe(401);
+});
+
+test("internal API routes are not reachable through the website", async ({ request }) => {
+  const response = await request.post("/api/v1/internal/outbox/drain");
+  expect(response.status()).toBe(404);
+});
+
+test("a forged edge key from the visitor is replaced", async ({ request }) => {
+  const response = await request.get("/api/v1/auth/me", {
+    headers: { "X-Empire-Edge-Key": "forged", "X-Empire-Client-IP": "203.0.113.9" },
+  });
+  expect(response.status()).toBe(401);
 });

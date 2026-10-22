@@ -2,6 +2,8 @@
 
 SECURITY: `send_default_pii=False` keeps cookies, IPs and request bodies (lead data) out of
 Sentry; the before_send hook also drops request bodies and cookies defensively.
+DO NOT CHANGE `include_local_variables=False`: with local variables on, a crash during sign-in
+or a password change would send the typed password (and lead details) to Sentry.
 """
 
 from __future__ import annotations
@@ -21,7 +23,13 @@ def _scrub(event: Any, hint: Any) -> Any:
         headers = request.get("headers")
         if isinstance(headers, dict):
             for name in list(headers):
-                if name.lower() in {"cookie", "x-csrf-token", "x-internal-key", "authorization"}:
+                if name.lower() in {
+                    "cookie",
+                    "x-csrf-token",
+                    "x-internal-key",
+                    "x-empire-edge-key",
+                    "authorization",
+                }:
                     headers[name] = "[removed]"
     return event
 
@@ -34,6 +42,7 @@ def init_sentry(settings: Settings, *, component: str) -> bool:
         environment=settings.app_env,
         release=f"empire-api@{settings.version}",
         send_default_pii=False,
+        include_local_variables=False,
         traces_sample_rate=0.05,
         before_send=_scrub,
     )

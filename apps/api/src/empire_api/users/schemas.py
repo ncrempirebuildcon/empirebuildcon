@@ -26,7 +26,7 @@ class StrictModel(BaseModel):
 
 class LoginRequest(StrictModel):
     email: EmailStr
-    password: str = Field(min_length=1, max_length=MAX_LENGTH)
+    password: str = Field(min_length=1, max_length=MAX_LENGTH, repr=False)
 
 
 class PasswordForgot(StrictModel):
@@ -35,12 +35,12 @@ class PasswordForgot(StrictModel):
 
 class PasswordReset(StrictModel):
     token: str = Field(min_length=16, max_length=200)
-    new_password: str = Field(min_length=MIN_LENGTH, max_length=MAX_LENGTH)
+    new_password: str = Field(min_length=MIN_LENGTH, max_length=MAX_LENGTH, repr=False)
 
 
 class PasswordChange(StrictModel):
-    current_password: str = Field(min_length=1, max_length=MAX_LENGTH)
-    new_password: str = Field(min_length=MIN_LENGTH, max_length=MAX_LENGTH)
+    current_password: str = Field(min_length=1, max_length=MAX_LENGTH, repr=False)
+    new_password: str = Field(min_length=MIN_LENGTH, max_length=MAX_LENGTH, repr=False)
 
 
 class User(BaseModel):

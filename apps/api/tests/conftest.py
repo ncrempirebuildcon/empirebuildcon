@@ -27,7 +27,7 @@ os.environ["INTERNAL_API_KEY"] = "test-internal-key-0123456789-abcdefghijklmnop"
 os.environ["IP_HASH_SALT"] = "test-ip-salt-0123456789-abcdefghijklmnop"
 os.environ["DATA_ENCRYPTION_KEY"] = "test-data-key"
 os.environ["CORS_ALLOWED_ORIGINS"] = ""
-os.environ["TRUSTED_PROXY_HOPS"] = "0"
+os.environ["EDGE_PROXY_KEY"] = ""
 
 # The imports below come after the environment on purpose: settings are read at import time.
 from alembic import command

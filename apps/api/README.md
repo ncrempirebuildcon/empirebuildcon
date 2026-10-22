@@ -89,7 +89,7 @@ def update_thing(key: str, body: ThingUpdate, request: Request,
 ```
 
 Checklist for a new route:
-1. **Permission.** Use `staff(...)` and `require(...)` with a permission that exists in `users/roles.py`. Adding a new permission or changing a role needs owner approval (CONTRIBUTING §7).
+1. **Permission.** Use `staff(...)`: it both enforces the permission and publishes it in the spec. Take `require(...)` as a parameter only when you need the signed-in user (it runs once per request). The permission must exist in `users/roles.py`; adding one or changing a role needs owner approval (CONTRIBUTING §7).
 2. **Public routes.** Use `**PUBLIC` instead, and add rate limits (`platform.rate_limit.enforce`).
 3. **Request bodies.** Staff bodies use `extra="forbid"`, and every string has a length limit.
 4. **Audit and events.** Write an audit row for every create, update, delete, publish and export, and an outbox event for anything others react to (ARCHITECTURE §9).
@@ -102,7 +102,7 @@ All settings are environment variables. They are listed in the repo's `.env.exam
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `TRUSTED_PROXY_HOPS` | `0` | How many of our own proxies append to `X-Forwarded-For`. Set it per host so per-IP rate limits can't be dodged. |
+| `EDGE_PROXY_KEY` | empty | Shared secret with the web proxy (`apps/web/src/proxy.ts`). When set, calls without it get 403 (except health checks and `/api/v1/internal/*`), and only then is the client IP read from `X-Empire-Client-IP`. Empty locally; required in staging and production (D-027). `X-Forwarded-For` is never trusted. |
 | `DB_POOL_SIZE` | `5` | Connections per process |
 | `WORKER_DRAIN_INTERVAL_SECONDS` | `30` | Tick length of `empire-worker` |
 

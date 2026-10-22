@@ -2,8 +2,10 @@
 
 Implements: ARCHITECTURE §3 (no redirects, same-origin API under /api), SECURITY.md §3–4.
 
-Middleware order (outermost first): trailing-slash strip → request id/log → security headers
-→ CORS (development only). The strip must run first so every later layer sees the final path.
+Middleware order (outermost first): trailing-slash strip → security headers → request id/log
+and the 500 safety net → edge guard (only our web proxy may call us) → CORS (development only).
+The strip must run first so every later layer sees the final path; security headers sit outside
+the 500 safety net and the edge guard so their answers carry the headers too.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from empire_api.config import Settings, get_settings
 from empire_api.errors import PROBLEM_MEDIA_TYPE, register_error_handlers
 from empire_api.integrations import routes as internal_routes
 from empire_api.logs import configure_logging
+from empire_api.middleware.edge_guard import EdgeGuardMiddleware
 from empire_api.middleware.request_context import RequestContextMiddleware
 from empire_api.middleware.security_headers import SecurityHeadersMiddleware
 from empire_api.middleware.trailing_slash import StripTrailingSlashMiddleware
@@ -67,8 +70,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
             allow_headers=["Content-Type", "X-CSRF-Token"],
         )
-    app.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_production_like)
+    # add_middleware wraps the app, so the LAST one added is the OUTERMOST.
+    app.add_middleware(EdgeGuardMiddleware, edge_key=settings.edge_proxy_key.get_secret_value())
     app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_production_like)
     app.add_middleware(StripTrailingSlashMiddleware)
 
     _install_openapi(app)

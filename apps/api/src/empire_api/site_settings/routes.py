@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from empire_api.db import get_db
-from empire_api.errors import problem_responses
+from empire_api.errors import ApiProblem, problem_responses
 from empire_api.platform.crypto import client_ip
 from empire_api.site_settings import flags
 from empire_api.site_settings.models import FeatureFlag as FlagRow
@@ -58,6 +58,9 @@ def _out(db: Session, row: FlagRow) -> FeatureFlag:
     )
 
 
+SUPER_ADMIN_ONLY_FLAGS = frozenset({"admin_2fa"})
+
+
 @router.get(
     "/flags", response_model=list[FeatureFlag], operation_id="list_flags", **staff("settings.read")
 )
@@ -82,5 +85,9 @@ def set_flag(
     db: Db,
 ) -> FeatureFlag:
     """Switch a feature on or off. Locked features (not built yet) answer 409."""
+    if key in SUPER_ADMIN_ONLY_FLAGS and actor.user.role != "super_admin":
+        # SECURITY: admins hold flags.manage, but two-factor protects super-admins too, so only
+        # a super-admin may switch it off (or on).
+        raise ApiProblem(403, "Only a super-admin can change this setting.")
     row = flags.set_flag(db, key, body.enabled, actor_id=actor.user.id, ip=client_ip(request))
     return _out(db, row)

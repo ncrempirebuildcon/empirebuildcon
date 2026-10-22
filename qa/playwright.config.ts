@@ -40,7 +40,7 @@ export default defineConfig({
     {
       command: "pnpm --filter @empire/web start",
       url: WEB_URL,
-      env: { API_ORIGIN: API_URL, SITE_URL: WEB_URL },
+      env: { API_ORIGIN: API_URL, SITE_URL: WEB_URL, EDGE_PROXY_KEY: env.EDGE_PROXY_KEY ?? "" },
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
     },
