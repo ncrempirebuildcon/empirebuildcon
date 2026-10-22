@@ -268,3 +268,21 @@ The owner decides at the Phase 9 gate. Claude's view: at minimum, budget the Net
 - **Accounts and permissions.** Reset links are claimed atomically, and every other open link is burned on reset or password change. The last *usable* super-admin can't be demoted or deactivated (rows locked). Phones are masked in audit diffs. `staff()` both marks and enforces a permission. Only a super-admin can switch `admin_2fa`. The raw-HTML lint ban now also covers components and the UI package.
 **Consequences:** The deploy (Phase 9) sets the same `EDGE_PROXY_KEY` on Netlify and Cloud Run and confirms the client-IP header on Netlify staging. The nonce-based CSP stays in Phase 5 (D-026).
 
+
+## D-028 · Protecting `main` depends on the GitHub plan (Proposed, 2026-10-22)
+
+**Context:** D-026 assumes a protected `main` (PR, one approval, green CI, no force pushes). The repository is private, and the owner's GitHub account is on the free plan.
+**Options:**
+1. Stay on GitHub Free and follow the rules by hand. Costs nothing, but GitHub doesn't stop a direct push to `main`.
+2. GitHub Pro on the owner's personal account. Protection is enforced on private repos.
+3. A GitHub organisation on GitHub Team. Protection is enforced, and seats suit more developers later.
+4. Make the repo public. Protection is free, but the code becomes public. Not wanted.
+**Decision (proposed):** Option 1 until a second developer joins or the Phase 9 go-live gate, whichever comes first; then the owner picks 2 or 3. Claude doesn't push to `main` either way (D-026), so the risk until then is mostly human error. The settings to apply are listed in CONTRIBUTING §12.
+**Consequences:** Until the upgrade, the owner checks that CI is green before merging. The CI workflow already runs on every pull request.
+**Verified / assumed:**
+- Checked 22 Oct 2026 in GitHub Docs ("About protected branches", "GitHub's plans") and on github.com/pricing:
+  - Protected branches on private repos need Pro, Team or Enterprise.
+  - The Free plan lists repository rules for public repos only.
+  - Free includes 2,000 Actions minutes a month; Pro and Team include 3,000.
+  - Team costs $4 USD per user per month for the first 12 months.
+- The Pro price wasn't shown on the pages read.

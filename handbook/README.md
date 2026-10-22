@@ -81,7 +81,7 @@ These are the short versions. Details are in the linked pages.
    - Leads are never hard-deleted; erasure goes through `leads.erase` ([ARCHITECTURE.md](ARCHITECTURE.md) §8, [SECURITY.md](SECURITY.md)).
 4. **Permissions are checked in the API on every call.** Hiding a button in the UI is not security.
 5. **Accessibility is WCAG 2.1 AA.** That means real buttons and labels, a visible focus ring, 44 px touch targets and colour never used as the only signal.
-6. **`main` is protected.** Everything reaches it through a reviewed pull request with green CI ([CONTRIBUTING.md](CONTRIBUTING.md)).
+6. **`main` is protected.** Everything reaches it through a reviewed pull request with green CI ([CONTRIBUTING.md](CONTRIBUTING.md)). On a private repo with GitHub Free, GitHub can't enforce this, so follow it by hand (CONTRIBUTING §12, D-028).
 
 ## Glossary
 

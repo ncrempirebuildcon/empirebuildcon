@@ -78,12 +78,13 @@ Refs: #123
 
 ## 6. Before you push
 
-Run the same checks CI runs. The exact commands arrive with the code in Phase 3 and will be listed in [SETUP.md](SETUP.md). They will cover:
+Run the same checks CI runs. The exact commands are in [SETUP.md § Checks](SETUP.md#checks-the-same-as-ci). They cover:
 
 - formatting and lint (Prettier and ESLint for the web, Ruff for Python);
 - type-check (`tsc`, mypy);
 - tests (pytest for the API; Playwright and axe for browser journeys);
 - database migrations from an empty database;
+- the OpenAPI contract and generated client;
 - build.
 
 Also check:
@@ -145,3 +146,19 @@ AI assistants follow every rule above, plus these:
 - Leave the handbook and the code comments good enough that the next person, human or AI, can continue without asking.
 
 The same rules for AI agents are in [`../AGENTS.md`](../AGENTS.md).
+
+## 12. Repository settings on GitHub (owner)
+
+The owner sets these once, after the first push. They turn the rules above into settings that GitHub enforces.
+
+**Branch protection for `main`** (Settings → Branches → Add rule, or Settings → Rules → New ruleset):
+- Require a pull request before merging, with 1 approval. Dismiss stale approvals when new commits are pushed.
+- Require these status checks to pass: `secrets`, `api`, `web`, `contract`, `e2e`. Require the branch to be up to date.
+- Require conversation resolution.
+- Block force pushes and deletions.
+- Allow only **squash merging** (Settings → General → Pull requests), and turn on "Automatically delete head branches".
+
+**GitHub plan (checked 22 Oct 2026, D-028):**
+- On **GitHub Free**, protected branches and rulesets work only on *public* repositories. On a *private* repository they need GitHub Pro (personal account) or GitHub Team (organisation).
+- Until the owner upgrades, nothing above is enforced. Everyone follows the rules by hand, and the owner checks that CI is green before merging.
+- GitHub Free includes 2,000 Actions minutes a month for private repositories. After the first few CI runs, check the real use under Settings → Billing and plans. Concurrent runs on the same branch cancel each other (`concurrency` in `ci.yml`), which saves minutes.
