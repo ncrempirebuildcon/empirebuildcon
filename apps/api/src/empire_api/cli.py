@@ -3,7 +3,8 @@
 Commands:
   create-superadmin  One-time: create the owner's account and print a setup link (D-009).
   create-user        Development/test only: a staff account with a password from stdin.
-  seed               Feature flags and default settings (idempotent). --sample: Phase 4.
+  seed               Feature flags, default settings and the amenity catalogue (idempotent).
+                     --sample also adds sample projects (development and demos; D-015).
   openapi            Write the OpenAPI spec for the typed web client (D-020).
   gen-secrets        Print fresh random values for your own local .env.
 
@@ -26,6 +27,7 @@ from sqlalchemy import select
 
 from empire_api.config import get_settings
 from empire_api.db import get_sessionmaker
+from empire_api.projects.seed import SampleRefusedError, seed_amenities, seed_sample
 from empire_api.site_settings.defaults import seed_settings
 from empire_api.site_settings.flags import seed_flags
 from empire_api.users import passwords, service
@@ -95,16 +97,38 @@ def create_user(
 
 @app.command("seed")
 def seed(
-    sample: Annotated[bool, typer.Option("--sample", help="Also add sample projects")] = False,
+    sample: Annotated[
+        bool, typer.Option("--sample", help="Also add sample projects (never in production)")
+    ] = False,
 ) -> None:
-    """Create feature flags and default settings. Safe to run again."""
+    """Create feature flags, default settings and the amenity catalogue. Safe to run again.
+
+    `--sample` adds "Sample City" and "Sample — Project A/B" for development and demos. They are
+    marked is_sample, stay drafts, and are refused when APP_ENV is production (D-015).
+    """
+    if sample and get_settings().app_env == "production":
+        _fail("Sample data is never added in production (D-015).")
     with get_sessionmaker()() as db:
         flags_added = seed_flags(db)
         settings_added = seed_settings(db)
+        amenities_added = seed_amenities(db)
         db.commit()
-    _out(f"Seeded: {flags_added} new flags, {settings_added} new settings groups.")
+    _out(
+        f"Seeded: {flags_added} new flags, {settings_added} new settings groups, "
+        f"{amenities_added} new amenities."
+    )
     if sample:
-        _out("Sample projects arrive in Phase 4 with the projects module (D-015). Nothing added.")
+        with get_sessionmaker()() as db:
+            try:
+                result = seed_sample(db)
+            except SampleRefusedError as exc:
+                _fail(str(exc))
+                return
+            db.commit()
+        _out(
+            f"Sample data: {result.projects_added} sample projects added, "
+            f"{result.projects_skipped} already there (all marked is_sample, all drafts)."
+        )
 
 
 @app.command("openapi")

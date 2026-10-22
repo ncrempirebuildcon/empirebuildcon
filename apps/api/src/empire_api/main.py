@@ -25,6 +25,8 @@ from empire_api.middleware.request_context import RequestContextMiddleware
 from empire_api.middleware.security_headers import SecurityHeadersMiddleware
 from empire_api.middleware.trailing_slash import StripTrailingSlashMiddleware
 from empire_api.observability import init_sentry
+from empire_api.projects import routes as project_routes
+from empire_api.projects import routes_catalogue, routes_children
 from empire_api.site_settings import routes as settings_routes
 from empire_api.users import routes_admin, routes_auth
 
@@ -58,6 +60,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         routes_auth.router,
         routes_admin.router,
         settings_routes.router,
+        project_routes.router,
+        routes_children.router,
+        routes_catalogue.router,
         internal_routes.router,
     ):
         app.include_router(router)

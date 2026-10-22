@@ -30,6 +30,7 @@ os.environ["CORS_ALLOWED_ORIGINS"] = ""
 os.environ["EDGE_PROXY_KEY"] = ""
 
 # The imports below come after the environment on purpose: settings are read at import time.
+import httpx
 from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
@@ -40,6 +41,7 @@ from sqlalchemy.orm import Session
 from empire_api.config import get_settings
 from empire_api.db import get_engine, get_sessionmaker, reset_engine
 from empire_api.main import create_app
+from empire_api.projects import blockers, maps, routes_catalogue
 from empire_api.site_settings.flags import seed_flags
 from empire_api.users import passwords
 from empire_api.users.models import User
@@ -55,6 +57,17 @@ TABLES = (
     "rate_limit_bucket",
     "feature_flag",
     "setting",
+    "project_amenity",
+    "payment_plan",
+    "construction_update",
+    "location_advantage",
+    "specification",
+    "configuration",
+    "tower",
+    "project",
+    "amenity",
+    "locality",
+    "city",
 )
 
 
@@ -79,6 +92,24 @@ def clean_tables(database: None) -> None:
     with get_sessionmaker()() as db:
         seed_flags(db)
         db.commit()
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never reach the network: the maps resolver's real HTTP client is replaced by one
+    that fails the test. Tests that follow short links inject a fake client instead."""
+
+    def refuse() -> httpx.Client:
+        raise AssertionError("A test tried to reach the network through the maps resolver.")
+
+    monkeypatch.setattr(maps, "default_client", refuse)
+    monkeypatch.setattr(routes_catalogue, "resolver_client", refuse)
+
+
+@pytest.fixture
+def qr_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pretend every project has its RERA QR image (the QR upload arrives with media, part 2)."""
+    monkeypatch.setattr(blockers, "rera_qr_present", lambda db, project: True)
 
 
 @pytest.fixture

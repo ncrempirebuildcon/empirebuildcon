@@ -5,6 +5,15 @@ updates:
     directory: "/"
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 10
+    ignore:
+      # WHY: typescript-eslint 8.x supports TypeScript < 6.1 only, and openapi-typescript 7.13
+      # crashes on TypeScript 7 (CI on Dependabot PR #3, 22 Oct 2026; D-032). Patch updates still
+      # come. Remove this when both tools support the newer TypeScript.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # WHY: the Node types must match the Node major we run (.nvmrc: 24). Bump with Node itself.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch:
         update-types: [minor, patch]

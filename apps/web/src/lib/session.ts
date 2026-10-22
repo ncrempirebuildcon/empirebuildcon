@@ -11,9 +11,11 @@
  * headers (lib/edge.ts) are added so the API accepts the call.
  */
 import { cookies, headers as requestHeaders } from "next/headers";
+import { redirect } from "next/navigation";
 import { createApiClient, unwrap } from "@empire/api-client";
 import type { SessionUser } from "./api";
 import { edgeHeaders } from "./edge";
+import { SIGN_IN_PATH } from "./routes";
 
 // DO NOT CHANGE: the cookie name is fixed by the API (SECURITY.md §1); the __Host- prefix makes
 // browsers refuse it unless it is Secure, host-only and Path=/.
@@ -36,4 +38,15 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const result = await api.GET("/api/v1/auth/me");
   if (result.response.status === 401) return null;
   return unwrap(result);
+}
+
+/**
+ * The signed-in staff member for a CMS page, or a redirect to the sign-in page.
+ * WHY in every page and not only a layout: layouts are not re-rendered on client navigation,
+ * so a check there would not run again when the session ends (Next.js "partial rendering").
+ */
+export async function requireSessionUser(): Promise<SessionUser> {
+  const me = await getSessionUser();
+  if (!me) redirect(SIGN_IN_PATH);
+  return me;
 }

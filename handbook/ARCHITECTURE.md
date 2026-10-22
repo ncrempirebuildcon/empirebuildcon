@@ -202,7 +202,12 @@ Every create, update, delete, publish, export, login and permission change write
 
 ## 13. Maps
 
-- Staff paste a Google Maps link, a `maps.app.goo.gl` short link or a plus code; the API extracts the pin (coordinates in the URL; short links followed on the server only to Google hosts with a 5 s timeout; plus codes decoded with the Open Location Code library). Staff can also type or drag the pin.
+- Staff paste a Google Maps link, a `maps.app.goo.gl` short link or a plus code, and the API extracts the pin (`POST /api/v1/admin/maps/resolve`):
+  - **Long links:** the coordinates are read from the URL, in this order: the place pin `!3d…!4d…`; the `q=`, `query=`, `destination=` and `ll=` values; `/maps/search/<lat>,<lng>` and `/maps/place/<lat>,<lng>` (the usual target of a shared dropped pin); and finally the map centre `@lat,lng`.
+  - **Short links:** followed on the server only, under the rules in SECURITY.md §5.
+  - **Full plus codes** (e.g. `7JWV8XX8+XX`): decoded by our own port of Open Location Code, tested against Google's official vectors (D-031).
+  - **Short plus codes** (`8XX8+XX Noida`): refused, with a message asking for the full code or a Maps link.
+- Staff can also type the pin. Dragging the pin on a map arrives with the map component in Phase 5.
 - The site shows the pin with **Leaflet + OpenStreetMap** tiles, lazy-loaded below the fold, with a pop-up giving the project name, address, RERA number and a "Directions" link to Google Maps.
 
 ## 14. Search
@@ -270,3 +275,5 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 | Accessibility | axe via Playwright on every template | Every push |
 | Performance | Lighthouse CI (mobile) ≥ 90 for performance, accessibility, best practices, SEO | On main |
 | Visual | Playwright screenshots, mobile + desktop | Before each gate |
+
+The browser suite signs in **once per run**: a Playwright setup project saves the CMS session to `qa/.auth/` (git-ignored), and the CMS journeys reuse it. This is because the API allows 10 sign-in attempts per network in 15 minutes, successful ones included (D-027). Locally that is enough for about three full runs every 15 minutes (`qa/README.md`).

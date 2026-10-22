@@ -1,9 +1,12 @@
 /**
  * Runs once before the browser journeys:
  *   1. Brings the database schema up to date (Alembic).
- *   2. Creates a throwaway super-admin with a random email and password through the API's
+ *   2. Loads the default settings, flags and amenity catalogue, plus the clearly marked sample
+ *      projects (`empire-api seed --sample`, dev/test only, D-015). Safe to run again: repeated runs
+ *      on the same database add nothing twice.
+ *   3. Creates a throwaway super-admin with a random email and password through the API's
  *      dev/test-only CLI (`empire-api create-user`, refused in staging/production).
- *   3. Saves the credentials to qa/.auth/e2e-user.json (git-ignored) for login.spec.ts.
+ *   4. Saves the credentials to qa/.auth/e2e-user.json (git-ignored) for the CMS journeys.
  *
  * SECURITY: the password is random per run and only ever exists on this machine or CI runner.
  */
@@ -28,6 +31,7 @@ export default function globalSetup() {
     });
 
   uv(["alembic", "upgrade", "head"]);
+  uv(["empire-api", "seed", "--sample"]);
 
   // WHY: example.com is reserved for documentation (RFC 2606) and never receives mail; ".test"
   // addresses are rejected by the API's email validation as a special-use domain.

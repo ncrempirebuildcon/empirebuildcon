@@ -6,12 +6,25 @@ import type { ReactNode } from "react";
 import { cx } from "../cx";
 
 export type ChipVariant =
-  "ongoing" | "completed" | "soldOut" | "sample" | "draft" | "scheduled" | "published" | "archived";
+  | "upcoming"
+  | "ongoing"
+  | "completed"
+  | "available"
+  | "soldOut"
+  | "offMarket"
+  | "sample"
+  | "draft"
+  | "scheduled"
+  | "published"
+  | "archived";
 
 const styles: Record<ChipVariant, string> = {
+  upcoming: "text-ivory border border-line-strong",
   ongoing: "text-gold-300 border border-gold-500/60",
   completed: "text-palm border border-palm-line",
+  available: "text-palm border border-palm-line",
   soldOut: "bg-danger-bg text-danger-on-bg",
+  offMarket: "bg-noir-700 text-muted",
   sample: "text-danger border border-danger",
   draft: "text-muted border border-line-strong",
   scheduled: "text-gold-300 border border-gold-500/60",

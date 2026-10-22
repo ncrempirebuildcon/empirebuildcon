@@ -1,6 +1,7 @@
 /**
  * Button: the four button styles from handbook/DESIGN_SYSTEM.md §8 (primary, secondary,
- * tertiary, WhatsApp), with loading and disabled states.
+ * tertiary, WhatsApp), plus the CMS `danger` outline (design board NoirCmsProject, "Archive
+ * project"), with loading and disabled states.
  *
  * Accessibility (WCAG 2.1 AA, DESIGN_SYSTEM §9):
  * - Min height 44 px (touch target) except `tertiary`, which is an inline text action.
@@ -13,7 +14,7 @@
 import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from "react";
 import { cx } from "../cx";
 
-export type ButtonVariant = "primary" | "secondary" | "tertiary" | "whatsapp";
+export type ButtonVariant = "primary" | "secondary" | "tertiary" | "whatsapp" | "danger";
 
 const base =
   "inline-flex items-center justify-center gap-2 rounded-pill font-sans text-small " +
@@ -24,6 +25,9 @@ const variants: Record<ButtonVariant, string> = {
   secondary: "min-h-11 px-5 border border-gold-500 text-gold-300 font-bold hover:bg-gold-tint",
   tertiary: "px-1 text-gold-400 font-bold underline-offset-4 hover:underline",
   whatsapp: "min-h-11 px-5 bg-palm-bg text-palm font-bold hover:brightness-110",
+  // Destructive or irreversible CMS actions (archive, delete). Outline only: never a solid red
+  // button next to the gold primary, so the main action stays the obvious one.
+  danger: "min-h-11 px-5 border border-danger text-danger font-bold hover:bg-danger-bg/40",
 };
 
 /** Class string for a link that should look like a button. */

@@ -5,7 +5,12 @@
  *   1. `webServer` starts the API (uvicorn) and the built web app (`next start`) unless they are
  *      already running locally. Build the web app first: `pnpm --filter @empire/web build`.
  *   2. global-setup.ts migrates the database and creates a throwaway super-admin.
- *   3. Specs run in Chromium only (the browser most visitors use in India; others come in Phase 8).
+ *   3. The "setup" project (specs/auth.setup.ts) signs that user in once and saves the session for
+ *      the CMS journeys (lib/auth.ts `CMS_STATE`).
+ *   4. Specs run in Chromium only (the browser most visitors use in India; others come in Phase 8).
+ *
+ * WHY sign in once: the API allows 10 sign-in attempts per network per 15 minutes
+ * (handbook/SECURITY.md §1). One sign-in per CMS test would trip that limit, as it should.
  *
  * WHY: PW_CHROMIUM_PATH lets a machine use a pre-installed Chromium (e.g. Claude's workspace);
  * CI installs the browser that matches @playwright/test instead.
@@ -28,7 +33,10 @@ export default defineConfig({
     trace: "retain-on-failure",
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "setup", testMatch: /.*\.setup\.ts/, use: { ...devices["Desktop Chrome"] } },
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, dependencies: ["setup"] },
+  ],
   webServer: [
     {
       command: "uv --directory ../apps/api run uvicorn empire_api.main:app --port 8000",
