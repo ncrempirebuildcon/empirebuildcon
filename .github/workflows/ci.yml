@@ -9,6 +9,8 @@
 #   lighthouse  mobile Lighthouse on main only (scores ≥ 0.9; see qa/README.md for the noindex exception)
 #
 # DO NOT CHANGE: the PostgreSQL major version must match production (Neon, PostgreSQL 18; D-006/D-007).
+# WHY: astral-sh/setup-uv publishes only full version tags (there is no moving `v10` tag), so it is
+# pinned to a release commit with the version in a comment. Dependabot keeps the pin up to date (D-030).
 name: CI
 
 on:
@@ -41,6 +43,12 @@ env:
 jobs:
   secrets:
     runs-on: ubuntu-latest
+    # WHY: on pull requests the action lists the PR's commits through the API, which needs
+    # pull-requests: read (the first CI run failed with 403 "Resource not accessible by integration").
+    # Comments stay off, so the token never needs write access.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -48,6 +56,9 @@ jobs:
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          # Pinned: the action's built-in default (8.24.3) is older than the version used for local scans.
+          GITLEAKS_VERSION: "8.28.0"
 
   api:
     runs-on: ubuntu-latest
@@ -67,7 +78,7 @@ jobs:
         working-directory: apps/api
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
@@ -112,7 +123,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
@@ -145,7 +156,7 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}

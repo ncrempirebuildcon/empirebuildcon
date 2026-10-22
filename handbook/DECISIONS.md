@@ -301,3 +301,19 @@ The owner decides at the Phase 9 gate. Claude's view: at minimum, budget the Net
 - Claude can't see CI results or review comments on GitHub. When CI fails, the owner shares the failing job's log or a screenshot.
 - Pull request auto-fix isn't available.
 - Before new work, the owner fetches `origin`, so Claude starts from the latest `main`.
+
+## D-030 · Fixes after the first CI run on GitHub (Accepted, 2026-10-22)
+
+**Context:** The first run of the CI workflow on pull request #1 failed in two places:
+- The `api` and `contract` jobs failed with "Unable to resolve action `astral-sh/setup-uv@v10`, unable to find version `v10`". D-026 assumed a moving `v10` tag, but setup-uv publishes only full version tags.
+- The `secrets` job failed with 403 "Resource not accessible by integration". On pull requests, gitleaks-action reads the PR's commits through the API, which needs `pull-requests: read`.
+
+The `web` job passed.
+**Decision:**
+- setup-uv is pinned to the commit of release v10.3.2 (`07a047e…`), with the version in a comment. That release includes the checksums for uv 0.13.5. Dependabot updates the pin.
+- The `secrets` job gets `pull-requests: read`. PR comments are turned off, so the token stays read-only.
+- gitleaks is pinned to 8.28.0, the version used for the local scans. The action's own default is 8.24.3.
+**Verified / assumed:** Checked 22 Oct 2026:
+- The setup-uv releases page lists v10.3.2 (22 Oct) at commit `07a047e608db84b3d8c06cd9a7c7dcc9c355c18e`, "update known checksums for 0.13.5". Its README pins by SHA.
+- The 403 response named the needed permission (`x-accepted-github-permissions: pull_requests=read`).
+- gitleaks-action's README lists `GITLEAKS_ENABLE_COMMENTS` and `GITLEAKS_VERSION`.
