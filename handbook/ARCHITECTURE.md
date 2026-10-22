@@ -19,8 +19,8 @@ Diagram sources are in `diagrams/src/*.mmd` (Mermaid); the `.svg` files next to 
 empire/                      (repo root = A:\Adarsh\Empire_RealEstate)
 ├─ apps/
 │  ├─ web/        Next.js (App Router, TypeScript, Tailwind) — public site + CMS UI
-│  ├─ api/        FastAPI — /api/v1, SQLAlchemy 2, Alembic migrations
-│  └─ worker/     Background jobs (same Python package as api, separate entry point)
+│  └─ api/        FastAPI — /api/v1, SQLAlchemy 2, Alembic migrations; the background worker is the
+│                 `empire-worker` entry point of the same package (D-010, D-026)
 ├─ packages/
 │  ├─ ui/         Design system components built from brand/tokens (Phase 3; spec in handbook/DESIGN_SYSTEM.md)
 │  └─ api-client/ Typed TypeScript client generated from the API's OpenAPI spec
@@ -54,11 +54,11 @@ One PostgreSQL database. Each API module owns its tables, schemas, routes and ev
 | `leads` | Lead, LeadConsent, LeadNote, LeadActivity, SiteVisit, Notification | `/public/leads`, `/public/site-visits`, `/public/brochure-requests`, `/admin/leads/**`, `/admin/site-visits/**`, `/admin/reports/utm` | `lead.*`, `site_visit.*` |
 | `content` | Page, Block, Post, Faq, Offer, Testimonial, ConsentText | `/public/pages`, `/public/posts`, `/public/faqs`, `/public/testimonials`, `/admin/pages/**` … | `page.*`, `post.*`, `faq.changed`, `offer.*`, `testimonial.changed`, `consent_text.published` |
 | `seo` | Redirect; `seo` JSON on content rows; sitemap feed | `/public/redirects`, `/public/sitemap`, `/admin/redirects` | `redirect.changed` |
-| `users` | User, Role, Session, PasswordResetToken, AuditLog | `/auth/**`, `/admin/users/**`, `/admin/roles`, `/admin/audit-log` | `user.*` |
+| `users` | User, Session, PasswordResetToken (roles are a code matrix, §11) | `/auth/**`, `/admin/users/**`, `/admin/roles`, `/admin/audit-log` | `user.*` |
 | `settings` | Setting, FeatureFlag | `/public/site`, `/admin/settings/**`, `/admin/flags/**` | `settings.updated`, `flag.changed` |
-| `integrations` | OutboxEvent, WebhookEndpoint, WebhookDelivery, integration config | `/admin/integrations/**`, `/admin/webhooks/**`, `/internal/outbox/drain` | — (delivers events) |
+| `integrations` | WebhookEndpoint, WebhookDelivery, integration config; outbox handlers and the drain | `/admin/integrations/**`, `/admin/webhooks/**`, `/internal/outbox/drain` | — (delivers events) |
 | `ai` | KnowledgeChunk (pgvector), ChatConversation, ChatMessage | `/ai/chat` (**flag `chat_widget` off**) | — |
-| `platform` (shared) | RateLimitBucket, outbox writer, audit writer, i18n helpers | `/api/health` | — |
+| `platform` (shared) | RateLimitBucket, AuditLog, OutboxEvent (tables and writers), crypto helpers, i18n helpers | `/api/health` | — |
 
 Full list: [api/ENDPOINTS.md](api/ENDPOINTS.md) (159 operations).
 
@@ -208,7 +208,7 @@ Every create, update, delete, publish, export, login and permission change write
 ## 14. Search
 
 - PostgreSQL full-text search (generated `tsvector` over name, locality, city, tagline) plus `pg_trgm` for typos, and structured filters (status, city, locality, type, BHK, budget). Filters live in the URL.
-- The `vector` extension (pgvector) is enabled from the first migration so Phase 7 needs no database change (D-013).
+- The `vector` extension (pgvector) is enabled by the first migration wherever the server has it (Neon, CI and the Docker image do), so Phase 7 needs no database change (D-013). A bare local PostgreSQL without pgvector still works until Phase 7 (D-026).
 
 ## 15. Languages
 
@@ -239,7 +239,7 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 
 | Environment | Purpose | Where |
 |---|---|---|
-| Local / Claude's workspace | Development and tests | Cloud workspace with PostgreSQL; `docker-compose.yml` provided for any future developer (D-019) |
+| Local / Claude's workspace | Development and tests | Any machine with PostgreSQL, or `docker compose up -d db` (PostgreSQL 18 + pgvector); see [SETUP.md](SETUP.md) (D-019, D-026) |
 | Staging | Owner review at milestones and gates | Netlify (web) + Cloud Run (API) + Neon branch `staging` |
 | Production | Live site | Same providers, separate Neon branch/project and Cloud Run service; free first, step-ups listed in D-007 |
 

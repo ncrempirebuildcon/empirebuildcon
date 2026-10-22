@@ -138,9 +138,9 @@ Some files are generated, such as the typed API client from the OpenAPI spec ([D
 AI assistants follow every rule above, plus these:
 
 - Always pull the latest `main` before starting, and work on a branch.
-- **Pushing:** for now the owner pushes. Claude commits on a branch in the owner's copy of the repo, and the owner pushes and opens the PR (brief §10).
-  - If the owner allows it, Claude pushes its own feature branches and opens PRs.
+- **Pushing:** Claude pushes its **own** feature branches and opens PRs; the owner allowed this on 22 Oct 2026 (D-026). Other AI assistants ask the owner to push unless the owner allows them the same.
   - Claude never pushes to `main`, never merges its own PR, and never force-pushes a branch it did not create.
+  - The only exception was the one-time bootstrap commit that created `main` (handbook and brand files, no code), so that pull requests have a base (D-026).
 - Never type, store or ask for passwords or tokens. The owner does account and sign-in steps.
 - Leave the handbook and the code comments good enough that the next person, human or AI, can continue without asking.
 

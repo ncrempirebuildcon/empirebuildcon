@@ -20,8 +20,8 @@
 |---|---|---|
 | 0 | Discovery, questions, tracker | Done |
 | 1 | Architecture, data model, API contract, security plan | Done |
-| 2 | Brand, design system, page and CMS templates | Templates done (Black & gold); waiting for owner approval |
-| 3 | Foundation: monorepo, CI, auth, roles, outbox | Next |
+| 2 | Brand, design system, page and CMS templates | Done; approved by the owner on 22 Oct 2026 |
+| 3 | Foundation: monorepo, CI, auth, roles, outbox | In progress |
 | 4–10 | CMS core, public site, marketing, AI layer, QA, go-live, handover | Planned |
 
 The owner keeps the live task list (a private tracker page). Ask the owner for access.

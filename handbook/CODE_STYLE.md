@@ -94,9 +94,9 @@ def deliver_outbox_batch(session, now):
 ```
 
 ```ts
-// WHY: carpet area is stored once in sq ft (the unit on the RERA certificate);
-// sq m is always derived, so the two can never disagree on screen.
-export const sqftToSqm = (sqft: number) => Math.round(sqft * 0.092903 * 10) / 10;
+// WHY: area is stored once, in square metres (ARCHITECTURE §6); every other unit
+// shown on screen is derived from it, so two figures can never disagree.
+export const sqmToSqft = (sqm: number) => Math.round(sqm / 0.092903);
 ```
 
 ### 2.4 Docstrings
