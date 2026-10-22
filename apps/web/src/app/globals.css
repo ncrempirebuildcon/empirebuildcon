@@ -1,0 +1,83 @@
+/*
+ * Global styles: Tailwind v4 + the generated Black & gold theme (packages/ui/src/theme.css).
+ * Colours, radii and fonts come only from tokens (handbook/DESIGN_SYSTEM.md); no hex values here.
+ */
+@import "tailwindcss";
+@import "@empire/ui/theme.css";
+
+/* WHY: Tailwind scans this app automatically, but the shared components live in another package. */
+@source "../../../../packages/ui/src";
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background-color: var(--color-noir-900);
+  }
+  body {
+    background-color: var(--color-noir-900);
+    color: var(--color-body);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    color: var(--color-ivory);
+  }
+  a {
+    color: var(--color-gold-400);
+  }
+  a:hover {
+    color: var(--color-gold-300);
+  }
+  ::placeholder {
+    color: var(--color-muted);
+  }
+  ::selection {
+    background-color: var(--color-gold-tint);
+    color: var(--color-ivory);
+  }
+  /* SECURITY/a11y: never remove the focus ring (DESIGN_SYSTEM §4, §9). */
+  :focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Display headline in metallic gold: one H1 per page only (DESIGN_SYSTEM §2). */
+  .text-metallic {
+    color: var(--color-gold-400);
+    background: var(--gradient-metallic);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  /* Gold hairline with a four-point star in the middle (DESIGN_SYSTEM §5). */
+  .star-rule {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--color-gold-500);
+  }
+  .star-rule::before,
+  .star-rule::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--gradient-hairline);
+  }
+  .star-rule::after {
+    transform: scaleX(-1);
+  }
+}

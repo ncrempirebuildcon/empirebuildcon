@@ -1,0 +1,5 @@
+# Throwaway credentials made by global-setup.ts for each run (never commit).
+.auth/
+.lighthouseci/
+test-results/
+playwright-report/
