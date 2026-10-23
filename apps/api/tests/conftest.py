@@ -43,11 +43,14 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from empire_api.config import get_settings
+from empire_api.content.consent import seed_consent_texts
+from empire_api.content.models import ConsentText
 from empire_api.db import get_engine, get_sessionmaker, reset_engine
+from empire_api.leads import intake as lead_intake
 from empire_api.main import create_app
 from empire_api.media.store import get_store
 from empire_api.projects import blockers, maps, routes_catalogue
@@ -58,6 +61,12 @@ from empire_api.users.models import User
 API_ROOT = Path(__file__).resolve().parents[1]
 GOOD_PASSWORD = "correct horse battery staple"
 TABLES = (
+    "lead_activity",
+    "lead_note",
+    "lead_consent",
+    "site_visit",
+    "lead",
+    "consent_text",
     "media_link",
     "upload_intent",
     "media",
@@ -198,3 +207,34 @@ def owner(client: TestClient) -> SignedIn:
 
 def new_client(app: FastAPI) -> TestClient:
     return TestClient(app, base_url="https://testserver", follow_redirects=False)
+
+
+# --- Leads (Phase 4 part 3; helpers in tests/leads_support.py) -------------------------------
+
+
+@pytest.fixture
+def texts() -> dict[str, dict[str, object]]:
+    """The draft lead-form and marketing texts, current (as `empire-api seed` in dev/test)."""
+    with get_sessionmaker()() as session:
+        seed_consent_texts(session)
+        session.commit()
+        rows = session.scalars(select(ConsentText).where(ConsentText.is_current.is_(True))).all()
+        return {row.kind: {"id": str(row.id), "version": row.version} for row in rows}
+
+
+@pytest.fixture
+def intake_unlimited(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lift the public intake limit (all TestClient calls share one IP)."""
+    monkeypatch.setattr(lead_intake, "INTAKE_LIMIT", 10_000)
+
+
+@pytest.fixture
+def sales_pair(app: FastAPI) -> Iterator[tuple[SignedIn, SignedIn]]:
+    """Two sales users, "Sales 1" and "Sales 2", each signed in with their own client."""
+    pair = []
+    for number in (1, 2):
+        user = make_user("sales", email=f"sales{number}@example.com", name=f"Sales {number}")
+        pair.append(sign_in(new_client(app), user))
+    yield pair[0], pair[1]
+    for signed in pair:
+        signed.client.close()

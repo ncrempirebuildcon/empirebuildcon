@@ -10,6 +10,10 @@ delivered runs it again), so every handler must be idempotent, e.g. keyed on `ev
 
 Phase 3 has one handler: a structured log line per event, so delivery can be watched.
 TODO(phase-4): email for `user.setup_link_issued` / `user.password_reset_requested`.
+TODO(phase-4): part 5 emails the sales inbox (or the owner) on `lead.created`, but ONLY when
+`data.alert` is true: duplicates (same phone and project within 24 h), manual leads and samples
+carry `alert: false` and must not alert again (ARCHITECTURE §8). Also email the new owner on
+`lead.assigned`, and sales on `site_visit.requested`.
 TODO(phase-5): web revalidation on publish events. TODO(phase-6): webhooks and WhatsApp.
 """
 

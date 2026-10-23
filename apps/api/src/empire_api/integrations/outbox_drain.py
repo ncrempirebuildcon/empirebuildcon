@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from empire_api.db import get_engine, get_sessionmaker, rows_affected
 from empire_api.integrations.handlers import handlers_for
+from empire_api.leads.erasure import anonymise_inactive
 from empire_api.logs import get_logger
 from empire_api.media import handlers as media_handlers
 from empire_api.media.uploads import discard_stale_intents
@@ -141,8 +142,10 @@ def drain_soon(background: BackgroundTasks, budget_seconds: float = 3.0) -> None
 
 
 def cleanup(now: datetime | None = None) -> dict[str, int]:
-    """Delete expired sessions, used/expired reset tokens and old rate-limit buckets, and send
-    unconfirmed direct uploads to be destroyed (media/uploads.discard_stale_intents)."""
+    """Delete expired sessions, used/expired reset tokens and old rate-limit buckets, send
+    unconfirmed direct uploads to be destroyed (media/uploads.discard_stale_intents), and
+    anonymise leads with no activity for the retention period (leads/erasure.py, SECURITY.md §8).
+    """
     now = now or utcnow()
     old_sessions = delete(UserSession).where(
         or_(
@@ -159,11 +162,16 @@ def cleanup(now: datetime | None = None) -> dict[str, int]:
         tokens = rows_affected(db.execute(old_tokens))
         buckets = rows_affected(db.execute(old_buckets))
         uploads = discard_stale_intents(db, now)
+    # WHY its own transaction: a problem anonymising one lead must not undo the session and
+    # token clean-up above (it raises after they are committed, and the next run retries).
+    with get_sessionmaker()() as db, db.begin():
+        anonymised = anonymise_inactive(db, now)
     counts = {
         "sessions": sessions,
         "reset_tokens": tokens,
         "rate_limit_buckets": buckets,
         "unconfirmed_uploads": uploads,
+        "leads_anonymised": anonymised,
     }
     log.info("cleanup_done", **counts)
     return counts

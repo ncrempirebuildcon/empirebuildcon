@@ -82,9 +82,14 @@ def list_projects(
     publish_state: PublishState | None = None,
     sales_status: SalesStatus | None = None,
     city: uuid.UUID | None = None,
+    blocked: Annotated[
+        bool | None,
+        Query(description="true = can't be published yet (any publish blocker); false = ready"),
+    ] = None,
 ) -> ProjectList:
-    """Projects, most recently edited first, with the CMS list's filters."""
-    filters = service.ProjectFilters(q, status, publish_state, sales_status, city)
+    """Projects, most recently edited first, with the CMS list's filters. `blocked` is the
+    dashboard's "drafts blocked from publishing" link (addition, Phase 4 part 3)."""
+    filters = service.ProjectFilters(q, status, publish_state, sales_status, city, blocked)
     rows, total = service.list_projects(db, paging, filters)
     covers, qrs = media_queries.covers_and_qrs(db, (p.id for p in rows))
     return ProjectList(

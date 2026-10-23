@@ -8,7 +8,8 @@ D-002, D-015.
 
 Rules (the Phase 4 spec):
   - New projects are drafts. Publish needs `projects.publish` and an empty blocker list.
-  - Delete only drafts that were never published; otherwise 409 "Archive it instead".
+  - Delete only drafts that were never published and have no leads; otherwise 409 "Archive it
+    instead". Leads keep their project when it is archived (leads/queries.project_has_leads).
   - Archive = PATCH publish_state "archived"; unpublish (or PATCH "draft") = back to draft.
     Taking a *published* project off the site either way needs `projects.publish`, and so
     does moving its sales_status to or from off_market (hidden from the site, ARCHITECTURE §7).
@@ -28,6 +29,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from empire_api.errors import ApiProblem
+from empire_api.leads import queries as lead_queries
 from empire_api.pagination import PageParams
 from empire_api.platform import audit
 from empire_api.projects import blockers as blocker_rules
@@ -59,6 +61,7 @@ WAS_PUBLISHED: Final = (
     "This project has been on the website, so it can't be deleted. Archive it instead."
 )
 NOT_A_DRAFT: Final = "Only drafts can be deleted. Restore it to draft first, or keep it archived."
+HAS_LEADS: Final = "This project has leads, so it can't be deleted. Archive it instead."
 _AUDIT_SKIP: Final = ("updated_by",)
 
 # Everything a project row loads for the full CMS view (ProjectAdmin).
@@ -82,6 +85,8 @@ class ProjectFilters:
     publish_state: str | None = None
     sales_status: str | None = None
     city_id: uuid.UUID | None = None
+    # true = can't be published now (at least one publish blocker); false = ready.
+    blocked: bool | None = None
 
 
 def load_project(db: Session, project_id: uuid.UUID) -> Project:
@@ -121,6 +126,8 @@ def list_projects(
     ):
         if value is not None:
             stmt = stmt.where(column == value)
+    if filters.blocked is not None:
+        stmt = stmt.where(Project.id.in_(_blocked_ids(db, stmt, blocked=filters.blocked)))
     total = int(db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
     rows = db.scalars(
         stmt.options(
@@ -133,6 +140,18 @@ def list_projects(
         .limit(paging.per_page)
     ).all()
     return list(rows), total
+
+
+def _blocked_ids(db: Session, stmt: Any, *, blocked: bool) -> list[uuid.UUID]:
+    """Ids of the matching projects that are (or aren't) blocked from publishing.
+
+    WHY in Python: blockers.publish_blockers is the one place that decides "ready to publish"
+    (RERA number, visible RERA QR, a configuration, no sample data in production), and the
+    dashboard's "drafts blocked" count uses it too, so the count and this list always agree.
+    PERF: one blocker check per matching project; a developer has a few dozen at most.
+    """
+    rows = db.scalars(stmt).all()
+    return [p.id for p in rows if bool(blocker_rules.publish_blockers(db, p)) == blocked]
 
 
 # --- Create and update -----------------------------------------------------------------------
@@ -270,16 +289,19 @@ def _emit_after_update(
 
 
 def delete_project(db: Session, project_id: uuid.UUID, actor: Actor) -> None:
-    """Delete a draft that was never published, with all its children.
+    """Delete a draft that was never published and has no leads, with all its children.
 
     INVARIANT: `published_at` is never cleared (models.py), so it tells "never published".
-    TODO(phase-4): part 3 also refuses projects that have leads ("Archive it instead").
+    COMPLIANCE: a project with leads is only ever archived (ARCHITECTURE §6): its leads keep
+    pointing at it, and leads are never deleted. The foreign key is RESTRICT as a backstop.
     """
     project = lock_project(db, project_id)
     if project.published_at is not None:
         raise conflict(WAS_PUBLISHED)
     if project.publish_state != "draft":
         raise conflict(NOT_A_DRAFT)
+    if lead_queries.project_has_leads(db, project.id):
+        raise conflict(HAS_LEADS)
     record(
         db,
         actor,
