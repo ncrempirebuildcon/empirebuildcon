@@ -1,10 +1,11 @@
 /**
- * Helpers for CMS journeys: sign in as the throwaway super-admin from global-setup.ts, call the
- * API as that user (with the session cookie and CSRF token, exactly like the CMS does), upload a
- * file the same way, and run axe.
+ * Helpers for CMS journeys: sign in as the throwaway super-admin (or the sales user) from
+ * global-setup.ts, call the API as that user (with the session cookie and CSRF token, exactly like
+ * the CMS does), upload a file the same way, and run axe.
  *
- * CMS specs reuse one signed-in session (`CMS_STATE`, saved by specs/auth.setup.ts) because the API
- * allows only 10 sign-in attempts per network per 15 minutes (SECURITY.md §1).
+ * CMS specs reuse signed-in sessions (`CMS_STATE` for the super-admin, `SALES_STATE` for the sales
+ * user, both saved by specs/auth.setup.ts) because the API allows only 10 sign-in attempts per
+ * network per 15 minutes (SECURITY.md §1).
  *
  * SECURITY: the credentials and the saved session exist only for this test run (qa/.auth is
  * git-ignored); the CSRF token is read from /auth/me like the browser app does, never stored.
@@ -13,10 +14,12 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type APIResponse, type Page } from "@playwright/test";
-import { AUTH_FILE } from "../global-setup";
+import { AUTH_FILE, SALES_AUTH_FILE } from "../global-setup";
 
 /** Saved browser state (session cookie) of the signed-in throwaway super-admin. */
 export const CMS_STATE = resolve(dirname(AUTH_FILE), "cms-state.json");
+/** Saved browser state of the signed-in throwaway sales user (sees only their own leads). */
+export const SALES_STATE = resolve(dirname(AUTH_FILE), "sales-state.json");
 
 export interface E2EUser {
   email: string;
@@ -28,9 +31,13 @@ export function e2eUser(): E2EUser {
   return JSON.parse(readFileSync(AUTH_FILE, "utf8")) as E2EUser;
 }
 
-/** Signs in through the real form and waits for the CMS dashboard. */
-export async function signIn(page: Page): Promise<void> {
-  const user = e2eUser();
+/** The throwaway sales user's credentials. */
+export function salesUser(): E2EUser {
+  return JSON.parse(readFileSync(SALES_AUTH_FILE, "utf8")) as E2EUser;
+}
+
+/** Signs in through the real form (the super-admin by default) and waits for the dashboard. */
+export async function signIn(page: Page, user: E2EUser = e2eUser()): Promise<void> {
   await page.goto("/admin/login");
   await page.getByLabel("Email").fill(user.email);
   await page.getByLabel("Password", { exact: true }).fill(user.password);

@@ -42,6 +42,8 @@ export interface TableProps<T> {
   minWidth?: number;
   /** Marks the table busy while new rows load. */
   busy?: boolean;
+  /** Extra classes for one row, e.g. bold text for an unread lead. Never the only signal. */
+  rowClassName?: (row: T) => string | undefined;
   className?: string;
 }
 
@@ -54,6 +56,7 @@ export function Table<T>({
   empty,
   minWidth,
   busy = false,
+  rowClassName,
   className,
 }: TableProps<T>) {
   const captionId = useId();
@@ -109,7 +112,10 @@ export function Table<T>({
             </tr>
           ) : (
             rows.map((row, index) => (
-              <tr key={rowKey(row)} className="border-t border-line align-middle">
+              <tr
+                key={rowKey(row)}
+                className={cx("border-t border-line align-middle", rowClassName?.(row))}
+              >
                 {columns.map((column) => {
                   const classes = cx(
                     "px-3 py-2.5 text-left first:pl-4.5 last:pr-4.5",

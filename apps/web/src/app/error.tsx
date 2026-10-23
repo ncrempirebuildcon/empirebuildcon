@@ -3,6 +3,9 @@
  * Friendly error state for any page segment (DESIGN_SYSTEM §8 "States": error + Try again).
  * Next.js 16 passes `retry()`, which re-fetches and re-renders the segment.
  * TODO(phase-5): report errors to Sentry (@sentry/nextjs) instead of the console.
+ * SECURITY: when that happens, strip the query string from reported URLs and breadcrumbs: the
+ * lead inbox's `?q=` can hold a mobile number (SECURITY.md §8, "logs never contain phone
+ * numbers"). Nothing in the web app logs or reports addresses today.
  */
 import { useEffect } from "react";
 import Link from "next/link";

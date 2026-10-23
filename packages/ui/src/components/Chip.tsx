@@ -1,6 +1,10 @@
 /**
  * Status chip (handbook/DESIGN_SYSTEM.md §8 "Chips"). Every chip carries a text label, so colour
  * is never the only signal (WCAG 1.4.1).
+ *
+ * The `stage…` variants are the lead pipeline stages from the CMS boards (NoirCmsLeads,
+ * NoirCmsDashboard), drawn with the `stage-*` tokens: New, Contacted, Site visit, Negotiation,
+ * Booked, Lost. Their contrast is in DESIGN_SYSTEM §9 (Booked 9.9:1, Lost 11.6:1).
  */
 import type { ReactNode } from "react";
 import { cx } from "../cx";
@@ -16,7 +20,13 @@ export type ChipVariant =
   | "draft"
   | "scheduled"
   | "published"
-  | "archived";
+  | "archived"
+  | "stageNew"
+  | "stageContacted"
+  | "stageSiteVisit"
+  | "stageNegotiation"
+  | "stageBooked"
+  | "stageLost";
 
 const styles: Record<ChipVariant, string> = {
   upcoming: "text-ivory border border-line-strong",
@@ -30,6 +40,12 @@ const styles: Record<ChipVariant, string> = {
   scheduled: "text-gold-300 border border-gold-500/60",
   published: "text-palm border border-palm-line",
   archived: "bg-noir-700 text-muted",
+  stageNew: "text-stage-new-text border border-stage-new-border",
+  stageContacted: "text-stage-contacted-text border border-stage-contacted-border",
+  stageSiteVisit: "text-stage-site-visit-text border border-stage-site-visit-border",
+  stageNegotiation: "bg-stage-negotiation-bg text-stage-negotiation-text",
+  stageBooked: "bg-stage-booked-bg text-stage-booked-text",
+  stageLost: "bg-stage-lost-bg text-stage-lost-text",
 };
 
 export interface ChipProps {

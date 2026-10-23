@@ -1,13 +1,14 @@
 "use client";
 /**
  * The signed-in staff member and their permissions, shared with every CMS screen inside
- * AdminShell, plus a way for a screen to set the page heading in the shell's top bar.
+ * AdminShell, plus a way for a screen to set the page heading in the shell's top bar, and the
+ * dashboard counts the shell loads once per page (the Leads badge and the dashboard read them).
  *
  * SECURITY: `can()` only decides what to show. The API checks the same permission on every call
  * (ARCHITECTURE.md §11); hiding a button is never the protection.
  */
 import { createContext, useContext, useEffect } from "react";
-import type { SessionUser } from "@/lib/api";
+import type { Schema, SessionUser } from "@/lib/api";
 
 /** Permission keys from the matrix in handbook/ARCHITECTURE.md §11 used by the CMS screens. */
 export type Permission =
@@ -16,7 +17,26 @@ export type Permission =
   | "projects.write"
   | "projects.publish"
   | "projects.delete"
+  | "leads.read"
+  | "leads.read_all"
+  | "leads.update"
+  | "leads.assign"
+  | "leads.export"
+  | "leads.report"
+  | "leads.erase"
+  | "site_visits.manage"
   | (string & {});
+
+/** The dashboard as the shell loaded it (`GET /admin/dashboard`). */
+export interface DashboardState {
+  data?: Schema<"Dashboard">;
+  error?: unknown;
+  loading: boolean;
+  /** Try again after an error (shows the loading state). */
+  reload: () => void;
+  /** Fetch again quietly, e.g. after a lead was opened, so the unread badge goes down. */
+  refresh: () => Promise<void>;
+}
 
 export interface AdminSession {
   me: SessionUser;
@@ -25,6 +45,8 @@ export interface AdminSession {
   setHeading: (heading: string) => void;
   /** Tell the shell the screen has unsaved changes, so Sign out asks first. */
   setUnsaved: (unsaved: boolean) => void;
+  /** The dashboard counts, latest leads and tasks; `null` when the role has no dashboard. */
+  dashboard: DashboardState | null;
 }
 
 export const AdminSessionContext = createContext<AdminSession | null>(null);

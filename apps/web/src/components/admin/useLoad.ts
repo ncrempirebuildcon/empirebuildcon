@@ -12,8 +12,10 @@
  *      screen already has, e.g. the saved project returned by a PATCH, without a new request.
  *   4. `refresh()` fetches again quietly: `loading` stays false, so the screen is not replaced by
  *      a skeleton and unsaved form fields stay as they are.
+ *   5. `reload`, `replace` and `refresh` keep their identity until the key changes, so a screen
+ *      can pass them on (e.g. through a context) without re-rendering everything that uses them.
  */
-import { useEffect, useEffectEvent, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
 interface Result<T> {
   key: string;
@@ -26,6 +28,12 @@ export function useLoad<T>(key: string, loader: () => Promise<T>) {
   const [result, setResult] = useState<Result<T> | null>(null);
   const fullKey = `${key}#${attempt}`;
   const runLoader = useEffectEvent(loader);
+  // WHY a ref: refresh() runs from event handlers, where an effect event may not be called; the
+  // ref always holds the loader from the latest render.
+  const latestLoader = useRef(loader);
+  useEffect(() => {
+    latestLoader.current = loader;
+  });
 
   useEffect(() => {
     let current = true;
@@ -42,18 +50,22 @@ export function useLoad<T>(key: string, loader: () => Promise<T>) {
     };
   }, [fullKey]);
 
+  const reload = useCallback(() => setAttempt((n) => n + 1), []);
+  const replace = useCallback((data: T) => setResult({ key: fullKey, data }), [fullKey]);
+  const refresh = useCallback(async () => {
+    const data = await latestLoader.current();
+    setResult({ key: fullKey, data });
+    return data;
+  }, [fullKey]);
+
   const isCurrent = result?.key === fullKey;
   return {
     /** The latest data; while a new key loads this is still the previous data. */
     data: result?.data,
     error: isCurrent ? result?.error : undefined,
     loading: !isCurrent,
-    reload: () => setAttempt((n) => n + 1),
-    replace: (data: T) => setResult({ key: fullKey, data }),
-    refresh: async () => {
-      const data = await loader();
-      setResult({ key: fullKey, data });
-      return data;
-    },
+    reload,
+    replace,
+    refresh,
   };
 }

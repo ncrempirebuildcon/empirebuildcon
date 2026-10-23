@@ -2,14 +2,18 @@
 
 The Empire public website and the CMS user interface (Next.js 16 App Router, TypeScript, Tailwind CSS 4).
 
-## What is here (Phase 3, Phase 4 parts 1 and 2)
+## What is here (Phase 3, Phase 4 parts 1–3)
 
 | Route | What |
 |---|---|
 | `/` | Black & gold "coming soon" holding page (`noindex`) |
 | `/admin/login` | Staff sign-in (email + password; generic error; lockout message) |
-| `/admin` | CMS dashboard: welcome, shortcuts and the role's permissions (counts arrive in part 3) |
-| `/admin/projects` | Projects list: search and filters in the URL (`?q=&status=&publish_state=&sales_status=&city=&page=`), status chips, SAMPLE badge, paging; "+ New project" with `projects.write` |
+| `/admin` | CMS dashboard (board NoirCmsDashboard): "At a glance" count tiles that open the filtered lists (the API sends each count's link), latest leads (masked numbers), "Needs attention" tasks, upcoming site visits, and leads by source for the last 30 days (with `leads.report`); honest empty states |
+| `/admin/leads` | Lead inbox (board NoirCmsLeads): newest first, paged, as a **table** or a **pipeline board**; search (name, reference, last digits of the mobile) and filters in the URL with the API's own names (`?q=&status=&project_id=&owner_id=&source=&utm_source=&utm_medium=&utm_campaign=&open=true&from=&to=&read=false&is_spam=true&view=board&page=`; filters that arrive by link, like `open` or the UTM tags, show as removable chips); quick filters New, Unread, Mine, Unassigned, Spam; unread rows bold with "Unread:" for screen readers; masked mobile (`+91 98xxxxxx10`); "+ Add lead" (manual lead, consent note required; `?add=1` opens it); "Export CSV" with `leads.export` after a personal-data warning |
+| `/admin/leads/[id]` | Lead detail (board NoirCmsLead): full number with Call (`tel:`) and WhatsApp (`wa.me`, mobiles only), owner (with `leads.assign`), stage with confirm and a required lost reason (a fixed reason code; "Other reason" needs a few words), enquiry details (editable from call notes), consent record (text version, label shown, time, marketing yes/no; read-only), UTM and click IDs, notes and the activity timeline, the site visit (confirm/reschedule/done/no-show/cancel inline), duplicate check, spam, "Mark unread", and "Erase personal data" with `leads.erase` after a ConfirmDialog that names the duplicate group it erases and, when other leads share the phone number, offers an unticked "Also erase the N other leads with this phone number" (`?scope=person`). Opening an unread lead marks it read |
+| `/admin/site-visits` | Site-visit calendar (board NoirCmsVisits): week, day and list views (list by default on phones), status filter (one status, or "still open" = `open=true`) and project filter, the open visit in the address (`?view=&date=&status=&open=&project_id=&visit=`; the dashboard's `?from=&to=` links open the right day or week); confirm with date and time (IST), reschedule, done, no-show, cancel, handled by and a note |
+| `/admin/reports/utm` | UTM report (`leads.report`): leads, site-visit requests and bookings by source, medium, campaign and project for a date range (default the last 30 days); counts only, no personal data. With `leads.read` a row's lead count opens the inbox filtered by every column of that row |
+| `/admin/projects` | Projects list: search and filters in the URL (`?q=&status=&publish_state=&sales_status=&city=&blocked=true&page=`; `blocked` comes from the dashboard and shows as a removable chip), status chips, SAMPLE badge, paging; "+ New project" with `projects.write` |
 | `/admin/projects/new` | Short create form (name, construction status, optional city) → opens the editor |
 | `/admin/projects/[id]` | Project editor (board NoirCmsProject), tabs in the URL (`?tab=`): Details (basics, RERA, price), Towers, Configurations (with each one's floor plan), Amenities, Specifications, Media (media manager), Location (address, map pin from a Maps link or plus code, location advantages), Progress (with each update's photos), Payment plans, Documents (RERA QR code, brochure and "brochure gated", documents, designated account), SEO (with the share image). Publishing panel: blockers, Publish/Unpublish, Archive, Duplicate, Delete draft |
 | `/admin/catalogue` | Cities, localities and amenities: tables with add, edit and delete |
@@ -42,6 +46,18 @@ The public pages arrive in Phase 5 and the other CMS screens in the later parts 
   - Previews use plain `<img>` with the store's thumbnail URLs and the item's alt text (else its title); QR codes and floor plans sit on an ivory tile. The public image loader comes in Phase 5 (`TODO(phase-5)`).
 - **Request size:** `next.config.ts` lets the `/api` proxy pass request bodies up to the API's 10 MB photo cap plus 64 KB (`experimental.proxyClientMaxBodySize`); without it Next.js cuts bodies at 10 MB. With the fake store, direct uploads also pass through this proxy, so locally a video above about 10 MB is refused; test big files against Cloudinary.
 - **Map:** the draggable map comes with the public site (`TODO(phase-5)`).
+- **Leads** (`src/app/admin/leads/`, `src/components/admin/leads/`, `src/lib/leads/`, ARCHITECTURE §8):
+  - The shell loads `GET /admin/dashboard` once per page: the **Leads** menu item shows the unread count as a badge ("12 unread" for screen readers) and the dashboard reads the same answer (`useAdminSession().dashboard`). Opening a lead refreshes it.
+  - **Object-level rule:** a sales user (no `leads.read_all`) gets only their own leads from the API; the inbox hides the Owner filter and Mine/Unassigned for them, and someone else's lead shows "This lead isn't available" (the API answers 404, like a missing lead).
+  - **Phones in lists are masked** (`maskPhone`, `+91 98xxxxxx10`); the full number appears only on the lead detail and in the selected visit's Call/WhatsApp links. The lead page's browser title is "Lead", never the person's name.
+  - **Pipeline:** stage changes are toggle buttons on the detail and a "Move to" list on each board card (keyboard and screen-reader friendly; no drag). Lost always asks for a reason. Moves are announced in a polite live region; on the board focus follows the moved card.
+  - **Consent:** a manual lead needs a consent note ("Verbal on phone call"); the consent record is read-only. Marketing consent is shown as given or not given, never assumed.
+  - **Export:** fetched with the session cookie and the CSRF token (the API refuses the export without it, so a plain link can't download personal data), turned into a temporary object URL and saved with `<a download>` (the URL is revoked afterwards); a refusal (over 50,000 rows, no permission) shows the API's message in the dialog.
+  - **Unsaved work:** a typed note, open "Edit details", a chosen stage, an edited visit and the Add lead form count as unsaved changes (`useUnsavedChanges`; one guard per screen, fed by `useDirtyParts`). Links, sign-out, closing the tab, "Mark unread" (through `leave()`) and moving the calendar ask first; Cancel in Add lead asks "Discard this lead?".
+  - **Duplicates:** the duplicate check and the timeline show only leads the viewer may open (the API leaves the others out); a viewer without `leads.read_all` never sees a claim about leads outside their own.
+  - **Erase:** the ConfirmDialog says which leads it erases (the lead and its repeat enquiries; optionally every lead with the phone number), lists what is removed (name, mobile, email, message, preferred contact time, page addresses, click IDs, UTM term and content, note texts, the lost-reason note, visit notes) and kept (reference, stage history, source and campaign, project, consent metadata), says it can't be undone, and focuses "Keep the data" first.
+  - **Times:** stored in UTC, shown and typed in India time (`@empire/ui/format`: `istDate`, `istTime`, `istToIso`, `startOfWeek`, `formatAge`). A confirmed visit's time is sent as one UTC instant.
+  - Staff to assign or to handle a visit come from `GET /admin/lead-owners`.
 
 ## How it fits together
 
