@@ -444,3 +444,70 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - `python-multipart` 0.0.32.
 - **Not yet tried against a real account.** Try a real upload, confirm, delete and poster on staging. The owner must enable PDF delivery in the Cloudinary console.
 - **Phase 5 CSP must allow:** `connect-src https://api.cloudinary.com` and `img-src https://res.cloudinary.com`.
+
+## D-034 · Phase 4 part 3: leads, site visits and dashboard (Accepted, 2026-10-23)
+
+**Context:** Part 3 builds the lead pipeline, the public lead intake API, site visits, the dashboard and consent texts. The public forms come in Phase 5, and email alerts in part 5.
+**Decision:**
+- **Phone rule (strict, our own code rather than `phonenumbers`):**
+  - Mobiles are 10 digits starting 6–9.
+  - Landlines must include the STD code.
+  - Foreign numbers are refused for now; NRI leads come in Phase 6.
+  - "Fancy" numbers (repeated digits, runs such as 98765 43210) are deliberately accepted, because operators sell them as VIP numbers. Rate limits, the honeypot, duplicate linking and "mark spam" handle junk.
+  - Landlines with STD codes starting 6–8 can't be told from mobiles, so they may get a WhatsApp link.
+  - Sample leads use `+91 00000 000NN`. No Indian number starts with the trunk prefix 0, so these can't belong to anyone, and the public forms refuse them.
+- **Consent:**
+  - Consent texts are versioned and never edited after publishing.
+  - A draft-marked text can't be published in production. Until one is published, public intake answers 503.
+  - Marketing consent is a separate optional record.
+- **Rate limits:** IPv6 visitors are keyed by their /64 network, and IPv4-mapped addresses by their IPv4. This covers intake, sign-in, lockout and password-reset requests, so rotating addresses inside one allocation doesn't help.
+- **Spam and duplicates:**
+  - A filled honeypot gets an identical 201 with a look-alike reference, and nothing is stored.
+  - Duplicates (same phone and project within 24 hours) are saved, linked, given to the same owner, and emit `lead.created` with `alert: false`.
+- **Assignment:**
+  - Round robin keeps its turn in a settings row locked until commit. That makes it fair under concurrent submissions; a test runs 12 at once across 3 people.
+  - Manual leads default to the person entering them. Giving one to someone else needs `leads.assign`.
+- **Access:**
+  - Object-level rule: anyone else's lead answers 404.
+  - Duplicate links are scoped too: a viewer never learns that a lead they can't see exists.
+  - A manual lead links only to an earlier lead its creator can see.
+  - Search text is never written to the audit log, only a marker.
+  - Site visits follow their lead's rule, because a visit shows the buyer's details.
+  - The UTM report is counts only. Sales see their own leads; marketing (no `leads.read`) sees counts for all.
+- **Export:**
+  - At most 50,000 rows. A bigger request is refused, never cut off silently.
+  - The export needs the `X-CSRF-Token` header and refuses cross-site fetch metadata, so another site can't trigger a download. The CMS downloads it with fetch.
+  - Formula-guarded CSV with a BOM. Audited, with a timeline line per exported lead.
+- **Erasure and retention:**
+  - Erasure also scrubs notes, the preferred contact time, the visitor-typed UTM term and content, the lost-reason note, visit notes, the IP hash, the consent page URL and stored event payloads that carry personal data.
+  - It covers the lead's whole duplicate group. With `?scope=person` it also covers every lead with the same phone; the dialog offers that.
+  - Lost reasons are a fixed code plus an optional note (`other` requires one), so reports keep the code after the note is erased.
+  - Audit rows are never edited (an invariant of the audit log), so personal free text never enters them: notes and emails are recorded as `[hidden]`.
+  - Retention anonymises after 3 years without real activity; reads and exports don't count.
+  - Visitor enquiries and read/unread write no audit rows; the lead's timeline covers them.
+- **Brochure requests** return the public file URL with `expires_at: null`. Gating collects a lead; it isn't access control, and the docs say so.
+- **CMS:**
+  - Lists, cards and the dashboard show masked phone numbers. The full number shows only on the lead detail and in its call/WhatsApp links. Browser titles never carry the buyer's name.
+  - Stage moves use an accessible "Move to" control; lost needs a reason code, plus a note when the code is "other".
+  - Confirming a visit moves its lead to "site visit". Later edits to a confirmed visit (time, notes, handler) don't move the lead again.
+  - Calendar times are typed and shown in IST and sent as UTC.
+  - Dashboard links appear only for CMS screens that exist.
+  - `next dev` is told not to write its own `apps/web/AGENTS.md` (`agentRules: false`); the root AGENTS.md is the single place for AI rules.
+- **Not built yet:**
+  - Staff-created site visits.
+  - Recording a consent withdrawal.
+  - Foreign numbers.
+  - An event for detail edits.
+  - Email alerts (part 5).
+- **Contract changes:**
+  - Additions: `marketing_consent`, `GET /admin/lead-owners`, inbox `status_counts`, `lost_reason_note`, `same_phone_count` (shown only to `leads.erase` holders), extra lead/visit/dashboard fields, and the `privacy` settings group.
+  - New query parameters: `open`, `utm_source` and `utm_medium` (inbox and export), `scope` (erase), `open` (site visits) and `blocked` (projects list).
+  - Tightened: `lost_reason` is a code list instead of free text, and `preferred_bhk` is 0.5–20 in half steps.
+  - Deviations: `is_sample` instead of `is_test`, a nullable `page_url` for manual leads, typed enums, and the honeypot and `website` rules above.
+**Verified / assumed:**
+- **Indian numbering**, read 23 Oct 2026:
+  - DoT National Numbering Plan 2003 (§1.9, §2.1.5–2.1.6, Annex I);
+  - TRAI recommendations of 29 May 2020;
+  - TRAI press release 09/2025 (still a recommendation; numbers stay 10 digits).
+- **`phonenumbers`** 9.0.41 (PyPI, 8 Oct 2026) was considered and not added.
+- **Export timing:** 50,000 rows streamed in about 6 s locally.

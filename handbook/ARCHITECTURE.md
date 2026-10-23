@@ -110,13 +110,35 @@ The `/_internal/revalidate` route lives outside `/api/*` so it is handled by Nex
 ![Lead flow](diagrams/seq-lead.svg)
 
 - **Intake:** one endpoint per intent: enquiry, site-visit request, brochure request. All accept UTM fields and click IDs (`gclid`, `gbraid`, `wbraid`, `fbclid`, `msclkid`) that the site keeps in first-party storage from the landing URL for 30 days.
-- **Phone:** normalised to E.164 (`+91XXXXXXXXXX`); accepts `98765 43210`, `+91-98765-43210`, `09876543210`. Indian mobile numbers must start 6–9; landlines allowed with STD code.
-- **Consent:** the form shows the current consent text; the lead stores the text id, version, time, page URL and the exact checkbox label shown. A lead without consent is rejected.
-- **Spam:** hidden honeypot field + rate limits (5 per 10 minutes per IP and per phone, in PostgreSQL) + duplicate check (same phone and project within 24 hours links to the earlier lead instead of alerting again). Captcha only if spam gets through (flag `captcha`).
+- **Phone:** normalised to E.164 (`+91XXXXXXXXXX`). Accepted forms include `98765 43210`, `+91-98765-43210`, `09876543210` and `919876543210`.
+  - Mobiles are 10 digits starting 6–9.
+  - Landlines must include the STD code: 10 digits starting 1–5 after the trunk 0.
+  - Foreign numbers aren't accepted yet (`TODO(phase-6)` for NRI leads).
+  - "Fancy" numbers (repeated digits, runs) are valid, because operators sell them.
+  - The rule follows the DoT National Numbering Plan (D-034).
+- **Consent:** the form shows the current consent text. The lead stores the text id, version, time, page URL and the exact checkbox label shown. A lead without consent is rejected.
+  - A stale version gets 409 (reload the page).
+  - Until an approved text is published, intake answers 503.
+  - Marketing consent is a separate, optional record. It is never assumed.
+  - Manual leads carry the staff member's note on how consent was given.
+  - Consent texts live in the content module. They are versioned and never edited after publishing, and a draft-marked text can't be published in production (D-017).
+- **Spam:**
+  - A filled honeypot gets the same 201 answer with a look-alike reference, and nothing is stored.
+  - Rate limits: 5 per 10 minutes per network (IPv6 by /64) and per phone hash, in PostgreSQL.
+  - Duplicates: the same phone and project within 24 hours is saved, linked to the earlier lead (`duplicate_of_id`) and given to the same owner. Its `lead.created` event has `alert: false`, so no second alert goes out.
+  - Captcha comes only if spam gets through (flag `captcha`).
 - **General leads:** `project_id` may be empty (contact page, NRI page).
 - **Assignment (D-016):** in the same transaction as the insert, using `settings.lead_routing`: `single` (everything to one person or the sales inbox), `round_robin` (in turn among listed sales users), or `manual`. Default: single → sales inbox.
 - **Pipeline:** new → contacted → site_visit → negotiation → booked / lost (lost needs a reason). Every change writes a `lead_activity` row.
-- **Inbox:** newest first, paged, read/unread, filters in the URL; dashboard counts link to the filtered inbox (e.g. "12 new" → `/admin/leads?status=new`).
+- **Inbox:** newest first, paged, read/unread, with filters in the URL. Dashboard counts link to the filtered inbox (e.g. "12 new" → `/admin/leads?status=new`).
+  - INVARIANT: every count shows the same number as the list it opens. The count and the list share one query, with filters such as `open` (still being worked: not booked, lost or erased), `utm_source`/`utm_medium` for the UTM report, `open` on site visits (requested or confirmed) and `blocked` on projects (drafts that can't be published yet). A browser test clicks each count and compares.
+- **Object-level access:** without `leads.read_all`, staff see only leads they own. Duplicate links are scoped the same way, and a manual lead links only to an earlier lead its creator can see. This covers the list, detail, notes, activity, visits, export and dashboard. Anyone else's lead answers 404. The UTM report shows counts only; for sales it covers their own leads.
+- **Export:** CSV (`leads.export`), streamed and guarded against spreadsheet formulas, with a UTF-8 BOM so Excel shows Hindi names.
+  - It is capped at 50,000 rows. Bigger requests are refused, never silently cut.
+  - Each export is audited, and each exported lead's timeline records it.
+- **Erasure:** `leads.erase` replaces personal fields, notes, the IP hash, consent page URL and stored event payloads with a stub. The reference, status, dates and consent metadata are kept. Leads are never hard-deleted.
+- **Retention:** the daily clean-up anonymises leads with no real activity for `privacy.lead_retention_years` (default 3). Reads and exports don't count as activity.
+- **Projects with leads** can't be deleted, only archived.
 - **Alerts:** email at launch; WhatsApp in Phase 6 (needs WhatsApp Business API).
 
 ## 9. Events and the outbox
@@ -132,7 +154,7 @@ Envelope: `{id, type, occurred_at, actor_id, aggregate: {type, id, slug}, data}`
 | `construction_update.published` | Update goes live | Revalidate project · webhooks |
 | `media.added` / `media.updated` / `media.removed` | Upload, reorder, cover, show/hide, delete | Revalidate the owner if published |
 | `media.upload_discarded` | A direct upload was refused or never confirmed | Destroy the file at the store (retried) |
-| `lead.created` | Lead saved | Email alert · WhatsApp alert (flag) · CRM webhooks · Meta Conversions API + Google Ads conversion (only with marketing consent and flag on) |
+| `lead.created` | Lead saved (`data.alert` is false for duplicates and manual leads) | Email alert · WhatsApp alert (flag) · CRM webhooks · Meta Conversions API + Google Ads conversion (only with marketing consent and flag on) |
 | `lead.status_changed` / `lead.assigned` | Pipeline move / owner change | CRM webhooks · email to new owner |
 | `site_visit.requested` / `site_visit.updated` | Visit form / CMS change | Sales alert · webhooks |
 | `page.published` / `page.unpublished` | Incl. scheduled publish | Revalidate page, nav, sitemap · AI index |
@@ -148,7 +170,7 @@ Envelope: `{id, type, occurred_at, actor_id, aggregate: {type, id, slug}, data}`
 |---|---|---|
 | Outbox drain | Inside the request right after commit for time-critical events (3 s budget), plus a sweep every 15 minutes | Lead alerts go out within seconds; the sweep retries failures. Every 15 minutes (not every minute) so the free database can sleep (D-007) |
 | Schedule tick | Every 15 minutes, with the sweep | Scheduled page publish/unpublish, offer start/end |
-| Clean-up | Daily | Expired sessions, reset tokens, old rate-limit buckets |
+| Clean-up | Daily | Expired sessions, reset tokens, old rate-limit buckets, stale upload intents, and anonymising leads past the retention period |
 | Backup export | Daily | Only if the database plan has no automatic backups (D-007) |
 | Knowledge index | On publish events | Phase 7 |
 
@@ -302,4 +324,4 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 | Performance | Lighthouse CI (mobile) ≥ 90 for performance, accessibility, best practices, SEO | On main |
 | Visual | Playwright screenshots, mobile + desktop | Before each gate |
 
-The browser suite signs in **once per run**: a Playwright setup project saves the CMS session to `qa/.auth/` (git-ignored), and the CMS journeys reuse it. This is because the API allows 10 sign-in attempts per network in 15 minutes, successful ones included (D-027). Locally that is enough for about three full runs every 15 minutes (`qa/README.md`).
+The browser suite signs in as few times as possible: a Playwright setup project signs in the super-admin and a sales user once each and saves their sessions to `qa/.auth/` (git-ignored); the journeys reuse them. With the sign-in tests, a run uses 4 sign-ins, because the API allows 10 per network in 15 minutes, successful ones included (D-027). Locally that is about two full runs per 15 minutes. Public lead intake is limited too (5 per 10 minutes per network), so a run makes one public submission and adds other test leads through the staff API (`qa/README.md`).
