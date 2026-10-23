@@ -111,6 +111,7 @@ def test_seed_sample_adds_marked_sample_projects_once(db: Session) -> None:
     result = runner.invoke(app, ["seed", "--sample"])
     assert result.exit_code == 0, result.output
     assert "2 sample projects added" in result.output
+    assert "Sample media: 6 SAMPLE placeholder tiles added" in result.output
     projects = db.scalars(select(Project).order_by(Project.slug)).all()
     assert [p.name for p in projects] == ["Sample — Project A", "Sample — Project B"]
     for project in projects:
@@ -129,6 +130,7 @@ def test_seed_sample_adds_marked_sample_projects_once(db: Session) -> None:
         assert sum(stage["percent"] for stage in plan.stages) == 100
     again = runner.invoke(app, ["seed", "--sample"])
     assert "0 sample projects added, 2 already there" in again.output
+    assert "0 SAMPLE placeholder tiles added, 2 projects already had photos" in again.output
     assert db.scalar(select(func.count()).select_from(Project)) == 2
 
 

@@ -115,6 +115,7 @@ Formats:
 | Chat slot | A reserved bubble bottom-right, off until Phase 7 (feature flag). |
 | CMS shell | 248 px `noir-950` sidebar with a gold active bar, 64 px top bar with search, sample-data warning strip, cards in `noir-800`. Stage chips: New, Contacted, Site visit, Negotiation, Booked, Lost, all text-labelled. |
 | CMS form kit (`@empire/ui`) | `TextField`, `Select`, `Textarea` with a character count, and `NumberField` (whole rupees with Indian grouping; never `type=number`). They share one label, hint and error layout. Also: `Tabs`, `Table` (real headers), `ConfirmDialog` (native `<dialog>`, focus starts on Cancel), `ReorderList` with Move up/Move down buttons and an `aria-live` announcement (drag is optional, the buttons are required), and `Skeleton`. `Button` has a `danger` variant. `Chip` adds `upcoming`, `available` and `offMarket`. Details in `packages/ui/README.md`. |
+| Media kit (`@empire/ui`) | `FileDropZone`/`FileButton`: a real button with a file chooser, where drag and drop is an extra. `ProgressBar` (`role="progressbar"`), `Switch` ("Show on website"), `SegmentedControl` (Photos/Videos/Documents) and `Dialog`. Media cards show the order number, a cover star, a HIDDEN badge and an honest label (artist's impression / actual photo / progress photo with month). Every `<img>` uses the item's alt text, else its title. |
 
 ## 9. Accessibility review (WCAG 2.1 AA)
 

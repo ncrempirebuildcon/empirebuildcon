@@ -15,13 +15,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Chip, ConfirmDialog } from "@empire/ui";
-import { api, type SessionUser } from "@/lib/api";
+import { api, setCsrfToken, type SessionUser } from "@/lib/api";
 import { ROLE_LABELS } from "@/lib/labels";
-import { CATALOGUE_PATH, PROJECTS_PATH, SIGN_IN_PATH } from "@/lib/routes";
+import { CATALOGUE_PATH, MEDIA_PATH, PROJECTS_PATH, SIGN_IN_PATH } from "@/lib/routes";
 import { AdminSessionContext, type AdminSession } from "./session-context";
 import { NavIcon, type NavIconName } from "./NavIcon";
 
-export type AdminSection = "dashboard" | "projects" | "catalogue";
+export type AdminSection = "dashboard" | "projects" | "catalogue" | "media";
 
 interface MenuItem {
   label: string;
@@ -35,8 +35,8 @@ interface MenuItem {
 }
 
 // Menu items from the CMS boards with the permission each one needs (ARCHITECTURE.md §11).
-// TODO(phase-4): link Leads, Site visits, Media, Pages, Offers & blog, Users, Settings and Audit
-// log as their screens arrive in the later parts of Phase 4.
+// TODO(phase-4): link Leads, Site visits, Pages, Offers & blog, Users, Settings and Audit log as
+// their screens arrive in the later parts of Phase 4.
 const MENU: MenuItem[] = [
   {
     label: "Dashboard",
@@ -61,7 +61,13 @@ const MENU: MenuItem[] = [
     href: CATALOGUE_PATH,
     section: "catalogue",
   },
-  { label: "Media", permission: "media.upload", icon: "media" },
+  {
+    label: "Media",
+    permission: "media.upload",
+    icon: "media",
+    href: MEDIA_PATH,
+    section: "media",
+  },
   { label: "Pages", permission: "content.read", icon: "pages" },
   { label: "Offers & blog", permission: "offers.manage", icon: "offers" },
   { label: "Users & roles", permission: "users.manage", icon: "users", divider: true },
@@ -99,8 +105,8 @@ export function AdminShell({ me, section, heading, breadcrumb, children }: Admin
 
   useEffect(() => {
     // WHY: writes need the CSRF token bound to this session (SECURITY.md §3); keep it in memory only.
-    api.setCsrfToken(me.csrf_token ?? null);
-    return () => api.setCsrfToken(null);
+    setCsrfToken(me.csrf_token ?? null);
+    return () => setCsrfToken(null);
   }, [me.csrf_token]);
 
   const signOut = useCallback(async () => {

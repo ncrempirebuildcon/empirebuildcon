@@ -23,6 +23,10 @@ const defaults: Record<string, () => string> = {
   IP_HASH_SALT: () => generated(48),
   // The web proxy and the API share this key, exactly as in production (apps/web/src/proxy.ts).
   EDGE_PROXY_KEY: () => generated(48),
+  // WHY explicit: the media journeys must never reach Cloudinary. The fake store keeps files on
+  // disk and offers a Cloudinary-shaped upload endpoint, so the browser flow runs unchanged
+  // (apps/api README "Media store"). The API's default in test is fake as well.
+  MEDIA_STORE: () => "fake",
 };
 
 /** Settings for the API process and its CLI; fills any missing value once per test run. */

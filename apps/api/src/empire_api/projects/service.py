@@ -168,6 +168,7 @@ def update_project(db: Session, project_id: uuid.UUID, body: ProjectUpdate, acto
 
     How it works:
       1. Lock the project and turn the body into column changes (nested objects merge).
+         A share image that has left the library is cleared (audited with a note).
       2. Check the state change is allowed, then validate the merged result.
       3. Apply, write one audit row with the diff, and emit the event the change implies.
          Nothing changed → nothing is written.
@@ -177,6 +178,7 @@ def update_project(db: Session, project_id: uuid.UUID, body: ProjectUpdate, acto
     target = sent.pop("publish_state", None)
     before = snapshot(project, _AUDIT_SKIP)
     changes = project_input.columns(db, project, sent)
+    dangling = project_input.drop_dangling_share_image(db, project, sent, changes)
     _check_transition(project.publish_state, target, actor)  # 2
     visibility_changed = _check_visibility(project, changes, actor)
     merged = {column.key: getattr(project, column.key) for column in Project.__table__.columns}
@@ -196,6 +198,9 @@ def update_project(db: Session, project_id: uuid.UUID, body: ProjectUpdate, acto
         db.rollback()
         return
     project.updated_by = actor.user_id
+    if dangling:
+        diff["seo.og_image_id"] = [dangling, None]
+        diff["note"] = [None, "The share image had been deleted from the library; cleared."]
     record(
         db,
         actor,

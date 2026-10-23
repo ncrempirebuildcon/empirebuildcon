@@ -31,6 +31,14 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   skipTrailingSlashRedirect: true,
+  experimental: {
+    // WHY: with a proxy (src/proxy.ts) Next.js buffers request bodies and silently cuts them at
+    // 10 MB, so a photo near the API's 10 MB cap would arrive truncated instead of getting the
+    // API's clear 413. This is the cap plus 64 KB for the multipart fields. Videos and documents
+    // never pass here in production: they go straight from the browser to Cloudinary.
+    // SECURITY: keep this close to the API's limit; it bounds the memory one request can take.
+    proxyClientMaxBodySize: 10 * 1024 * 1024 + 64 * 1024,
+  },
   transpilePackages: ["@empire/ui", "@empire/api-client"],
   images: {
     remotePatterns: [{ protocol: "https", hostname: "res.cloudinary.com" }],

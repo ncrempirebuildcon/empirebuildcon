@@ -20,6 +20,8 @@ from empire_api.config import Settings, get_settings
 from empire_api.errors import PROBLEM_MEDIA_TYPE, register_error_handlers
 from empire_api.integrations import routes as internal_routes
 from empire_api.logs import configure_logging
+from empire_api.media import routes as media_routes
+from empire_api.media import routes_dev as media_dev_routes
 from empire_api.middleware.edge_guard import EdgeGuardMiddleware
 from empire_api.middleware.request_context import RequestContextMiddleware
 from empire_api.middleware.security_headers import SecurityHeadersMiddleware
@@ -63,9 +65,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         project_routes.router,
         routes_children.router,
         routes_catalogue.router,
+        media_routes.router,
         internal_routes.router,
     ):
         app.include_router(router)
+    if settings.media_store_kind == "fake":
+        # SECURITY: the fake store's file and upload routes exist only while it is active,
+        # which config.py refuses in staging and production (D-033).
+        app.include_router(media_dev_routes.router)
 
     if settings.cors_origins:
         app.add_middleware(
@@ -103,6 +110,7 @@ def _install_openapi(app: FastAPI) -> None:
                 "description": "Shared secret for scheduler → API calls. Env INTERNAL_API_KEY.",
             },
         }
+        components.setdefault("schemas", {}).update(media_routes.openapi_components())
         _problem_media_type(original)
         # FastAPI always adds its own validation-error schemas; our 422s are Problem objects.
         for unused in ("HTTPValidationError", "ValidationError"):

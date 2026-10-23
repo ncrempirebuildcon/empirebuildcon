@@ -3,16 +3,18 @@
  * Progress (board NoirCmsProject, "Progress"): dated construction updates, for the whole project
  * or one tower, with a percentage and what changed. Draft updates stay in the CMS; publishing one
  * (while the project is live) tells the website to refresh (ARCHITECTURE §9,
- * `construction_update.published`). Photos come with the media manager.
+ * `construction_update.published`). Each saved update has its progress photos under it
+ * (ProgressPhotos.tsx, kept mounted while the update is edited); they upload and save straight
+ * away.
  */
 import { NumberField, Select, TextField, Textarea } from "@empire/ui";
 import { api, call, type Schema } from "@/lib/api";
 import { formatCalendarDate } from "@/lib/dates";
 import { UPDATE_STATE, keyOf, optionsOf, type UpdateState } from "@/lib/labels";
 import { CollectionEditor } from "@/components/admin/CollectionEditor";
-import { MediaPlaceholder } from "@/components/admin/states";
 import { useCollection } from "@/components/admin/useCollection";
 import { orNull, useReportDirty, type ChildTabProps, type ConstructionUpdate } from "./editorTypes";
+import { ProgressPhotos } from "./ProgressPhotos";
 
 interface UpdateDraft {
   update_date: string;
@@ -35,6 +37,10 @@ const toInput = (d: UpdateDraft): Schema<"ConstructionUpdateInput"> => ({
 function validate(d: UpdateDraft) {
   const errors: Record<string, string> = {};
   if (!d.update_date) errors.update_date = "Enter the date of the update.";
+  // Mirrors the API: an update reports what has happened (dates compared in India time).
+  else if (d.update_date > todayInIndia()) {
+    errors.update_date = "An update reports what has happened, so it can't be in the future.";
+  }
   if (!d.title.trim()) errors.title = "Give the update a title, e.g. September 2026 progress.";
   if (d.progress_percent !== null && (d.progress_percent < 0 || d.progress_percent > 100)) {
     errors.progress_percent = "Enter a percentage from 0 to 100.";
@@ -47,7 +53,13 @@ function todayInIndia(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 }
 
-export function ProgressTab({ project, canWrite, onChanged, reportDirty }: ChildTabProps) {
+export function ProgressTab({
+  project,
+  canWrite,
+  canUpload,
+  onChanged,
+  reportDirty,
+}: ChildTabProps & { canUpload: boolean }) {
   const id = project.id;
   const towers = project.towers ?? [];
   const towerName = (towerId: string | null | undefined) =>
@@ -119,7 +131,7 @@ export function ProgressTab({ project, canWrite, onChanged, reportDirty }: Child
       getLabel={updateLabel}
       canWrite={canWrite}
       renderSummary={(u) => (
-        <span className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-0.5">
           <span>
             <strong className="text-ivory">{formatCalendarDate(u.update_date)}</strong> ·{" "}
             {towerName(u.tower_id)}
@@ -132,7 +144,17 @@ export function ProgressTab({ project, canWrite, onChanged, reportDirty }: Child
           {u.body ? (
             <span className="text-caption whitespace-pre-line text-muted">{u.body}</span>
           ) : null}
-        </span>
+        </div>
+      )}
+      renderExtra={(u) => (
+        // WHY outside the summary: Edit swaps the summary for the form; the photos (and any
+        // upload still running) stay where they are.
+        <ProgressPhotos
+          update={u}
+          canUpload={canUpload}
+          onChanged={onChanged}
+          reportDirty={reportDirty}
+        />
       )}
       renderForm={(d, set, errors) => (
         <div className="grid gap-x-5 gap-y-4 md:grid-cols-2">
@@ -190,9 +212,10 @@ export function ProgressTab({ project, canWrite, onChanged, reportDirty }: Child
             error={errors.publish_state}
             hint="Published updates show on the website once the project is live."
           />
-          <div className="md:col-span-2">
-            <MediaPlaceholder what="Progress photos, labelled with their month, are added in the media manager." />
-          </div>
+          <p className="text-caption text-muted md:col-span-2">
+            Progress photos are added under the update once it is saved. They are labelled
+            &quot;Progress photo&quot; with the update&apos;s month.
+          </p>
         </div>
       )}
     />

@@ -2,7 +2,7 @@
 
 The Empire public website and the CMS user interface (Next.js 16 App Router, TypeScript, Tailwind CSS 4).
 
-## What is here (Phase 3, Phase 4 part 1)
+## What is here (Phase 3, Phase 4 parts 1 and 2)
 
 | Route | What |
 |---|---|
@@ -11,8 +11,9 @@ The Empire public website and the CMS user interface (Next.js 16 App Router, Typ
 | `/admin` | CMS dashboard: welcome, shortcuts and the role's permissions (counts arrive in part 3) |
 | `/admin/projects` | Projects list: search and filters in the URL (`?q=&status=&publish_state=&sales_status=&city=&page=`), status chips, SAMPLE badge, paging; "+ New project" with `projects.write` |
 | `/admin/projects/new` | Short create form (name, construction status, optional city) → opens the editor |
-| `/admin/projects/[id]` | Project editor (board NoirCmsProject), tabs in the URL (`?tab=`): Details (basics, RERA, price), Towers, Configurations, Amenities, Specifications, Media (placeholder), Location (address, map pin from a Maps link or plus code, location advantages), Progress, Payment plans, Documents (RERA QR status, designated account), SEO. Publishing panel: blockers, Publish/Unpublish, Archive, Duplicate, Delete draft |
+| `/admin/projects/[id]` | Project editor (board NoirCmsProject), tabs in the URL (`?tab=`): Details (basics, RERA, price), Towers, Configurations (with each one's floor plan), Amenities, Specifications, Media (media manager), Location (address, map pin from a Maps link or plus code, location advantages), Progress (with each update's photos), Payment plans, Documents (RERA QR code, brochure and "brochure gated", documents, designated account), SEO (with the share image). Publishing panel: blockers, Publish/Unpublish, Archive, Duplicate, Delete draft |
 | `/admin/catalogue` | Cities, localities and amenities: tables with add, edit and delete |
+| `/admin/media` | Media library: every photo, video and document as a grid or a list; search, type and "not attached" filters and the view in the URL (`?q=&kind=&unattached=true&view=list&page=`); rename, alt text and honest label (a neutral "No label" where none is set: QR codes, plans and share images need none); "Delete from library" only with `media.manage` and only when the file is attached to nothing (the others say where they are used); SAMPLE placeholders carry the SAMPLE chip |
 | 404 / error | Black & gold not-found page and a "Try again" error state |
 | `/robots.txt` | Disallows everything until go-live (`TODO(phase-9)`) |
 
@@ -28,7 +29,19 @@ The public pages arrive in Phase 5 and the other CMS screens in the later parts 
 - **Off market on a live project:** without `projects.publish`, a published project can't be moved into or out of "Off market" (the API refuses it too), and the Sales status field says why.
 - **Map pin:** "Get pin" stores the normalised plus code from the API (never the place name typed after it) and the link only when a link was pasted; both are shown with Clear buttons, and typing coordinates by hand clears them.
 - **Phones:** no CMS page scrolls sideways at 390 px; wide tables scroll inside their own region (`qa/specs/responsive-cms.spec.ts`).
-- **Media:** uploads, floor plans, the RERA QR upload and share images show "Media manager arrives in the next update" until part 2 (`TODO(phase-4)`). The draggable map comes with the public site (`TODO(phase-5)`).
+- **Media manager** (`src/components/admin/media/`, `src/lib/media/`, ARCHITECTURE §12):
+  - One drop zone (a real button with a file chooser; dropping files is a bonus) sends each file to the right list by type: photos to the gallery, videos, documents. Photos, Videos and Documents show their counts; each item has its order number, the cover star (photos), a HIDDEN badge, its honest label (artist's impression / actual photo / progress photo with the month), a "Show on website" switch, Move up/Move down (mouse users can also drag), "Edit details" (title, alt text, label and month, in a dialog) and "Remove from project" (the file stays in the library).
+  - **Honest labels first:** photos dropped on the Media tab wait for one question, "What are these photos?" (artist's impression, actual photo, or progress photo with its month; nothing pre-selected). The answer is sent with the batch (`ImageUpload.label`/`label_month`), so they arrive shown. The API keeps an unlabelled gallery photo hidden: such a photo says "Hidden until labelled", its switch is disabled with the reason, and "Add label" opens its details. Progress photos added to a construction update are labelled with the update's month.
+  - Files are checked in the browser before anything is sent (`lib/media/files.ts`: JPG, PNG, WebP, AVIF ≤ 10 MB; MP4, MOV, WebM ≤ 100 MB; PDF, DOC, DOCX, PPT, PPTX ≤ 10 MB; never SVG, HEIC or GIF). The API checks everything again.
+  - **Photos** are re-encoded in the browser (`lib/media/resize.ts`), which also drops EXIF/GPS data, then sent to `POST /admin/media/images` with an XHR so progress shows: photos at a 2560 px long edge as WebP (else JPEG) at 0.85; the RERA QR as lossless PNG at 1200 px; floor plans as lossless WebP (else PNG). Smaller sizes are tried when a result is over 10 MB.
+  - **Videos and documents** go straight to the store: `upload-signature` → XHR POST of the file with exactly the signed `fields` to `upload_url` → `confirm` with the store's reply unmodified (it attaches the file too). In development and tests the API's fake store answers like Cloudinary on `/api/v1/dev-media/…`, so the same code runs.
+  - Uploads run one at a time with a progress bar (`role="progressbar"`), Cancel while the file is being sent, and Dismiss for a refusal; start, finish and failures are announced in a polite live region. Once every byte is sent the row says "Saving…" and Cancel goes away (the server finishes on its own); a Cancel that races the end re-reads the owner, so the list shows what was really saved. Running uploads count as unsaved changes for the leave warning; editing a construction update keeps its photo uploads running.
+  - "Show on website" and the cover star save one change at a time: a switch flipped while another saves shows "Saving…" and waits its turn.
+  - Single places replace in one step: the RERA QR code (Documents; required to publish; a live project's QR can be replaced, never removed or hidden), the brochure (one PDF), each configuration's floor plan (image or PDF), the share image (SEO; pick a project photo or upload one, saved with Save draft as `seo.og_image_id`).
+  - Media needs `media.upload`, not `projects.write` (marketing manages media without editing facts); deleting from the library needs `media.manage`.
+  - Previews use plain `<img>` with the store's thumbnail URLs and the item's alt text (else its title); QR codes and floor plans sit on an ivory tile. The public image loader comes in Phase 5 (`TODO(phase-5)`).
+- **Request size:** `next.config.ts` lets the `/api` proxy pass request bodies up to the API's 10 MB photo cap plus 64 KB (`experimental.proxyClientMaxBodySize`); without it Next.js cuts bodies at 10 MB. With the fake store, direct uploads also pass through this proxy, so locally a video above about 10 MB is refused; test big files against Cloudinary.
+- **Map:** the draggable map comes with the public site (`TODO(phase-5)`).
 
 ## How it fits together
 

@@ -1,7 +1,8 @@
 """Publish blockers: the one place that decides whether a project may go on the website.
 
 Collaborators: service.publish_project (409 when the list isn't empty), present.project_admin
-(`publish_blockers` on ProjectAdmin, so the CMS can show the checklist before anyone clicks).
+(`publish_blockers` on ProjectAdmin, so the CMS can show the checklist before anyone clicks),
+media/queries.py (the RERA QR link).
 Implements: D-002 (RERA number and QR before publishing), D-015 (no sample data on the live
 site), ARCHITECTURE §7.
 
@@ -18,6 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from empire_api.config import get_settings
+from empire_api.media import queries as media_queries
 from empire_api.projects.models import Configuration, Project
 
 RERA_NUMBER_MISSING: Final = "RERA registration number missing"
@@ -35,12 +37,11 @@ class Blocker:
 
 
 def rera_qr_present(db: Session, project: Project) -> bool:
-    """Whether the project has its RERA QR code image.
+    """Whether the project shows its RERA QR code: a *visible* `rera_qr` image link exists.
 
-    TODO(phase-4): part 2 (media) answers True when a visible media link with role `rera_qr`
-    exists for this project. Until then every project is blocked, which is the safe default.
+    COMPLIANCE: hidden doesn't count, because the website wouldn't show it (D-002).
     """
-    return False
+    return media_queries.rera_qr_present(db, project.id)
 
 
 def publish_blockers(db: Session, project: Project) -> list[Blocker]:

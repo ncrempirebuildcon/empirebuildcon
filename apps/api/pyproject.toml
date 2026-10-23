@@ -26,6 +26,12 @@ dependencies = [
     "uuid-utils==1.1.0",
     # The maps resolver follows Google short links on the server (projects/maps.py).
     "httpx==0.28.1",
+    # Media (D-033): the official Cloudinary SDK (signing, upload, Admin API, delivery URLs),
+    # Pillow to read photo dimensions and draw the SAMPLE tiles, and the multipart parser that
+    # the capped upload reader streams through (media/multipart.py).
+    "cloudinary==1.46.3",
+    "pillow==13.0.0",
+    "python-multipart==0.0.32",
 ]
 
 [project.scripts]
@@ -80,6 +86,11 @@ packages = ["empire_api"]
 
 [[tool.mypy.overrides]]
 module = ["uuid_utils.*"]
+ignore_missing_imports = true
+
+# The Cloudinary SDK ships no type hints; media/cloudinary_store.py and signing.py wrap it.
+[[tool.mypy.overrides]]
+module = ["cloudinary", "cloudinary.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

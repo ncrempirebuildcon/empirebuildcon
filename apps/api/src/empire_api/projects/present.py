@@ -1,17 +1,21 @@
 """Rows → response shapes for the projects module, with the computed read-only fields
 (`display` strings, `directions_url`, tower progress, configuration labels, blockers).
 
-Collaborators: routes*.py call these after the services; display.py formats ₹ and area.
-Nothing here writes to the database.
+Collaborators: routes*.py call these after the services; display.py formats ₹ and area;
+media/queries.py supplies the media fields (gallery, cover, RERA QR, floor plans, photos), which
+the callers load and pass in. Nothing here touches the database.
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Final
 
+from empire_api.media.queries import ProjectMedia
+from empire_api.media.schemas import LinkedMedia, Media
 from empire_api.projects import display, models
 from empire_api.projects.blockers import Blocker
 from empire_api.projects.models import PriceColumns, Project
@@ -135,7 +139,9 @@ def tower_out(row: models.Tower, progress: int | None) -> Tower:
     )
 
 
-def configuration_out(row: models.Configuration) -> Configuration:
+def configuration_out(
+    row: models.Configuration, floor_plans: list[LinkedMedia] | None = None
+) -> Configuration:
     return Configuration(
         id=row.id,
         slug=row.slug,
@@ -148,7 +154,7 @@ def configuration_out(row: models.Configuration) -> Configuration:
         area=area_of(row.area_min_sqm, row.area_max_sqm, row.area_basis, row.area_display_unit),
         price=price_of(row),
         sales_status=row.sales_status,
-        floor_plans=[],  # TODO(phase-4): part 2 lists media links with role floor_plan.
+        floor_plans=floor_plans or [],
         sort_order=row.sort_order,
         is_sample=row.is_sample,
         translations=Translations(row.translations),
@@ -170,7 +176,9 @@ def advantage_out(row: models.LocationAdvantage) -> LocationAdvantage:
     )
 
 
-def update_out(row: models.ConstructionUpdate) -> ConstructionUpdate:
+def update_out(
+    row: models.ConstructionUpdate, photos: list[LinkedMedia] | None = None
+) -> ConstructionUpdate:
     return ConstructionUpdate(
         id=row.id,
         tower_id=row.tower_id,
@@ -178,7 +186,7 @@ def update_out(row: models.ConstructionUpdate) -> ConstructionUpdate:
         update_date=row.update_date,
         progress_percent=row.progress_percent,
         body=row.body,
-        photos=[],  # TODO(phase-4): part 2 lists progress photos from media links.
+        photos=photos or [],
         publish_state=row.publish_state,
         sort_order=row.sort_order,
     )
@@ -248,15 +256,18 @@ def _property_types(rows: Iterable[models.Configuration]) -> list[str]:
     return seen
 
 
-def _rera(project: Project) -> Rera:
-    # TODO(phase-4): part 2 fills `qr` from the project's `rera_qr` media link.
+def _rera(project: Project, qr: Media | None) -> Rera:
+    """COMPLIANCE (D-002): `qr` is the project's *visible* RERA QR, the one the site shows."""
     return Rera(
-        authority=project.rera_authority, number=project.rera_number, url=project.rera_url, qr=None
+        authority=project.rera_authority, number=project.rera_number, url=project.rera_url, qr=qr
     )
 
 
-def project_summary(project: Project) -> ProjectAdminSummary:
-    """A CMS list row. Needs `city`, `locality` and `configurations` loaded."""
+def project_summary(
+    project: Project, cover: Media | None = None, rera_qr: Media | None = None
+) -> ProjectAdminSummary:
+    """A CMS list row. Needs `city`, `locality` and `configurations` loaded; the cover (pinned,
+    else first visible photo) and the visible RERA QR come from media/queries.py."""
     return ProjectAdminSummary(
         id=project.id,
         slug=project.slug,
@@ -268,8 +279,8 @@ def project_summary(project: Project) -> ProjectAdminSummary:
         price=price_of(project),
         configuration_labels=configuration_labels(project.configurations),
         property_types=_property_types(project.configurations),
-        cover=None,  # TODO(phase-4): part 2 picks the pinned or first visible gallery photo.
-        rera=_rera(project),
+        cover=cover,
+        rera=_rera(project, rera_qr),
         possession_date=project.possession_date,
         is_featured=project.is_featured,
         is_sample=project.is_sample,
@@ -316,9 +327,21 @@ def _rera_account(project: Project) -> ReraAccount | None:
     )
 
 
-def project_admin(project: Project, blockers: list[Blocker]) -> ProjectAdmin:
+@dataclass(frozen=True)
+class AdminMedia:
+    """Everything media-backed in ProjectAdmin, loaded by the caller (routes.admin_view)."""
+
+    project: ProjectMedia
+    floor_plans: dict[uuid.UUID, list[LinkedMedia]]
+    photos: dict[uuid.UUID, list[LinkedMedia]]
+    share_image: Media | None
+
+
+def project_admin(project: Project, blockers: list[Blocker], media: AdminMedia) -> ProjectAdmin:
     """The full CMS view of a project with its children, each in its saved order."""
-    summary = project_summary(project).model_dump(exclude={"publish_state", "published_at"})
+    summary = project_summary(project, media.project.cover, media.project.rera_qr).model_dump(
+        exclude={"publish_state", "published_at"}
+    )
     progress = tower_progress(project.construction_updates)
     return ProjectAdmin(
         **summary,
@@ -330,17 +353,20 @@ def project_admin(project: Project, blockers: list[Blocker]) -> ProjectAdmin:
         launch_date=project.launch_date,
         location=_location(project),
         towers=[tower_out(t, progress.get(t.id)) for t in project.towers],
-        configurations=[configuration_out(c) for c in project.configurations],
+        configurations=[
+            configuration_out(c, media.floor_plans.get(c.id)) for c in project.configurations
+        ],
         amenities=[amenity_out(link.amenity) for link in project.amenity_links],
         specifications=[specification_out(s) for s in project.specifications],
         location_advantages=[advantage_out(a) for a in project.location_advantages],
-        construction_updates=[update_out(u) for u in project.construction_updates],
+        construction_updates=[
+            update_out(u, media.photos.get(u.id)) for u in project.construction_updates
+        ],
         payment_plans=[plan_out(p) for p in project.payment_plans],
-        # TODO(phase-4): part 2 fills gallery, videos, documents and brochure from media links.
-        gallery=[],
-        videos=[],
-        documents=[],
-        brochure=None,
+        gallery=media.project.gallery,
+        videos=media.project.videos,
+        documents=media.project.documents,
+        brochure=media.project.brochure,
         brochure_gated=project.brochure_gated,
         faqs=[],  # TODO(phase-4): part 4 (content) lists the project's FAQs.
         seo=Seo.model_validate(project.seo),
@@ -353,4 +379,5 @@ def project_admin(project: Project, blockers: list[Blocker]) -> ProjectAdmin:
         publish_blockers=[b.message for b in blockers],
         rera_account=_rera_account(project),
         featured_order=project.featured_order,
+        og_image=media.share_image,
     )

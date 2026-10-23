@@ -11,7 +11,11 @@ Rules:
     account, tower/phase registrations and the SEO canonical path are cleared (D-002).
   - Towers, configurations, specifications, location advantages, construction updates,
     payment plans and the amenity list are copied; configurations and updates point at the
-    copied towers. Media is not copied (TODO(phase-4): part 2 decides whether links are).
+    copied towers.
+  - COMPLIANCE: media links are NOT copied (photos, videos, documents, brochure, floor plans,
+    progress photos, and above all the RERA QR, which belongs to the source's registration).
+    The SEO share image (`seo.og_image_id`) is cleared too. The copy needs its own QR and
+    photos, so it shows "RERA QR code missing" until staff upload them (D-002).
 """
 
 from __future__ import annotations
@@ -77,7 +81,11 @@ def duplicate_project(db: Session, source: Project, actor: Actor) -> uuid.UUID:
                 created_by=actor.user_id,
                 updated_by=actor.user_id,
                 **_NO_REGISTRATION,
-                seo={k: v for k, v in source.seo.items() if k != "canonical_path"},
+                seo={
+                    k: v
+                    for k, v in source.seo.items()
+                    if k not in ("canonical_path", "og_image_id")
+                },
             )
         )
     )

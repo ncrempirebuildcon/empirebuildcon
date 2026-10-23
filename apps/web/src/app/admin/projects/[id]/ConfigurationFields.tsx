@@ -15,7 +15,6 @@ import {
   keyOf,
   optionsOf,
 } from "@/lib/labels";
-import { MediaPlaceholder } from "@/components/admin/states";
 import type { Collection } from "@/components/admin/useCollection";
 import type { ConfigurationDraft } from "./configurationDraft";
 import type { Configuration } from "./editorTypes";
@@ -165,9 +164,11 @@ export function ConfigurationFields({
           </>
         }
       />
-      <div className="md:col-span-2">
-        <MediaPlaceholder what="Floor plans for this configuration are added in the media manager." />
-      </div>
+      <p className="text-caption text-muted md:col-span-2">
+        {c.editing === "new"
+          ? "Floor plan: save the configuration first, then add its plan (image or PDF) in the Floor plan column of the table."
+          : "Floor plan: add or replace it (image or PDF) in the Floor plan column of the table. It saves straight away."}
+      </p>
     </div>
   );
 }

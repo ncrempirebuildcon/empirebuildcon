@@ -116,6 +116,7 @@ def test_hsts_and_hidden_docs_in_production() -> None:
         ip_hash_salt=SecretStr("p" * 48),
         data_encryption_key=SecretStr(Fernet.generate_key().decode()),
         edge_proxy_key=SecretStr("e" * 48),
+        cloudinary_url=SecretStr("cloudinary://key:not-a-secret@demo"),
     )
     prod = create_app(settings)
     with TestClient(prod, base_url="https://testserver") as c:

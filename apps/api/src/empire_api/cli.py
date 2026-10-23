@@ -4,7 +4,8 @@ Commands:
   create-superadmin  One-time: create the owner's account and print a setup link (D-009).
   create-user        Development/test only: a staff account with a password from stdin.
   seed               Feature flags, default settings and the amenity catalogue (idempotent).
-                     --sample also adds sample projects (development and demos; D-015).
+                     --sample also adds sample projects (development and demos; D-015) and,
+                     with the fake media store, SAMPLE placeholder tiles in their photos.
   openapi            Write the OpenAPI spec for the typed web client (D-020).
   gen-secrets        Print fresh random values for your own local .env.
 
@@ -25,8 +26,9 @@ import typer
 from cryptography.fernet import Fernet
 from sqlalchemy import select
 
-from empire_api.config import get_settings
+from empire_api.config import Settings, get_settings
 from empire_api.db import get_sessionmaker
+from empire_api.media.seed import seed_sample_media
 from empire_api.projects.seed import SampleRefusedError, seed_amenities, seed_sample
 from empire_api.site_settings.defaults import seed_settings
 from empire_api.site_settings.flags import seed_flags
@@ -129,16 +131,36 @@ def seed(
             f"Sample data: {result.projects_added} sample projects added, "
             f"{result.projects_skipped} already there (all marked is_sample, all drafts)."
         )
+        _seed_sample_media()
+
+
+def _seed_sample_media() -> None:
+    with get_sessionmaker()() as db:
+        media = seed_sample_media(db)
+        db.commit()
+    if media.store != "fake":
+        _out("Sample media skipped: placeholder tiles are only made with the fake media store.")
+    else:
+        _out(
+            f"Sample media: {media.added} SAMPLE placeholder tiles added, "
+            f"{media.skipped_projects} projects already had photos."
+        )
 
 
 @app.command("openapi")
 def openapi(
     out: Annotated[Path, typer.Option(help="Where to write the JSON spec")] = Path("openapi.json"),
 ) -> None:
-    """Write the OpenAPI spec generated from the code (source of truth from Phase 3, D-020)."""
+    """Write the OpenAPI spec generated from the code (source of truth from Phase 3, D-020).
+
+    WHY the fake media store is forced: the spec then always lists the development-only
+    dev-media routes, whatever CLOUDINARY_URL a developer has set, so the committed client
+    never changes with someone's local settings.
+    """
     from empire_api.main import create_app  # noqa: PLC0415 — only this command needs the app
 
-    spec = create_app().openapi()
+    settings = Settings(**{**get_settings().model_dump(), "media_store": "fake"})
+    spec = create_app(settings).openapi()
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(spec, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
     _out(f"Wrote {out}")

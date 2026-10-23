@@ -7,11 +7,14 @@ How it works:
      The migration itself is under test, not `create_all()`.
   3. Before every test: truncate every table (fast, and works even though app code commits),
      then seed the feature flags.
+  4. Media: the fake store (no CLOUDINARY_URL), writing to a temporary MEDIA_DEV_DIR; the
+     Cloudinary SDK's HTTP clients fail any test that would reach the network.
 """
 
 from __future__ import annotations
 
 import os
+import tempfile
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,8 +31,13 @@ os.environ["IP_HASH_SALT"] = "test-ip-salt-0123456789-abcdefghijklmnop"
 os.environ["DATA_ENCRYPTION_KEY"] = "test-data-key"
 os.environ["CORS_ALLOWED_ORIGINS"] = ""
 os.environ["EDGE_PROXY_KEY"] = ""
+os.environ.pop("CLOUDINARY_URL", None)
+os.environ.pop("MEDIA_STORE", None)
+os.environ["MEDIA_DEV_DIR"] = tempfile.mkdtemp(prefix="empire-media-test-")
 
 # The imports below come after the environment on purpose: settings are read at import time.
+import cloudinary.api_client.call_api
+import cloudinary.uploader
 import httpx
 from alembic import command
 from alembic.config import Config
@@ -41,6 +49,7 @@ from sqlalchemy.orm import Session
 from empire_api.config import get_settings
 from empire_api.db import get_engine, get_sessionmaker, reset_engine
 from empire_api.main import create_app
+from empire_api.media.store import get_store
 from empire_api.projects import blockers, maps, routes_catalogue
 from empire_api.site_settings.flags import seed_flags
 from empire_api.users import passwords
@@ -49,6 +58,9 @@ from empire_api.users.models import User
 API_ROOT = Path(__file__).resolve().parents[1]
 GOOD_PASSWORD = "correct horse battery staple"
 TABLES = (
+    "media_link",
+    "upload_intent",
+    "media",
     "app_user",
     "user_session",
     "password_reset_token",
@@ -74,6 +86,7 @@ TABLES = (
 @pytest.fixture(scope="session", autouse=True)
 def database() -> Iterator[None]:
     get_settings.cache_clear()
+    get_store.cache_clear()
     reset_engine()
     with get_engine().begin() as conn:
         conn.execute(text("DROP SCHEMA public CASCADE"))
@@ -105,10 +118,17 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(maps, "default_client", refuse)
     monkeypatch.setattr(routes_catalogue, "resolver_client", refuse)
 
+    def no_cloudinary(*args: object, **kwargs: object) -> None:
+        raise AssertionError("A test tried to reach Cloudinary through its SDK.")
+
+    monkeypatch.setattr(cloudinary.uploader._http, "request", no_cloudinary)
+    monkeypatch.setattr(cloudinary.api_client.call_api._http, "request", no_cloudinary)
+
 
 @pytest.fixture
 def qr_present(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pretend every project has its RERA QR image (the QR upload arrives with media, part 2)."""
+    """Pretend every project has its RERA QR image, for publish tests that aren't about media.
+    tests/test_media_projects.py uploads a real QR through the fake store instead."""
     monkeypatch.setattr(blockers, "rera_qr_present", lambda db, project: True)
 
 

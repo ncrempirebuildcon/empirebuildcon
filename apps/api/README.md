@@ -11,7 +11,8 @@ apps/api/
 ├─ pyproject.toml          pinned dependencies (D-006), ruff/mypy/pytest settings
 ├─ uv.lock                 exact versions; commit it
 ├─ alembic.ini, migrations/   database migrations (0001_foundation = Phase 3 tables,
-│                          0002_catalogue = projects, their children, cities, localities, amenities)
+│                          0002_catalogue = projects, their children, cities, localities, amenities,
+│                          0003_media = media library, upload intents, media links)
 ├─ scripts/                make_common_passwords.py (regenerates the weak-password list)
 ├─ src/empire_api/
 │  ├─ main.py              create_app(): routers, middleware, error handlers, OpenAPI tweaks
@@ -35,12 +36,26 @@ apps/api/
 │  │  ├─ children.py       the five operations for every child list; child_kinds.py = per kind
 │  │  ├─ catalogue.py      cities, localities, amenities ("used by N projects" guards)
 │  │  ├─ blockers.py       publish blockers: the one place that decides "ready to publish"
+│  │  ├─ media_owners.py   what media calls: an owner's project (locked), share-image use
 │  │  ├─ present.py        rows → responses; display.py = ₹ and area strings (twin of
 │  │  │                    packages/ui/src/format, same test vectors)
 │  │  ├─ maps.py           Google Maps pin resolver (SSRF rules in its header); pluscode.py
 │  │  ├─ routes.py, routes_children.py, routes_catalogue.py   HTTP only
 │  │  └─ seed.py           amenity catalogue and `seed --sample` (D-015)
-│  ├─ media/               contract shapes Media and LinkedMedia (the module arrives in part 2)
+│  ├─ media/               the media library, links to owners, uploads (Phase 4 part 2, D-033)
+│  │  ├─ models.py         media, upload_intent, media_link (exclusive arc); vocab.py = lists + limits
+│  │  ├─ store.py          the MediaStore interface and get_store(); cloudinary_store.py (official
+│  │  │                    SDK), fake_store.py (files in MEDIA_DEV_DIR, no network)
+│  │  ├─ signing.py        Cloudinary-compatible upload and reply signatures; credentials.py
+│  │  ├─ sniff.py          photo magic bytes + Pillow size check; multipart.py = capped body reader
+│  │  ├─ scrub.py          strips EXIF/GPS, XMP, IPTC, comments from photos before any store sees them
+│  │  ├─ uploads.py        photos through the API, upload signatures, confirm (intent rules)
+│  │  ├─ links.py          attach / show-hide / cover / detach / reorder; rules.py = roles per owner
+│  │  ├─ library.py        list, rename/alt/label, delete; events.py; handlers.py (destroy at store)
+│  │  ├─ queries.py        what the projects module reads (gallery, cover, RERA QR, floor plans…)
+│  │  ├─ routes.py         /admin/media/**, /admin/media-links/**; routes_dev.py = /dev-media/**
+│  │  │                    (fake store only)
+│  │  └─ seed.py           SAMPLE placeholder tiles for `seed --sample` (fake store only)
 │  ├─ integrations/        outbox drain + handlers, internal drain endpoint
 │  ├─ worker.py            empire-worker loop (paid always-on hosting)
 │  └─ cli.py               empire-api commands
@@ -56,6 +71,7 @@ uv sync                                        # install (creates .venv)
 uv run alembic upgrade head                    # migrate the database in DATABASE_URL
 uv run empire-api seed                         # flags, settings, amenity catalogue (idempotent)
 uv run empire-api seed --sample                # + "Sample — Project A/B" (dev/demo only; refused in production)
+                                               #   and SAMPLE placeholder tiles in their photos (fake store only)
 uv run uvicorn empire_api.main:app --reload    # API on http://localhost:8000 (docs at /api/docs)
 uv run empire-worker                           # optional: worker loop (drain + daily clean-up)
 
@@ -79,12 +95,15 @@ Important guards:
 - `test_no_route_ever_redirects` calls every route with and without a trailing slash and fails on any 3xx. This is the Current Investor bug (ARCHITECTURE §3).
 - `test_every_route_declares_who_may_call_it` fails if a route has no permission marker.
 - `test_models_match_the_migrated_database` fails if a model changed without a migration.
-- `test_projects_and_catalogue_match_the_design_contract` fails if a Projects or Catalogue operation drifts from `handbook/api/openapi-v1.yaml` (method, path, operationId, permission).
+- `test_projects_and_catalogue_match_the_design_contract` and `test_media_operations_match_the_design_contract` fail if a Projects, Catalogue or Media operation drifts from `handbook/api/openapi-v1.yaml` (method, path, operationId, permission).
+- `test_dev_media_routes_exist_only_with_the_fake_store` fails if the fake store's routes could exist with the real store.
 - `tests/test_display.py` runs the same money and area vectors as `packages/ui/test/format.test.ts`; change both together.
 
 Fixtures worth knowing (tests/conftest.py):
 - `no_network` (automatic): the maps resolver's real HTTP client fails any test that reaches it. Short-link tests inject a fake client (`httpx.MockTransport`).
-- `qr_present`: pretends every project has its RERA QR image, so publish can be tested before the media manager (part 2) exists. Without it, "RERA QR code missing" always blocks publishing.
+- `no_network` also replaces the Cloudinary SDK's HTTP clients with ones that fail the test. Cloudinary-store tests replace the SDK functions (`cloudinary.uploader.upload`, `cloudinary.api.resource`, …) instead.
+- Media tests run on the fake store (no `CLOUDINARY_URL`), writing to a temporary `MEDIA_DEV_DIR`.
+- `qr_present`: pretends every project has its RERA QR image, for publish tests that aren't about media. `tests/test_media_projects.py` uploads a real QR through the fake store instead.
 
 ## Adding a staff route
 
@@ -128,9 +147,14 @@ All settings are environment variables. They are listed in the repo's `.env.exam
 | Variable | Default | Meaning |
 |---|---|---|
 | `EDGE_PROXY_KEY` | empty | Shared secret with the web proxy (`apps/web/src/proxy.ts`). When set, calls without it get 403 (except health checks and `/api/v1/internal/*`), and only then is the client IP read from `X-Empire-Client-IP`. Empty locally; required in staging and production (D-027). `X-Forwarded-For` is never trusted. |
+| `CLOUDINARY_URL` | empty | `cloudinary://<api_key>:<api_secret>@<cloud_name>`. Required in staging and production. The secret stays on the server; only the cloud name and API key reach the browser, inside an upload signature (SECURITY.md §7). |
+| `MEDIA_STORE` | empty | `cloudinary` or `fake`. Empty: `cloudinary` when `CLOUDINARY_URL` is set, otherwise `fake`. Staging and production refuse `fake`. |
+| `MEDIA_DEV_DIR` | `apps/api/.media-dev/` | Where the fake store keeps files (git-ignored). Served at `/api/v1/dev-media/files/…`, which exists only while the fake store is active, as does its Cloudinary-shaped `/api/v1/dev-media/upload/{resource_type}`. |
 | `DB_POOL_SIZE` | `5` | Connections per process |
 | `WORKER_DRAIN_INTERVAL_SECONDS` | `30` | Tick length of `empire-worker` |
 
 The maps resolver (`POST /api/v1/admin/maps/resolve`) needs outbound HTTPS to Google's short-link hosts only (`maps.app.goo.gl`, `goo.gl`); long links and plus codes are read without any network call.
+
+The Cloudinary store needs outbound HTTPS to `api.cloudinary.com` (uploads, Admin API, destroy). Files are delivered from `res.cloudinary.com`. Videos and documents go from the browser straight to `api.cloudinary.com`, so the Phase 5 CSP needs `connect-src https://api.cloudinary.com` and `img-src https://res.cloudinary.com`.
 
 In development and test, missing secrets fall back to clearly insecure defaults so the app runs on a fresh clone. In staging and production, the app refuses to start without real values.

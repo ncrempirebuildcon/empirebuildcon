@@ -163,6 +163,9 @@ export type ProjectActions = ReturnType<typeof useProjectActions>;
 function tabForBlocker(blocker: string): { tab: string; label: string } | null {
   const text = blocker.toLowerCase();
   if (text.includes("qr")) return { tab: "documents", label: "Go to Documents" };
+  if (text.includes("floor plan")) return { tab: "configurations", label: "Go to Configurations" };
+  if (text.includes("photo") || text.includes("cover"))
+    return { tab: "media", label: "Go to Media" };
   if (text.includes("rera")) return { tab: "details", label: "Go to Details" };
   if (text.includes("configuration"))
     return { tab: "configurations", label: "Go to Configurations" };
@@ -315,7 +318,7 @@ export function PublishPanel({
             <>
               <p className="text-caption">
                 Duplicate makes a new draft with this project&apos;s details, towers and
-                configurations. Media is not copied.
+                configurations. Media is not copied: the copy needs its own photos and RERA QR code.
               </p>
               {/* WHY disabled while dirty: Duplicate copies the saved project and opens the
                   copy, so unsaved edits would be left behind on this page. */}

@@ -187,7 +187,7 @@ def test_tower_progress_comes_from_the_latest_published_update(
     for date, percent, state in (
         ("2026-08-31", 30, "published"),
         ("2026-09-30", 45, "published"),
-        ("2026-10-31", 60, "draft"),
+        ("2026-10-15", 60, "draft"),
     ):
         add_child(
             owner,

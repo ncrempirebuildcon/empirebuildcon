@@ -15,10 +15,12 @@ from sqlalchemy.orm import Session
 
 from empire_api.db import get_db
 from empire_api.errors import problem_responses
+from empire_api.media import queries as media_queries
 from empire_api.pagination import PageParams, page_params
 from empire_api.platform.crypto import client_ip
 from empire_api.projects import blockers, children, present, service
 from empire_api.projects.common import Actor
+from empire_api.projects.models import Project
 from empire_api.projects.schemas import ProjectAdmin, ProjectInput, ProjectList, ProjectUpdate
 from empire_api.projects.schemas_catalogue import Amenity
 from empire_api.projects.schemas_children import ProjectAmenitiesInput
@@ -51,10 +53,21 @@ def actor_of(info: SessionInfo, request: Request) -> Actor:
 
 
 def admin_view(db: Session, project_id: uuid.UUID) -> ProjectAdmin:
-    """The project as the CMS sees it, read fresh after any change."""
+    """The project as the CMS sees it, read fresh after any change (media included)."""
     db.expire_all()
     project = service.load_project(db, project_id)
-    return present.project_admin(project, blockers.publish_blockers(db, project))
+    media = present.AdminMedia(
+        project=media_queries.project_media(db, project.id),
+        floor_plans=media_queries.floor_plans(db, (c.id for c in project.configurations)),
+        photos=media_queries.progress_photos(db, (u.id for u in project.construction_updates)),
+        share_image=media_queries.library_item(db, _share_image_id(project)),
+    )
+    return present.project_admin(project, blockers.publish_blockers(db, project), media)
+
+
+def _share_image_id(project: Project) -> uuid.UUID | None:
+    value = project.seo.get("og_image_id")
+    return uuid.UUID(str(value)) if value else None
 
 
 @router.get(
@@ -73,8 +86,10 @@ def list_projects(
     """Projects, most recently edited first, with the CMS list's filters."""
     filters = service.ProjectFilters(q, status, publish_state, sales_status, city)
     rows, total = service.list_projects(db, paging, filters)
+    covers, qrs = media_queries.covers_and_qrs(db, (p.id for p in rows))
     return ProjectList(
-        items=[present.project_summary(p) for p in rows], meta=PageMeta(**paging.meta(total))
+        items=[present.project_summary(p, covers.get(p.id), qrs.get(p.id)) for p in rows],
+        meta=PageMeta(**paging.meta(total)),
     )
 
 
@@ -99,7 +114,7 @@ def create_project(body: ProjectInput, actor: Writer, request: Request, db: Db) 
     **staff("projects.read"),
 )
 def get_project(project_id: ProjectId, actor: Reader, db: Db) -> ProjectAdmin:
-    """The project with every child, the publish blockers and empty media placeholders."""
+    """The project with every child, its media and the publish blockers."""
     return admin_view(db, project_id)
 
 
@@ -173,7 +188,8 @@ def unpublish_project(
 def duplicate_project(
     project_id: ProjectId, actor: Writer, request: Request, db: Db
 ) -> ProjectAdmin:
-    """A draft copy (slug `<slug>-copy`, `-copy-2`, …) with every child; media isn't copied."""
+    """A draft copy (slug `<slug>-copy`, `-copy-2`, …) with every child. Media links are not
+    copied: the copy needs its own RERA QR and photos (duplicate.py)."""
     copy_id = service.duplicate_project(db, project_id, actor_of(actor, request))
     return admin_view(db, copy_id)
 

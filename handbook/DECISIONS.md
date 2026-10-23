@@ -380,3 +380,67 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 - The owner closes both pull requests with the comment `@dependabot ignore this major version`.
 **Consequences:** We revisit TypeScript when typescript-eslint and openapi-typescript both support the newer version. The Node types move together with a Node upgrade.
 **Verified / assumed:** The failures were read from the CI logs of PR #3 on 22 Oct 2026. The other jobs passed (API 96 tests, secret scan). Ignore syntax and comment commands are as described in GitHub Docs ("Dependabot options reference" and "Dependabot pull request comment commands"), checked 22 Oct 2026.
+
+## D-033 · Phase 4 part 2: media manager (Accepted, 2026-10-23)
+
+**Context:** Part 2 adds photos, videos, documents, the RERA QR, brochures, floor plans, progress photos and share images. It uses Cloudinary (D-007), but no account credentials exist in the development workspace.
+**Decision:**
+- **Two stores behind one interface.**
+  - `CloudinaryStore` uses the official `cloudinary` SDK, wrapped and typed, with credentials passed on every call.
+  - `FakeStore` runs development, tests and the browser suite with no network. It mimics Cloudinary's signed direct upload and signed replies.
+  - Staging and production refuse to start with the fake store or without `CLOUDINARY_URL`.
+- **Signing.**
+  - Requests are signed with SHA-256; replies are accepted with SHA-1 or SHA-256.
+  - Each direct upload gets an `upload_intent`: one user, one use, 60 minutes (Cloudinary's own signature lifetime, so a 100 MB video on a slow line still fits), `overwrite=false`.
+  - The API re-reads the asset from the Admin API before saving.
+- **Storage layout.**
+  - Public ids are `folder` + uuid, which behaves the same in Cloudinary's fixed and dynamic folder modes.
+  - PDFs are stored as images, so they open in the browser and get a page-1 thumbnail. Office files are stored as raw files and keep their extension.
+  - Videos get an eager poster, because the Free plan transforms only 40 MB of video on the fly.
+- **Privacy.**
+  - Photo metadata (EXIF/GPS, XMP, IPTC, comments) is stripped on the server before upload, so even the stored original has no location data. Anything appended after the image's real end is cut off. The ICC colour profile is kept. Animated images are refused, because re-encoding would silently keep one frame.
+  - Start-up configuration errors never echo environment values (`hide_input_in_errors`).
+  - Video container metadata (phones can record GPS) is still delivered as uploaded. This is checked on staging in Phase 9.
+- **Rules.**
+  - Single-valued roles replace the previous item.
+  - The cover is the pinned item, or else the first visible one.
+  - A live project's RERA QR can't be hidden or removed; it can only be replaced.
+  - A duplicate copies no media links and clears the share image, so a copy can never carry the original's QR (COMPLIANCE).
+  - Floor-plan changes emit `configuration.changed`.
+  - A new event, `media.upload_discarded`, routes every destroy through the outbox.
+- **Honest labels.**
+  - A photo is labelled artist's impression, actual photo, or progress photo with its month.
+  - The month can't be in the future (IST).
+  - Documents carry no label.
+  - The API enforces it: a gallery photo (project or construction update) or hero image can't be shown on the website without a label. Unlabelled photos attach hidden. Sample media is exempt, because it is never public.
+  - The CMS asks for the label before a batch of photos uploads.
+  - Construction updates can't be dated in the future.
+- **Roles not used yet:** `hero` and `og_image` links are refused for now. The share image is `seo.og_image_id`; the hero role waits for the Phase 5 design.
+- **CMS:**
+  - Media actions need `media.upload`. Deleting from the library needs `media.manage`, and only unattached files can be deleted.
+  - Uploads run one at a time, with progress and Cancel.
+  - A file's title, alt text and label are edited in one dialog with a single Save.
+  - The share image is `seo.og_image_id`, saved with the project.
+  - Progress photos are labelled "progress photo" with their update's month automatically.
+- **Contract additions:**
+  - `Media`: `label`, `label_month`, `is_sample`, `attached_count`.
+  - `UploadSignature`: `fields`, `expires_at`, and `resource_type: image` for PDFs.
+  - `ProjectAdmin.og_image`.
+  - `unattached=true` on the media list.
+**Verified / assumed:**
+- **Cloudinary documentation, read on 23 Oct 2026:**
+  - authentication and response signatures;
+  - upload reference and folder modes;
+  - Admin API resource lookup;
+  - transformation reference;
+  - video posters;
+  - PDF delivery;
+  - pricing.
+- **Free plan limits** (checked the same day): 10 MB images and raw files, 100 MB video, 25 MP, Admin API 500 requests per hour, 40 MB on-the-fly video.
+- **The response-signature example in Cloudinary's docs is inconsistent.** Its printed hex doesn't match the string shown. We follow the documented recipe, cross-checked against the vectors in Cloudinary's own SDK tests.
+- **PyPI versions** (checked 23 Oct 2026):
+  - `cloudinary` 1.46.3, released 4 Oct 2026.
+  - `pillow` 13.0.0, released 16 Oct 2026.
+  - `python-multipart` 0.0.32.
+- **Not yet tried against a real account.** Try a real upload, confirm, delete and poster on staging. The owner must enable PDF delivery in the Cloudinary console.
+- **Phase 5 CSP must allow:** `connect-src https://api.cloudinary.com` and `img-src https://res.cloudinary.com`.

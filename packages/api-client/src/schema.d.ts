@@ -241,6 +241,172 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Media library
+         * @description Newest first. `unattached=true` lists files nothing uses (safe to delete).
+         */
+        get: operations["list_media"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/media-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach media to a project, configuration, update, page or post
+         * @description Single-valued roles (brochure, rera_qr, hero, og_image, floor_plan) replace the current
+         *     link; the old file stays in the library. Pages and posts arrive in part 4.
+         */
+        post: operations["attach_media"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/media-links/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set order for one owner+role (first = cover unless pinned)
+         * @description `ids`: every link of one owner and role, each once, in the new order.
+         */
+        put: operations["reorder_media_links"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/media-links/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Detach (media stays in the library) */
+        delete: operations["detach_media"];
+        options?: never;
+        head?: never;
+        /**
+         * Show/hide on website, make cover
+         * @description Hidden items can't be the cover; hiding the cover unpins it. A live project's RERA QR
+         *     can't be hidden (409).
+         */
+        patch: operations["update_media_link"];
+        trace?: never;
+    };
+    "/api/v1/admin/media/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save a direct upload after verifying Cloudinary's signed reply
+         * @description 422 when the reply doesn't verify or match an upload you started in the last hour,
+         *     or when the stored file isn't what was signed for. A refused file is destroyed by the
+         *     outbox (the next sweep, at most 15 minutes later).
+         */
+        post: operations["media_confirm_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/media/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a photo through the API (magic-byte check, 10 MB limit)
+         * @description Multipart `ImageUpload`. Optional `attach_to` + `role` attach it in the same step.
+         */
+        post: operations["upload_image"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/media/upload-signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Signed parameters for a direct video/document upload to Cloudinary
+         * @description Video ≤ 100 MB; documents (PDF, DOC/DOCX, PPT/PPTX) ≤ 10 MB on the Cloudinary free plan. POST the file to `upload_url` as multipart with every entry of `fields`, then send the store's JSON reply, unchanged, to `confirm` within an hour (expires_at).
+         */
+        post: operations["media_upload_signature"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/media/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete from library and Cloudinary (refused while attached) */
+        delete: operations["delete_media"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename / alt text
+         * @description Title, alt text and the honest label (label_month: any day of the month).
+         */
+        patch: operations["update_media"];
+        trace?: never;
+    };
     "/api/v1/admin/projects": {
         parameters: {
             query?: never;
@@ -274,7 +440,7 @@ export interface paths {
         };
         /**
          * Get Project
-         * @description The project with every child, the publish blockers and empty media placeholders.
+         * @description The project with every child, its media and the publish blockers.
          */
         get: operations["get_project"];
         put?: never;
@@ -434,7 +600,8 @@ export interface paths {
         put?: never;
         /**
          * Copy as a new draft
-         * @description A draft copy (slug `<slug>-copy`, `-copy-2`, …) with every child; media isn't copied.
+         * @description A draft copy (slug `<slug>-copy`, `-copy-2`, …) with every child. Media links are not
+         *     copied: the copy needs its own RERA QR and photos (duplicate.py).
          */
         post: operations["duplicate_project"];
         delete?: never;
@@ -943,6 +1110,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dev-media/files/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Serve a file from the fake media store (development only) */
+        get: operations["dev_media_file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dev-media/upload/{resource_type}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cloudinary-shaped signed direct upload to the fake media store (development only) */
+        post: operations["dev_media_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/internal/outbox/drain": {
         parameters: {
             query?: never;
@@ -1127,7 +1328,10 @@ export interface components {
             bathrooms: number | null;
             /** Bhk */
             bhk: number | null;
-            /** Floor Plans */
+            /**
+             * Floor Plans
+             * @description Media links with role floor_plan (image or PDF; at most one)
+             */
             floor_plans: components["schemas"]["LinkedMedia"][];
             /**
              * Id
@@ -1206,7 +1410,10 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Photos */
+            /**
+             * Photos
+             * @description Progress photos: media links with role gallery, in order
+             */
             photos: components["schemas"]["LinkedMedia"][];
             /** Progress Percent */
             progress_percent: number | null;
@@ -1327,6 +1534,23 @@ export interface components {
             /** Version */
             version: string;
         };
+        ImageUpload: {
+            alt_text?: string;
+            /** @description owner_type:owner_id, e.g. project:<uuid> */
+            attach_to?: string;
+            /**
+             * Format: binary
+             * @description JPEG, PNG, WebP or AVIF, at most 10 MB and 25 megapixels. Embedded metadata (EXIF with GPS, XMP, IPTC, comments) is removed on the server and the EXIF orientation applied, so width/height are as displayed.
+             */
+            file: string;
+            /** @enum {string} */
+            label?: "artist_impression" | "actual_photo" | "progress_photo";
+            /** Format: date */
+            label_month?: string;
+            /** @enum {string} */
+            role?: "gallery" | "floor_plan" | "brochure" | "rera_qr" | "video" | "document" | "hero" | "og_image";
+            title?: string;
+        };
         /**
          * LinkedMedia
          * @description A media item as attached to an owner (project, configuration, construction update).
@@ -1334,6 +1558,11 @@ export interface components {
         LinkedMedia: {
             /** Alt Text */
             alt_text: string | null;
+            /**
+             * Attached Count
+             * @description How many projects, configurations or updates use it (delete needs 0)
+             */
+            readonly attached_count: number;
             /** Bytes */
             bytes: number;
             /**
@@ -1343,7 +1572,12 @@ export interface components {
             created_at: string;
             /** Duration S */
             duration_s: number | null;
-            /** Format */
+            /**
+             * Format
+             * @example jpg
+             * @example mp4
+             * @example pdf
+             */
             format: string;
             /** Height */
             height: number | null;
@@ -1354,6 +1588,11 @@ export interface components {
             id: string;
             /** Is Cover */
             is_cover: boolean;
+            /**
+             * Is Sample
+             * @description Sample placeholder from the seed — never shown live
+             */
+            is_sample: boolean;
             /** Is Visible */
             is_visible: boolean;
             /**
@@ -1361,6 +1600,16 @@ export interface components {
              * @enum {string}
              */
             kind: "image" | "video" | "document";
+            /**
+             * Label
+             * @description Honest label: artist's impression, actual photo or progress photo
+             */
+            label: ("artist_impression" | "actual_photo" | "progress_photo") | null;
+            /**
+             * Label Month
+             * @description First day of the month the photo shows (required for progress photos)
+             */
+            label_month: string | null;
             /**
              * Link Id
              * Format: uuid
@@ -1373,11 +1622,17 @@ export interface components {
             role: "gallery" | "floor_plan" | "brochure" | "rera_qr" | "video" | "document" | "hero" | "og_image";
             /** Sort Order */
             sort_order: number;
-            /** Thumbnail Url */
+            /**
+             * Thumbnail Url
+             * @description Small image; a poster for videos and PDFs
+             */
             thumbnail_url: string | null;
             /** Title */
             title: string;
-            /** Url */
+            /**
+             * Url
+             * @description Images: width-limited f_auto,q_auto copy. PDFs open in the browser; other documents download. Videos: the original file.
+             */
             url: string;
             /** Width */
             width: number | null;
@@ -1618,10 +1873,18 @@ export interface components {
              */
             role: "super_admin" | "admin" | "sales" | "marketing" | "content_editor";
         };
-        /** Media */
+        /**
+         * Media
+         * @description A file in the media library, with delivery URLs built by the store (media/store.py).
+         */
         Media: {
             /** Alt Text */
             alt_text: string | null;
+            /**
+             * Attached Count
+             * @description How many projects, configurations or updates use it (delete needs 0)
+             */
+            readonly attached_count: number;
             /** Bytes */
             bytes: number;
             /**
@@ -1631,7 +1894,12 @@ export interface components {
             created_at: string;
             /** Duration S */
             duration_s: number | null;
-            /** Format */
+            /**
+             * Format
+             * @example jpg
+             * @example mp4
+             * @example pdf
+             */
             format: string;
             /** Height */
             height: number | null;
@@ -1641,18 +1909,93 @@ export interface components {
              */
             id: string;
             /**
+             * Is Sample
+             * @description Sample placeholder from the seed — never shown live
+             */
+            is_sample: boolean;
+            /**
              * Kind
              * @enum {string}
              */
             kind: "image" | "video" | "document";
-            /** Thumbnail Url */
+            /**
+             * Label
+             * @description Honest label: artist's impression, actual photo or progress photo
+             */
+            label: ("artist_impression" | "actual_photo" | "progress_photo") | null;
+            /**
+             * Label Month
+             * @description First day of the month the photo shows (required for progress photos)
+             */
+            label_month: string | null;
+            /**
+             * Thumbnail Url
+             * @description Small image; a poster for videos and PDFs
+             */
             thumbnail_url: string | null;
             /** Title */
             title: string;
-            /** Url */
+            /**
+             * Url
+             * @description Images: width-limited f_auto,q_auto copy. PDFs open in the browser; other documents download. Videos: the original file.
+             */
             url: string;
             /** Width */
             width: number | null;
+        };
+        /** MediaLinkInput */
+        MediaLinkInput: {
+            /**
+             * Attach To
+             * @description owner_type:owner_id, e.g. project:<uuid>
+             */
+            attach_to: string;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * Media Id
+             * Format: uuid
+             */
+            media_id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "gallery" | "floor_plan" | "brochure" | "rera_qr" | "video" | "document" | "hero" | "og_image";
+        };
+        /** MediaLinkUpdate */
+        MediaLinkUpdate: {
+            /** Is Cover */
+            is_cover?: boolean | null;
+            /** Is Visible */
+            is_visible?: boolean | null;
+        };
+        /** MediaList */
+        MediaList: {
+            /** Items */
+            items: components["schemas"]["Media"][];
+            meta: components["schemas"]["PageMeta"];
+        };
+        /**
+         * MediaUpdate
+         * @description PATCH a library item: send only what changes. Labels are checked together with the
+         *     stored values (library.update_media).
+         */
+        MediaUpdate: {
+            /** Alt Text */
+            alt_text?: string | null;
+            /** Label */
+            label?: ("artist_impression" | "actual_photo" | "progress_photo") | null;
+            /**
+             * Label Month
+             * @description Any day of the month; stored as the first day
+             */
+            label_month?: string | null;
+            /** Title */
+            title?: string | null;
         };
         /** PageMeta */
         PageMeta: {
@@ -1863,6 +2206,8 @@ export interface components {
             location_advantages: components["schemas"]["LocationAdvantage"][];
             /** Name */
             name: string;
+            /** @description The library image named by seo.og_image_id (read-only; set it via seo) */
+            og_image: components["schemas"]["Media"] | null;
             /** Payment Plans */
             payment_plans: components["schemas"]["PaymentPlan"][];
             /** Possession Date */
@@ -2277,6 +2622,83 @@ export interface components {
             [key: string]: {
                 [key: string]: string;
             };
+        };
+        /** UploadConfirm */
+        UploadConfirm: {
+            /** Attach To */
+            attach_to?: string | null;
+            /**
+             * Cloudinary Response
+             * @description The JSON the store returned to the browser, unmodified
+             */
+            cloudinary_response: {
+                [key: string]: unknown;
+            };
+            /** Role */
+            role?: ("gallery" | "floor_plan" | "brochure" | "rera_qr" | "video" | "document" | "hero" | "og_image") | null;
+            /** Title */
+            title?: string | null;
+        };
+        /**
+         * UploadSignature
+         * @description Everything the browser needs to POST the file straight to the store.
+         */
+        UploadSignature: {
+            /** Api Key */
+            api_key: string;
+            /**
+             * Expires At
+             * Format: date-time
+             * @description Confirm before this time
+             */
+            expires_at: string;
+            /**
+             * Fields
+             * @description Send every one of these form fields with `file`, unchanged
+             */
+            fields: {
+                [key: string]: string;
+            };
+            /** Folder */
+            folder: string;
+            /** Max Bytes */
+            max_bytes: number;
+            /**
+             * Public Id
+             * @description Signed public id (inside `folder`)
+             */
+            public_id: string;
+            /**
+             * Resource Type
+             * @enum {string}
+             */
+            resource_type: "image" | "video" | "raw";
+            /** Signature */
+            signature: string;
+            /** Timestamp */
+            timestamp: number;
+            /** Upload Url */
+            upload_url: string;
+        };
+        /** UploadSignatureRequest */
+        UploadSignatureRequest: {
+            /** Bytes */
+            bytes: number;
+            /**
+             * Filename
+             * @description Only its extension is used; never stored
+             */
+            filename: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "video" | "document";
+            /**
+             * Mime Type
+             * @description The browser's type for the file ('' if unknown)
+             */
+            mime_type: string;
         };
         /**
          * User
@@ -3486,6 +3908,717 @@ export interface operations {
             };
             /** @description Too many requests */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_media: {
+        parameters: {
+            query?: {
+                /** @description Title or alt text contains */
+                q?: string | null;
+                kind?: ("image" | "video" | "document") | null;
+                /** @description owner_type:owner_id, e.g. project:<uuid> */
+                attached_to?: string | null;
+                /** @description Only files nothing uses */
+                unattached?: boolean;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaList"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    attach_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaLinkInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedMedia"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    reorder_media_links: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    detach_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_media_link: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaLinkUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedMedia"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    media_confirm_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UploadConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Media"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    upload_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ImageUpload"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Media"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a JPEG, PNG, WebP or AVIF image */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    media_upload_signature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UploadSignatureRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadSignature"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description File too large for the plan */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description File type not allowed */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Media"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6901,6 +8034,68 @@ export interface operations {
             };
             /** @description Too many requests */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    dev_media_file: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    dev_media_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_type: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
