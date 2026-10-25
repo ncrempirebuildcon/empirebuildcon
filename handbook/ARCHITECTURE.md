@@ -52,8 +52,8 @@ One PostgreSQL database. Each API module owns its tables, schemas, routes and ev
 | `listings` | Listing (resale/rent) | reserved; **flag `listings` off** — not built in v1 (D-004) | `listing.*` |
 | `media` | Media, MediaLink | `/admin/media/**`, `/admin/media-links/**` | `media.*` |
 | `leads` | Lead, LeadConsent, LeadNote, LeadActivity, SiteVisit, Notification | `/public/leads`, `/public/site-visits`, `/public/brochure-requests`, `/admin/leads/**`, `/admin/site-visits/**`, `/admin/reports/utm` | `lead.*`, `site_visit.*` |
-| `content` | Page, Block, Post, Faq, Offer, Testimonial, ConsentText | `/public/pages`, `/public/posts`, `/public/faqs`, `/public/testimonials`, `/admin/pages/**` … | `page.*`, `post.*`, `faq.changed`, `offer.*`, `testimonial.changed`, `consent_text.published` |
-| `seo` | Redirect; `seo` JSON on content rows; sitemap feed | `/public/redirects`, `/public/sitemap`, `/admin/redirects` | `redirect.changed` |
+| `content` | Page, Block, Post, Faq, Offer, Testimonial, ConsentText; the schedule tick | `/public/pages`, `/public/posts`, `/public/faqs`, `/public/testimonials` (Phase 5), `/admin/pages/**`, `/admin/posts/**`, `/admin/faqs/**`, `/admin/testimonials/**`, `/admin/offers/**`, `/admin/consent-texts/**` | `page.*`, `post.*`, `faq.changed`, `offer.*`, `testimonial.changed`, `consent_text.published` |
+| `seo` | Redirect; `seo` JSON checks and warnings on content rows; public paths; sitemap feed | `/public/redirects`, `/public/sitemap` (Phase 5), `/admin/redirects/**` | `redirect.changed` |
 | `users` | User, Session, PasswordResetToken (roles are a code matrix, §11) | `/auth/**`, `/admin/users/**`, `/admin/roles`, `/admin/audit-log` | `user.*` |
 | `settings` | Setting, FeatureFlag | `/public/site`, `/admin/settings/**`, `/admin/flags/**` | `settings.updated`, `flag.changed` |
 | `integrations` | WebhookEndpoint, WebhookDelivery, integration config; outbox handlers and the drain | `/admin/integrations/**`, `/admin/webhooks/**`, `/internal/outbox/drain` | — (delivers events) |
@@ -92,10 +92,43 @@ The `/_internal/revalidate` route lives outside `/api/*` so it is handled by Nex
 - **Translations (D-014):** English lives in the normal columns. A `translations` JSON column holds overlays per locale, e.g. `{"hi": {"name": "…", "tagline": "…"}}`. Missing translations fall back to English.
 - **SEO:** a `seo` JSON column on projects, configurations, pages, posts and cities: title, description, OG image, noindex, canonical path.
 - **Media links (exclusive arc):** `media_link` has one nullable foreign key per owner type (project, configuration, construction update, page, post) and a check constraint that exactly one is set. Real foreign keys, cascades on delete, one table to query. A partial unique index allows one cover per owner and role.
+- **Public paths:** `/` is the home page, `/<slug>` a page, `/blog/<slug>` a post and `/projects/<slug>` a project. Redirects and the sitemap use these.
 - **Publishing:** content rows have `publish_state` (draft, published, archived). Projects and configurations also have `sales_status`: **available**, **sold_out** (shown after available items with a "Sold out" badge), **off_market** (hidden from the public site).
 - **Sample data (D-015):** rows created by the sample seed carry `is_sample = true`. Public endpoints never return them in production, publish is blocked for them in production, and the CMS shows a "Sample" badge.
-- **Deletion:** projects with leads, pages and posts are archived, not deleted. Leads are never hard-deleted by staff; `leads.erase` (super-admin) replaces personal fields with a stub on a data-erasure request and logs it.
+- **Deletion:** projects with leads, and pages and posts that were ever published, are archived, not deleted. Offers that were ever live stay too (switch them off). Leads are never hard-deleted by staff; `leads.erase` (super-admin) replaces personal fields with a stub on a data-erasure request and logs it.
 - **Units:** the `unit` table (individual flats) is not built in v1 (D-005). Availability is tracked per configuration.
+
+**Content (Phase 4 part 4, D-035)**
+
+- **Pages** have a kind: `standard`, `landing`, `legal` or `system`.
+  - System pages (home, projects, about, contact) are seeded and can't be created. They and the seeded legal pages (privacy, terms, disclaimer) are *required pages* (`is_required`): they can't be deleted or archived, and keep their slug and kind. Unpublishing is allowed.
+  - A few slugs are reserved for the site's own sections (`admin`, `api`, `blog`, `projects`, `properties`, `search`, `sitemap`, locale prefixes and so on).
+  - COMPLIANCE (D-017): legal pages need `legal.publish` to publish, unpublish, schedule, archive, delete, edit while live *or scheduled*, or change kind to or from legal. Production refuses to publish text still marked `[DRAFT`, the same test as consent texts; it also refuses to leave such text on a live legal page, or to move it into or out of the legal kind.
+  - A live page can't be given a publish time, and taking a page down clears its publish time, so a stale one never brings the page back.
+  - Saving a page or its blocks may send `expected_updated_at`; if someone saved in between, the save is refused with 409 instead of overwriting their change.
+- **Blocks** are ordered rows on a page. `PUT /pages/{id}/blocks` saves the whole ordered list in one transaction. There are 17 types, each with a strict data shape (a discriminated union on `type`):
+  - hero, rich_text, image, gallery (≤ 24), video, project_grid, property_grid, cta, lead_form, faq_list, stats, testimonials, offer_banner, map, steps (≤ 8), columns (2–3) and divider.
+  - SECURITY: no text field accepts HTML. Links must be a site path or `https://` with a host; `javascript:`, `data:`, `http:`, `//host` and similar are refused. Videos come from a YouTube/Vimeo host allowlist and are stored as provider plus id.
+  - Every id a block names (media, project, city, FAQ, testimonial, offer) is checked, and read `FOR SHARE` so a concurrent delete can't slip past. Photos in hero, image and gallery blocks need an honest label (D-033).
+  - When a deleted FAQ or testimonial was the last one a block picked, the block is hidden: an empty pick list would otherwise mean "all site-wide FAQs" or "the newest testimonials".
+  - A project that a page block or an offer names can't be deleted (409 names where).
+  - COMPLIANCE: each stat needs a `source` and an `as_of` date that isn't in the future.
+- **Posts:** blog and news, with a FormattedText body, cover image (with an honest label), category, tags and author.
+- **FAQs:** site-wide or per project, ordered, with show/hide. Showing one needs `content.publish`. A project's FAQs appear in `ProjectAdmin.faqs`.
+- **Offers:** placement banner, home or project; a computed state (scheduled, live, ended, inactive).
+  - New offers start switched off. The image needs an honest label; a project placement always names its project (CHECK).
+  - COMPLIANCE: no countdown field exists, and pressure wording ("only N left", "hurry", "last few") is refused. When the text mentions a price or discount, a terms line or T&C link is required.
+  - An offer that has been live, or that a page shows, can't be deleted.
+- **Testimonials:** real only. A database CHECK stops one being shown without a `source` and `consent_date`. There is no sample flag, and the seed creates none.
+- **Redirects:** every active redirect is one hop.
+  - Chains collapse (A→B with B→C stored saves A→C, and redirects to A are re-pointed), keeping the original target's query string and fragment when the new target has none; a loop is refused with 409. Writes take an advisory lock.
+  - `to_path` is a site path, or `https://` on one of our domains, stored as its path; a path starting with `//` is refused, with a CHECK as backstop. Default 308.
+  - A redirect typed in the CMS can't start at the address of a live page, post or project (409).
+  - Paths match exactly and case-sensitively (Phase 5 contract); only the reserved-path check ignores case.
+  - A slug change on a live project, page or post creates or re-points a redirect from the old path. Publishing an item removes any redirect *from* its own path, so renaming back and forth can't loop.
+- **SEO JSON** is checked everywhere it appears: title ≤ 70 and description ≤ 170 (no HTML), an image for `og_image_id`, an internal `canonical_path` (no whitespace or control characters). Changing it needs `seo.manage`. The API also returns `seo_warnings` for the CMS checklist: a missing title or description, a title over 60 or a description over 160 characters (where search results cut them), and noindex. Warnings never block.
+- **Translations** of pages, posts and FAQs refuse HTML, and every translated field keeps its English length limit.
+- **Seed:** `empire-api seed` creates the system pages and the legal pages (privacy, terms, disclaimer) as required drafts with a clear DRAFT placeholder. `seed --sample` adds one SAMPLE post, one SAMPLE offer (switched off) and SAMPLE FAQs; it never adds testimonials.
 
 **Indexes worth naming now:** unique `slug` per table; `lead(created_at desc)`, `lead(status, created_at desc)`, `lead(owner_user_id, created_at desc)`, `lead(phone_e164)`; `project(publish_state, sales_status)`; GIN on `project.search_vector` (generated `tsvector`) and `pg_trgm` on project and locality names; `outbox_event(status, available_at)`.
 
@@ -157,8 +190,8 @@ Envelope: `{id, type, occurred_at, actor_id, aggregate: {type, id, slug}, data}`
 | `lead.created` | Lead saved (`data.alert` is false for duplicates and manual leads) | Email alert · WhatsApp alert (flag) · CRM webhooks · Meta Conversions API + Google Ads conversion (only with marketing consent and flag on) |
 | `lead.status_changed` / `lead.assigned` | Pipeline move / owner change | CRM webhooks · email to new owner |
 | `site_visit.requested` / `site_visit.updated` | Visit form / CMS change | Sales alert · webhooks |
-| `page.published` / `page.unpublished` | Incl. scheduled publish | Revalidate page, nav, sitemap · AI index |
-| `post.published` / `post.unpublished` | | Revalidate blog, sitemap · AI index |
+| `page.published` / `page.unpublished` / `page.updated` | Incl. scheduled publish; `updated` for edits while live | Revalidate page, nav, sitemap · AI index |
+| `post.published` / `post.unpublished` / `post.updated` | | Revalidate blog, sitemap · AI index |
 | `faq.changed`, `testimonial.changed` | | Revalidate · AI index (FAQs) |
 | `offer.started` / `offer.ended` / `offer.changed` | Scheduler tick or edit | Revalidate banners |
 | `settings.updated`, `flag.changed`, `redirect.changed`, `consent_text.published` | | Revalidate `site` tag |
@@ -169,7 +202,7 @@ Envelope: `{id, type, occurred_at, actor_id, aggregate: {type, id, slug}, data}`
 | Job | Frequency | Notes |
 |---|---|---|
 | Outbox drain | Inside the request right after commit for time-critical events (3 s budget), plus a sweep every 15 minutes | Lead alerts go out within seconds; the sweep retries failures. Every 15 minutes (not every minute) so the free database can sleep (D-007) |
-| Schedule tick | Every 15 minutes, with the sweep | Scheduled page publish/unpublish, offer start/end |
+| Schedule tick | Every 15 minutes, before every drain (worker loop and the internal drain endpoint) | Scheduled page publish/unpublish and offer start/end; each change is announced once. A scheduled publish that is blocked (for example a legal page still marked draft) is cancelled and audited |
 | Clean-up | Daily | Expired sessions, reset tokens, old rate-limit buckets, stale upload intents, and anonymising leads past the retention period |
 | Backup export | Daily | Only if the database plan has no automatic backups (D-007) |
 | Knowledge index | On publish events | Phase 7 |
@@ -230,16 +263,19 @@ Every create, update, delete, publish, export, login and permission change write
   3. The API checks the reply signature, matches the intent, re-reads the asset from the Admin API (type, bytes) and only then saves it.
   - Anything refused or never confirmed is destroyed through the outbox.
   - Free-plan limits (checked 23 Oct 2026): 10 MB images and raw files, 100 MB video, 25 MP. Only 40 MB of video can be transformed on the fly, so the video poster is made eagerly at upload.
-- **What files can be attached to.** A `media_link` attaches library items to one owner: a project, configuration or construction update (pages and posts come in part 4).
+- **What files can be attached to.** A `media_link` attaches library items to one owner: a project, configuration, construction update, page or post.
   - **Project roles:** `gallery`, `video`, `document`, `brochure` (PDF) and `rera_qr`. `hero` and `og_image` are reserved: the share image is `seo.og_image_id`, and the hero waits for Phase 5.
   - **Configuration role:** `floor_plan` (image or PDF).
   - **Construction update role:** `gallery` (progress photos).
+  - **Page and post roles:** `block` and `cover`. They are internal: the content API keeps them in step with the page's blocks and the post's cover, and the media-links endpoints refuse to change them (D-035).
+  - Offer images and testimonial photos are restrictive foreign keys, not links.
   - Single-valued roles (brochure, RERA QR, floor plan) replace the previous item.
 - **Order, cover and visibility.**
   - Staff set the order. The first *visible* photo is the cover unless another is pinned.
   - Each item can be shown or hidden on the website and renamed.
   - Photos carry an honest label: artist's impression, actual photo, or progress photo with its month. Gallery and hero photos can't be shown on the website without one.
-  - A library item can't be deleted while it is attached or used as a share image.
+  - A library item can't be deleted while it is attached, used as a share image, or used by a page block, post cover, offer or testimonial. The 409 names up to five places, and `GET /admin/media/{id}/usage` lists them all; a testimonial is named by the person's initials only.
+  - Renaming or relabelling an item revalidates every live project, page, post, offer and shown testimonial that uses it.
 - **RERA QR.** The project's visible `rera_qr` image is what clears the publish blocker. It can't be hidden or removed while the project is live; replace it instead.
 - **One drop zone** in the CMS sends each file to the right uploader by type.
 - **Delivery** uses Cloudinary transformations (`f_auto,q_auto`, width steps). Every delivered image URL carries a transformation, which also strips metadata.
@@ -272,7 +308,8 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 - Metadata and Open Graph images per page (generated OG image using the logo mark and project cover when none is set).
 - Structured data: `Organization` (site-wide), `RealEstateListing` / `Residence` for projects and configurations (no price when on request), `FAQPage`, `BreadcrumbList`.
 - `sitemap.xml` (split by type), `robots.txt`; canonical URLs always on `https://empirebuildcon.com`; clean slugs; breadcrumbs on every inner page.
-- A redirects manager in the CMS (301/308) feeds the web app's middleware.
+- A redirects manager in the CMS (301/308) feeds the web app's middleware (Phase 5). Redirects are one hop, never loop, and are created automatically on slug changes (§6, D-035).
+- Pages, posts and projects carry a `seo` JSON; the CMS shows the API's `seo_warnings` as a checklist.
 
 ## 17. Marketing and consent hooks (Phase 6, structure now)
 

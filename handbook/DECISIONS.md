@@ -511,3 +511,72 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - TRAI press release 09/2025 (still a recommendation; numbers stay 10 digits).
 - **`phonenumbers`** 9.0.41 (PyPI, 8 Oct 2026) was considered and not added.
 - **Export timing:** 50,000 rows streamed in about 6 s locally.
+
+## D-035 · Phase 4 part 4: content and SEO (Accepted, 2026-10-24)
+
+**Context:** Part 4 builds pages with blocks, blog posts, FAQs, offers, testimonials, redirects and SEO checks in the CMS. The public pages, public content endpoints, the sitemap and redirect hit counting come in Phase 5.
+**Decision:**
+- **Blocks:**
+  - 17 block types, each a strict data shape. `Block` and `BlockInput` are discriminated unions on `type` instead of the contract's free `data` object; every variant keeps the contract's fields, and a test enforces it.
+  - No text accepts HTML. Links are a site path or `https://`; videos are YouTube/Vimeo, stored as provider plus id.
+  - Stats need a source and an as-of date that isn't in the future (honest numbers).
+  - Block files and post covers are `media_link` rows with internal-only roles `block` and `cover`, kept in step by the content API; the media-links endpoints refuse to change them. Offer images and testimonial photos are restrictive foreign keys.
+  - Photos in hero, image and gallery blocks, post covers and offer images need an honest label (extends D-033; covers and offer images were added after review, because they often show renders). Testimonial photos don't: they show a person, not a property.
+- **Permissions (ARCHITECTURE §11):**
+  - Setting a schedule, or archiving or un-drafting a live page or post, needs `content.publish`.
+  - Changing `seo` on pages and posts needs `seo.manage`. Projects don't check it, but every role with `projects.write` holds it.
+  - FAQs: showing one needs `content.publish` (§11 lists FAQs under publish); editing a shown FAQ's text needs only `content.write`.
+  - Testimonials need `content.publish` for every write, as in the contract.
+- **Legal pages (D-017):**
+  - `legal.publish` is needed to publish, unpublish, schedule, archive, restore or delete a legal page, to edit one while it's live or scheduled (so the wording the schedule tick publishes is what a `legal.publish` holder scheduled), or to change a page's kind to or from legal. Unscheduled drafts can be edited with `content.write`.
+  - Production refuses to publish text still marked "[DRAFT", the same test consent texts use, to leave such text on a live legal page, and to move it into or out of the legal kind. Development and tests allow it, so the suite can run the flow.
+  - A scheduled publish that is blocked is cancelled and audited rather than retried every tick.
+  - `legal_version` is typed by staff.
+- **System pages:** home, projects, about and contact can't be created. They and the seeded legal pages (privacy, terms, disclaimer) are required pages (`is_required`): they can't be deleted or archived, and keep their slug and kind; unpublishing is allowed. That keeps the seed's match by slug safe, and the consent texts and footer can link to them. A short list of slugs is reserved for the site's own sections.
+- **Scheduling:** a live page can't be given a publish time, and every take-down clears it, so a stale time can't bring a page back.
+- **Concurrent edits:** page saves may send `expected_updated_at`; a stale one is refused with 409, so a stale tab can't drop someone else's blocks.
+- **Public paths:** `/` for home, `/<slug>` for pages, `/blog/<slug>` for posts, `/projects/<slug>` for projects.
+- **Redirects:**
+  - Every active redirect is one hop, enforced under one advisory lock. Chains collapse in both directions, and a loop is refused with 409.
+  - An `https://` URL on one of our domains is stored as its path. The default code is 308.
+  - Slug changes on live projects, pages and posts create or re-point redirects. Publishing deletes any redirect *from* the item's own path; otherwise renaming back and forth would make a loop.
+  - A stored target never starts with `//` (no open redirect; CHECK backstop). Collapsing a chain keeps the original target's query string and fragment when the onward target has none.
+  - A manual redirect can't start at the address of a live page, post or project.
+  - Phase 5 contract: paths match exactly and case-sensitively; only the reserved-path check (`/admin`, `/api`, `/_next`, `/_internal`) ignores case.
+- **Offers:**
+  - `is_active` defaults to false, so new offers save as drafts.
+  - No countdown field exists, and pressure wording ("only N left", "hurry", "last few", "selling fast") is refused.
+  - A light pattern asks for a terms line or T&C link when the text mentions a price or discount. It is a prompt, not legal review.
+  - An offer that has been live, or that a page shows, can't be deleted; switch it off instead.
+- **Testimonials:** real only. There's no sample flag, the seed creates none, and a database CHECK stops one being shown without a source and consent date. Audit diffs record `[hidden]` instead of names, words and the source, events carry ids only, and media usage names a testimonial by the person's initials.
+- **Deleting** an FAQ or testimonial removes it from every block that picked it; a block left with no picks is hidden rather than widened to "all FAQs" or "newest testimonials". A project that a page block or an offer names can't be deleted.
+- **Errors:** a field literally named `body` (post body, lead note body, consent text body) used to be reported as `request`; it is now `body`. Union tags are left out of error paths.
+- **CMS:**
+  - One "Save draft" saves both the page fields (PATCH, changed fields only) and the blocks (PUT of the full list). Publish waits until changes are saved.
+  - The block preview is a rough CMS preview with [bracketed] stand-ins for live data. The public rendering is Phase 5.
+  - Formatted text: bold and italic work within one line; the nearest closing mark wins; a tab counts as two spaces; `- ` needs text after it to become a bullet; nesting stops at four levels.
+  - Offer, testimonial and redirect editors open beside their lists, with the selected item in the address. Those lists page 25 at a time.
+  - Without `offers.manage`, the offer-banner block can only pick by placement; an offer already chosen shows read-only.
+  - A live or scheduled legal page is read-only in the editor without `legal.publish`, and required pages hide Delete, Archive and the address and kind fields.
+  - The web app gets its own unit tests (Vitest 5.0.5, the version `@empire/ui` already uses) for rules a browser test can't reach without another sign-in, such as the legal-page rights. CI runs them.
+- **Where the CMS differs from the design boards, and why:**
+  - Search and Construction progress blocks aren't offered (no API type yet). The board's approval flow for counts is replaced by the required source and as-of fields plus show/hide.
+  - Testimonials: the source is free text with suggestions; the permission-document upload and "written permission" tick box are replaced by the consent date, because the API stores no document.
+  - Offers: one placement instead of several "Show on" boxes, and "Switched on" instead of a schedule toggle, following the API.
+  - The page editor has no link to the live page yet (no public pages), no drag handles (move buttons only) and no "restorable versions" (no versions are kept).
+  - FAQs show one group at a time with a filter, so reordering stays within a group.
+- **Not built yet:**
+  - Public content endpoints, the sitemap and redirect hit counting (Phase 5).
+  - The private permission document for testimonials.
+  - Deleting a city doesn't yet check grid blocks that filter on it.
+  - The block pickers (one offer, chosen FAQs, testimonials, projects) load the first 100 rows only.
+  - Child URLs under a renamed project: a project slug change redirects `/projects/<old>` only. Phase 5 decides the URL scheme for configuration pages; if they sit under the project path, it adds a prefix redirect.
+  - Hindi translations UI (flag `locale_hi`).
+- **Contract changes:**
+  - Additions: `PUT /admin/faqs/order`, `GET /admin/media/{id}/usage`; `*Update` PATCH bodies with every field optional; `PageSummary`/`PostSummary` list rows; `path`, `seo_warnings`, `publish_blockers` and `og_image` on pages and posts; `terms`, `terms_url`, `state` and `has_been_live` on offers; `can_show` on testimonials; `origin` and `notices` on redirects; `project_name` on FAQs, offers and testimonials; filters `site_wide`, `category`, `placement`, `state`, `project_id`, `is_visible`, `origin` and `is_active`.
+  - Added after review: `is_required` on pages, and an optional `expected_updated_at` on page saves (409 when stale).
+  - Tightened: times must carry a time zone, ratings are 1–5, consent dates can't be in the future, and translated fields have the same length limits as their English fields.
+**Verified / assumed:**
+- No new dependencies in the API or the web app.
+- YouTube links are accepted as `watch?v=`, `youtu.be/`, `embed/`, `shorts/`, `live/` and `v/`; Vimeo as `vimeo.com/<id>` and `player.vimeo.com/video/<id>`. Assumed from the providers' current URL formats; not checked against their APIs.
+- The SEO warning lengths (60 and 160 characters) are where search results usually cut titles and descriptions. They are guidance, not limits.
