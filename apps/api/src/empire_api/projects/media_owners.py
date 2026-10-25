@@ -66,6 +66,17 @@ def projects_using_share_image(db: Session, media_id: uuid.UUID) -> int:
     return int(count or 0)
 
 
+def share_image_projects(db: Session, media_id: uuid.UUID) -> list[Project]:
+    """The projects that use this library item as their SEO share image, by name."""
+    return list(
+        db.scalars(
+            select(Project)
+            .where(Project.seo["og_image_id"].astext == str(media_id))
+            .order_by(Project.name)
+        )
+    )
+
+
 def share_image_ids() -> Select[str]:
     """The media ids (as text) projects use as their SEO share image, for library filters."""
     share = Project.seo["og_image_id"].astext
@@ -93,7 +104,9 @@ def projects_by_ids(db: Session, project_ids: set[uuid.UUID]) -> list[Project]:
 def sample_project_ids(db: Session) -> list[uuid.UUID]:
     """Ids of the seeded sample projects that exist (D-015)."""
     rows = db.scalars(
-        select(Project.id).where(Project.slug.in_(SAMPLE_SLUGS), Project.is_sample.is_(True))
+        select(Project.id)
+        .where(Project.slug.in_(SAMPLE_SLUGS), Project.is_sample.is_(True))
+        .order_by(Project.slug)
     )
     return list(rows)
 

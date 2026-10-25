@@ -55,13 +55,34 @@ apps/api/
 │  │  ├─ links.py          attach / show-hide / cover / detach / reorder; rules.py = roles per owner
 │  │  ├─ library.py        list, rename/alt/label, delete; events.py; handlers.py (destroy at store)
 │  │  ├─ queries.py        what the projects module reads (gallery, cover, RERA QR, floor plans…)
+│  │  ├─ content_links.py  what content calls: page block and post cover links, library facts
+│  │  ├─ usage.py          where a file is used (delete refused while used; GET …/usage)
 │  │  ├─ routes.py         /admin/media/**, /admin/media-links/**; routes_dev.py = /dev-media/**
 │  │  │                    (fake store only)
 │  │  └─ seed.py           SAMPLE placeholder tiles for `seed --sample` (fake store only)
-│  ├─ content/             consent texts (Phase 4 part 3; pages and posts arrive in part 4)
-│  │  ├─ models.py         consent_text: versions per kind, one current per kind, never edited
+│  ├─ content/             consent texts (part 3); pages, blocks, posts, FAQs, offers and
+│  │  │                    testimonials (Phase 4 part 4)
+│  │  ├─ models.py         consent_text, page, block, post, faq, offer, testimonial; vocab.py
 │  │  ├─ consent.py        drafts, publish (draft wording refused in production), the current
 │  │  │                    text, dev/test seed; routes.py = /admin/consent-texts/**
+│  │  ├─ blocks.py         one strict `data` shape per block type; block_types.py = the
+│  │  │                    Block/BlockInput unions; fields.py = no-HTML text, safe links
+│  │  ├─ block_refs.py     ids a block names, checked and read FOR SHARE (library kind + honest
+│  │  │                    label, projects…)
+│  │  ├─ pages.py          pages: create, edit, archive, delete, publish (legal.publish, draft
+│  │  │                    text, schedule rights, required pages, stale saves); page_blocks.py =
+│  │  │                    PUT blocks; page_rules.py = blockers, guarded legal pages
+│  │  ├─ posts.py, faqs.py, offers.py (+ offers_state.py), testimonials.py
+│  │  ├─ schedule.py       the schedule tick (scheduled pages, offer start/end), run before
+│  │  │                    each drain
+│  │  ├─ media_uses.py     what media calls: share images, offer images, testimonial photos;
+│  │  │                    media_changes.py = events when a file used by live content changes
+│  │  ├─ queries.py        what seo and projects call: what is live at a path, content naming
+│  │  │                    a project (its delete is refused)
+│  │  ├─ present.py        rows → responses; routes_pages.py, routes_marketing.py   HTTP only
+│  │  └─ seed.py           required system + legal pages (D-017 placeholder); sample post/offer/FAQs
+│  ├─ seo/                 redirects (one hop, no loops, auto on slug changes), seo checks and
+│  │                       warnings, public paths (paths.py); routes.py = /admin/redirects/**
 │  ├─ leads/               public intake, inbox, pipeline, visits, export, report (Phase 4 part 3)
 │  │  ├─ models.py         lead, lead_consent, lead_note, lead_activity, site_visit; vocab.py
 │  │  ├─ phone.py          Indian numbers → E.164 (the rule and its DoT/TRAI sources in its header)
@@ -92,13 +113,15 @@ Run everything from `apps/api/`. The root `.python-version` makes uv use Python 
 ```bash
 uv sync                                        # install (creates .venv)
 uv run alembic upgrade head                    # migrate the database in DATABASE_URL
-uv run empire-api seed                         # flags, settings, amenity catalogue (idempotent);
-                                               #   in development/test also the DRAFT consent texts, current
+uv run empire-api seed                         # flags, settings, amenity catalogue, system and legal
+                                               #   pages as drafts (idempotent); in development/test
+                                               #   also the DRAFT consent texts, current
 uv run empire-api seed --sample                # + "Sample — Project A/B" (dev/demo only; refused in production),
                                                #   SAMPLE placeholder tiles in their photos (fake store only)
-                                               #   and 12 "Sample Lead N" leads with 4 site visits
+                                               #   12 "Sample Lead N" leads with 4 site visits, and a
+                                               #   SAMPLE post, offer and FAQs (never a testimonial)
 uv run uvicorn empire_api.main:app --reload    # API on http://localhost:8000 (docs at /api/docs)
-uv run empire-worker                           # optional: worker loop (drain + daily clean-up)
+uv run empire-worker                           # optional: worker loop (schedule tick + drain + daily clean-up)
 
 uv run ruff check && uv run ruff format --check
 uv run mypy src                                # strict
@@ -124,6 +147,7 @@ Important guards:
 - `tests/test_leads_access.py` checks the object-level rule on every lead surface (inbox, detail, notes, activity, writes, visits, export, report, dashboard): someone else's lead is 404.
 - `test_round_robin_is_fair_under_concurrency` sends twelve enquiries at once to three people and expects exactly four each; it fails if the round-robin row lock is removed.
 - `test_erasure_leaves_a_stub_and_nothing_personal_anywhere` scans every table for the erased person's details.
+- The part 4 review fixes have their regression tests next to the feature: `tests/test_seo_redirects.py` (no `//host` targets, case-insensitive reserved paths, query kept when a chain collapses, no redirect from a live address), `tests/test_content_legal.py` (scheduled legal pages need `legal.publish`, no DRAFT text on a live legal page in production, required pages), `tests/test_content_edits.py` (stale saves, `canonical_path`, HTML and limits in SEO and translations), `tests/test_content_references.py` (FOR SHARE reads, project delete refused while content names it), `tests/test_content_schedule.py` (a stale `publish_at` never brings a page back) and `tests/test_content_media_use.py` (relabel events, labels on covers and offer images, testimonial initials).
 - `tests/test_leads_review_privacy.py` and `tests/test_leads_review_rules.py` hold the regression tests from the part 3 review: duplicate links never name another owner's lead, erasure leaves no free text (scanned across every table) and covers the duplicate group or the whole person, the export audit keeps no search text, the export needs `X-CSRF-Token`, an IPv6 /64 is one network for every limit, editing a confirmed visit doesn't move its lead again, every dashboard count equals the total of the list its link opens, BHK is in half steps, and "fancy" numbers operators sell (99999 99999, 98765 43210) stay accepted.
 - `test_dev_media_routes_exist_only_with_the_fake_store` fails if the fake store's routes could exist with the real store.
 - `tests/test_display.py` runs the same money and area vectors as `packages/ui/test/format.test.ts`; change both together.

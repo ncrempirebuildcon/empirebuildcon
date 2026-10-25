@@ -13,6 +13,7 @@ from collections.abc import Iterable, Mapping
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from empire_api.content import media_uses
 from empire_api.media import schemas
 from empire_api.media.models import Media, MediaLink
 from empire_api.media.store import AssetRef, MediaStore, get_store
@@ -20,7 +21,9 @@ from empire_api.projects.media_owners import share_image_counts
 
 
 def attached_counts(db: Session, media_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, int]:
-    """media id → how many places use it: links, plus projects' SEO share images."""
+    """media id → how many places use it: links (projects, configurations, updates, page blocks,
+    post covers), projects' SEO share images, and content's other uses (page and post share
+    images, offer images, testimonial photos; content/media_uses.py)."""
     ids = set(media_ids)
     if not ids:
         return {}
@@ -31,6 +34,8 @@ def attached_counts(db: Session, media_ids: Iterable[uuid.UUID]) -> dict[uuid.UU
     ).all()
     counts = {media_id: int(count) for media_id, count in rows}
     for media_id, count in share_image_counts(db, ids).items():
+        counts[media_id] = counts.get(media_id, 0) + count
+    for media_id, count in media_uses.use_counts(db, ids).items():
         counts[media_id] = counts.get(media_id, 0) + count
     return counts
 

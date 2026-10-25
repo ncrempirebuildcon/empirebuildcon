@@ -109,10 +109,31 @@ def problem_response(
     return JSONResponse(body, status_code=status, headers=headers, media_type=PROBLEM_MEDIA_TYPE)
 
 
+_LOCATIONS = ("body", "query", "path", "header", "cookie")
+# Discriminated-union tags pydantic puts into error locations, e.g. ("blocks", 0, "hero",
+# "data", …); registered by the module that owns the union (content/block_types.py).
+_UNION_TAGS: set[str] = set()
+
+
+def register_union_tags(tags: tuple[str, ...]) -> None:
+    """Leave these union tags out of field paths, so a block error reads `blocks.0.data.heading`
+    (the same path the services use for their own checks)."""
+    _UNION_TAGS.update(tags)
+
+
 def _field_name(loc: tuple[Any, ...]) -> str:
-    """('body', 'email') → 'email'; ('query', 'page') → 'page'. Keeps nested paths dotted."""
-    parts = [str(p) for p in loc if p not in ("body", "query", "path", "header", "cookie")]
-    return ".".join(parts) or "request"
+    """('body', 'email') → 'email'; ('query', 'page') → 'page'. Keeps nested paths dotted.
+
+    Only the first item names where the value came from; a field that happens to be called
+    `body` (a post's text) stays in the path.
+    """
+    parts = list(loc[1:] if loc and loc[0] in _LOCATIONS else loc)
+    kept = [
+        part
+        for index, part in enumerate(parts)
+        if not (part in _UNION_TAGS and index > 0 and isinstance(parts[index - 1], int))
+    ]
+    return ".".join(str(part) for part in kept) or "request"
 
 
 async def _api_problem(request: Request, exc: Exception) -> JSONResponse:

@@ -17,7 +17,12 @@ from sqlalchemy import ColumnElement
 
 from empire_api.errors import ApiProblem
 from empire_api.media.models import Media, MediaLink
-from empire_api.media.vocab import LABEL_REQUIRED_ROLES, ROLES_BY_OWNER, OwnerType
+from empire_api.media.vocab import (
+    CONTENT_OWNER_TYPES,
+    LABEL_REQUIRED_ROLES,
+    ROLES_BY_OWNER,
+    OwnerType,
+)
 from empire_api.timeutil import today_ist
 
 # TODO(phase-5): the public project page decides how a hero image is chosen; until then the
@@ -37,7 +42,11 @@ OWNER_LABELS: Final = {
     "project": "A project",
     "configuration": "A configuration",
     "construction_update": "A construction update",
+    "page": "A page",
+    "post": "A post",
 }
+# The links of pages and posts mirror their blocks and covers (media/content_links.py).
+CONTENT_LINK: Final = "This file is used by a page or a post. Change it in the page or post editor."
 ROLE_LABELS: Final = {
     "gallery": "photos",
     "floor_plan": "floor plan",
@@ -47,6 +56,8 @@ ROLE_LABELS: Final = {
     "document": "documents",
     "hero": "hero image",
     "og_image": "share image",
+    "block": "page block",
+    "cover": "cover image",
 }
 # The ProjectAdmin field (or collection) a role's links show up in, for `project.updated`.
 CHANGED_FIELD: Final = {
@@ -73,7 +84,7 @@ class Owner:
     def parse(cls, attach_to: str) -> Owner:
         """`project:<uuid>` → Owner (the schema has already checked the shape)."""
         owner_type, _, owner_id = attach_to.partition(":")
-        if owner_type not in ROLES_BY_OWNER:
+        if owner_type not in ROLES_BY_OWNER or owner_type in CONTENT_OWNER_TYPES:
             raise ApiProblem(422, "Unknown owner type.")
         return cls(type=owner_type, id=uuid.UUID(owner_id))  # type: ignore[arg-type]
 
@@ -83,8 +94,18 @@ class Owner:
             return cls("project", link.project_id)
         if link.configuration_id is not None:
             return cls("configuration", link.configuration_id)
+        if link.page_id is not None:
+            return cls("page", link.page_id)
+        if link.post_id is not None:
+            return cls("post", link.post_id)
         assert link.construction_update_id is not None  # noqa: S101 — ck_media_link_one_owner
         return cls("construction_update", link.construction_update_id)
+
+    @property
+    def is_content(self) -> bool:
+        """A page or post: its links are managed by the content module, not the CMS media
+        endpoints (CONTENT_LINK)."""
+        return self.type in CONTENT_OWNER_TYPES
 
     @property
     def column(self) -> str:

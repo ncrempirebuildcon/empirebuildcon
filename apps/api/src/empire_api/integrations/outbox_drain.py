@@ -9,6 +9,8 @@ How it works:
 
 PERF: free hosting calls the drain every 15 minutes from Cloud Scheduler (D-007) so the
 database can sleep in between; `drain_soon` covers time-critical events right after a request.
+Each scheduled run (and each worker loop) first runs the schedule tick (content/schedule.py,
+ARCHITECTURE §10: scheduled page publish/unpublish, offer start/end).
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from fastapi import BackgroundTasks
 from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.orm import Session
 
+from empire_api.content.schedule import schedule_tick
 from empire_api.db import get_engine, get_sessionmaker, rows_affected
 from empire_api.integrations.handlers import handlers_for
 from empire_api.leads.erasure import anonymise_inactive
@@ -114,12 +117,23 @@ def drain_with_lock() -> DrainResult | None:
         if not got.scalar_one():
             return None
         try:
+            run_tick_safely()
             result = drain()
             maybe_cleanup()
             return result
         finally:
             conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": DRAIN_LOCK_KEY})
             conn.commit()
+
+
+def run_tick_safely() -> None:
+    """The schedule tick (content/schedule.py) before a drain, so the events it writes go out
+    in the same run. WHY never raise: a broken tick must not stop event delivery; it is logged
+    (Sentry) and the next run tries again."""
+    try:
+        schedule_tick()
+    except Exception:
+        log.exception("schedule_tick_failed")
 
 
 def _drain_quietly(budget_seconds: float) -> None:

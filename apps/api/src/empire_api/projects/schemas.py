@@ -13,7 +13,7 @@ Additions to the contract, each needed by the CMS (recorded in the Phase 4 repor
 
 Media-backed fields (`cover`, `gallery`, `videos`, `documents`, `brochure`, `rera.qr`, and
 `floor_plans` / `photos` on children) come from the media module (media/queries.py). `faqs`
-stays empty until part 4 (TODO in present.py).
+come from the content module (content/faqs.py; the `Faq` shape lives there since part 4).
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from typing import Annotated, Any, Final
 from pydantic import Field, field_validator
 from pydantic_core import PydanticCustomError
 
+from empire_api.content.schemas_marketing import Faq
 from empire_api.media.schemas import LinkedMedia, Media
 from empire_api.projects.fields import (
     BlankIsNone,
@@ -71,21 +72,9 @@ from empire_api.projects.vocab import (
 )
 from empire_api.users.schemas import PageMeta
 
-PROJECT_TRANSLATABLE: Final = frozenset({"name", "tagline", "description"})
+# Translatable fields and their English lengths (schemas_shared.check_translation_fields).
+PROJECT_TRANSLATABLE: Final = {"name": 120, "tagline": 160, "description": 20_000}
 FeaturedOrder = Annotated[int, Field(ge=0, le=10_000)]
-
-
-class Faq(OutModel):
-    """Contract shape, for `faqs` on a project. TODO(phase-4): part 4 (content module) owns
-    FAQs; move this class there keeping its name."""
-
-    id: uuid.UUID
-    project_id: uuid.UUID | None
-    question: str
-    answer: str = Field(description="WhatsApp-style formatted text")
-    sort_order: int
-    is_visible: bool
-    translations: Translations
 
 
 class ProjectSummary(OutModel):

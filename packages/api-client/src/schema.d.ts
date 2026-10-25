@@ -207,6 +207,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/faqs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List faqs
+         * @description Site-wide first, then by project, each list in its order.
+         */
+        get: operations["list_faqs"];
+        put?: never;
+        /**
+         * Create faq
+         * @description Added at the end of its list. Showing it (`is_visible`, default true) needs
+         *     `content.publish`.
+         */
+        post: operations["create_faq"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/faqs/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the order of one FAQ list (site-wide, or one project's)
+         * @description An addition (Phase 4 part 4): send every FAQ of the list once, in the new order.
+         */
+        put: operations["reorder_faqs"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/faqs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete faq
+         * @description Also removes it from every page block that picked it.
+         */
+        delete: operations["delete_faq"];
+        options?: never;
+        head?: never;
+        /** Update faq */
+        patch: operations["update_faq"];
+        trace?: never;
+    };
     "/api/v1/admin/flags": {
         parameters: {
             query?: never;
@@ -634,6 +700,264 @@ export interface paths {
          * @description Title, alt text and the honest label (label_month: any day of the month).
          */
         patch: operations["update_media"];
+        trace?: never;
+    };
+    "/api/v1/admin/media/{id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where a library item is used
+         * @description Projects, configurations, updates, pages, posts, offers and testimonials using it (an
+         *     addition in Phase 4 part 4). Delete needs this list to be empty.
+         */
+        get: operations["media_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List offers
+         * @description Highest priority first. `placement`, `state` and `project_id` are additions.
+         */
+        get: operations["list_offers"];
+        put?: never;
+        /**
+         * Create offer
+         * @description Saved switched off unless `is_active` is true. No countdowns, no pressure wording; a
+         *     price or discount needs terms.
+         */
+        post: operations["create_offer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/offers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete offer
+         * @description Only offers that were never on the website and no page block shows.
+         */
+        delete: operations["delete_offer"];
+        options?: never;
+        head?: never;
+        /** Update offer */
+        patch: operations["update_offer"];
+        trace?: never;
+    };
+    "/api/v1/admin/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List pages
+         * @description Most recently edited first. Rows are PageSummary (no blocks).
+         */
+        get: operations["list_pages"];
+        put?: never;
+        /**
+         * Create page
+         * @description A draft. Kind standard, landing or legal (system pages come with the site).
+         */
+        post: operations["create_page"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/pages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get page */
+        get: operations["get_page"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete page
+         * @description Only drafts that were never published; otherwise archive. Never system pages.
+         */
+        delete: operations["delete_page"];
+        options?: never;
+        head?: never;
+        /**
+         * Update page
+         * @description Change the fields sent. `publish_state: archived` archives; `draft` restores. A slug
+         *     change on a live page leaves a 308 redirect from the old address. 409 when the page was
+         *     saved since `expected_updated_at`.
+         */
+        patch: operations["update_page"];
+        trace?: never;
+    };
+    "/api/v1/admin/pages/{id}/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save the page's blocks (full ordered list)
+         * @description Blocks left out are deleted. 422 names each problem, e.g. `blocks.2.data.href`. 409 when
+         *     the page was saved since `expected_updated_at`, or (production) for DRAFT legal text on a
+         *     live legal page.
+         */
+        put: operations["set_page_blocks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/pages/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish (legal pages need legal.publish)
+         * @description 409 listing every blocker (sample data or draft legal text in production).
+         */
+        post: operations["publish_page"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/pages/{id}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unpublish */
+        post: operations["unpublish_page"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List posts
+         * @description Newest first. Rows are PostSummary (no body). `category` is an addition.
+         */
+        get: operations["list_posts"];
+        put?: never;
+        /** Create post */
+        post: operations["create_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/posts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get post */
+        get: operations["get_post"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete post
+         * @description Only drafts that were never published; otherwise archive.
+         */
+        delete: operations["delete_post"];
+        options?: never;
+        head?: never;
+        /**
+         * Update post
+         * @description `publish_state: archived` archives; `draft` restores. A slug change on a live post
+         *     leaves a 308 redirect from the old address.
+         */
+        patch: operations["update_post"];
+        trace?: never;
+    };
+    "/api/v1/admin/posts/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish */
+        post: operations["publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/posts/{id}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unpublish */
+        post: operations["unpublish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/projects": {
@@ -1101,6 +1425,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/redirects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List redirects
+         * @description Newest first. `origin` and `is_active` are additions (Phase 4 part 4).
+         */
+        get: operations["list_redirects"];
+        put?: never;
+        /**
+         * Create redirect
+         * @description 409 for a loop or an address that already redirects. A chain is collapsed instead, and
+         *     `notices` says what changed.
+         */
+        post: operations["create_redirect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/redirects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete redirect */
+        delete: operations["delete_redirect"];
+        options?: never;
+        head?: never;
+        /** Update redirect */
+        patch: operations["update_redirect"];
+        trace?: never;
+    };
     "/api/v1/admin/reports/utm": {
         parameters: {
             query?: never;
@@ -1179,6 +1546,51 @@ export interface paths {
          * @description Confirm: status `confirmed` with `confirmed_for` (also moves a new or contacted lead to `site_visit`). Reschedule: a new `confirmed_for`. Also `completed`, `no_show`, `cancelled`, `handled_by_user_id` and `notes`. Every change is on the lead's timeline and in the audit log.
          */
         patch: operations["update_site_visit"];
+        trace?: never;
+    };
+    "/api/v1/admin/testimonials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List testimonials
+         * @description Newest first. `project_id` and `is_visible` are additions.
+         */
+        get: operations["list_testimonials"];
+        put?: never;
+        /**
+         * Create testimonial
+         * @description Real testimonials only: showing one needs `source` and `consent_date`.
+         */
+        post: operations["create_testimonial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/testimonials/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete testimonial
+         * @description Always allowed (consent can be withdrawn); it leaves every page block at once.
+         */
+        delete: operations["delete_testimonial"];
+        options?: never;
+        head?: never;
+        /** Update testimonial */
+        patch: operations["update_testimonial"];
         trace?: never;
     };
     "/api/v1/admin/users": {
@@ -1615,6 +2027,16 @@ export interface components {
             items: components["schemas"]["AuditEntry"][];
             meta: components["schemas"]["PageMeta"];
         };
+        /**
+         * Block
+         * @description A saved block; `data` has the shape of its `type`.
+         */
+        Block: components["schemas"]["HeroBlock"] | components["schemas"]["RichTextBlock"] | components["schemas"]["ImageBlock"] | components["schemas"]["GalleryBlock"] | components["schemas"]["VideoBlock"] | components["schemas"]["ProjectGridBlock"] | components["schemas"]["PropertyGridBlock"] | components["schemas"]["CtaBlock"] | components["schemas"]["LeadFormBlock"] | components["schemas"]["FaqListBlock"] | components["schemas"]["StatsBlock"] | components["schemas"]["TestimonialsBlock"] | components["schemas"]["OfferBannerBlock"] | components["schemas"]["MapBlock"] | components["schemas"]["StepsBlock"] | components["schemas"]["ColumnsBlock"] | components["schemas"]["DividerBlock"];
+        /**
+         * BlockInput
+         * @description One block as the editor sends it; `data` is checked against its `type`'s shape.
+         */
+        BlockInput: components["schemas"]["HeroBlockInput"] | components["schemas"]["RichTextBlockInput"] | components["schemas"]["ImageBlockInput"] | components["schemas"]["GalleryBlockInput"] | components["schemas"]["VideoBlockInput"] | components["schemas"]["ProjectGridBlockInput"] | components["schemas"]["PropertyGridBlockInput"] | components["schemas"]["CtaBlockInput"] | components["schemas"]["LeadFormBlockInput"] | components["schemas"]["FaqListBlockInput"] | components["schemas"]["StatsBlockInput"] | components["schemas"]["TestimonialsBlockInput"] | components["schemas"]["OfferBannerBlockInput"] | components["schemas"]["MapBlockInput"] | components["schemas"]["StepsBlockInput"] | components["schemas"]["ColumnsBlockInput"] | components["schemas"]["DividerBlockInput"];
         /** BrochureLink */
         BrochureLink: {
             /**
@@ -1762,6 +2184,60 @@ export interface components {
             msclkid?: string | null;
             /** Wbraid */
             wbraid?: string | null;
+        };
+        /** ColumnItem */
+        ColumnItem: {
+            /**
+             * Body
+             * Format: formatted-text
+             */
+            body: string;
+            /** Heading */
+            heading?: string | null;
+        };
+        /** ColumnsBlock */
+        ColumnsBlock: {
+            data: components["schemas"]["ColumnsData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "columns";
+        };
+        /** ColumnsBlockInput */
+        ColumnsBlockInput: {
+            data: components["schemas"]["ColumnsData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "columns";
+        };
+        /** ColumnsData */
+        ColumnsData: {
+            /** Columns */
+            columns: components["schemas"]["ColumnItem"][];
+            /** Heading */
+            heading?: string | null;
         };
         /**
          * Configuration
@@ -1972,6 +2448,64 @@ export interface components {
              */
             update_date: string;
         };
+        /**
+         * Cta
+         * @description A button: what it says and where it goes (a site path or an https address).
+         */
+        Cta: {
+            /** Href */
+            href: string;
+            /** Label */
+            label: string;
+        };
+        /** CtaBlock */
+        CtaBlock: {
+            data: components["schemas"]["CtaData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "cta";
+        };
+        /** CtaBlockInput */
+        CtaBlockInput: {
+            data: components["schemas"]["CtaData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "cta";
+        };
+        /** CtaData */
+        CtaData: {
+            /** Heading */
+            heading?: string | null;
+            /** Href */
+            href: string;
+            /** Label */
+            label: string;
+            /** Text */
+            text?: string | null;
+        };
         /** Dashboard */
         Dashboard: {
             /**
@@ -2031,6 +2565,48 @@ export interface components {
              */
             link: string;
         };
+        /** DividerBlock */
+        DividerBlock: {
+            data: components["schemas"]["DividerData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "divider";
+        };
+        /** DividerBlockInput */
+        DividerBlockInput: {
+            data?: components["schemas"]["DividerData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "divider";
+        };
+        /**
+         * DividerData
+         * @description A plain line between blocks. No settings.
+         */
+        DividerData: Record<string, never>;
         /** DrainResult */
         DrainResult: {
             /** Failed */
@@ -2040,15 +2616,11 @@ export interface components {
             /** Remaining */
             remaining: number;
         };
-        /**
-         * Faq
-         * @description Contract shape, for `faqs` on a project. TODO(phase-4): part 4 (content module) owns
-         *     FAQs; move this class there keeping its name.
-         */
+        /** Faq */
         Faq: {
             /**
              * Answer
-             * @description WhatsApp-style formatted text
+             * @description FormattedText
              */
             answer: string;
             /**
@@ -2056,15 +2628,121 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Is Sample */
+            is_sample: boolean;
             /** Is Visible */
             is_visible: boolean;
             /** Project Id */
             project_id: string | null;
+            /** Project Name */
+            project_name: string | null;
             /** Question */
             question: string;
             /** Sort Order */
             sort_order: number;
             translations: components["schemas"]["Translations"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * FaqInput
+         * @description A new FAQ: site-wide (no project) or for one project; added at the end of its list
+         *     unless `sort_order` is given. Showing it on the website needs `content.publish`.
+         */
+        FaqInput: {
+            /**
+             * Answer
+             * Format: formatted-text
+             */
+            answer: string;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /** Project Id */
+            project_id?: string | null;
+            /** Question */
+            question: string;
+            /** Sort Order */
+            sort_order?: number | null;
+            translations?: components["schemas"]["Translations"];
+        };
+        /** FaqList */
+        FaqList: {
+            /** Items */
+            items: components["schemas"]["Faq"][];
+            meta: components["schemas"]["PageMeta"];
+        };
+        /** FaqListBlock */
+        FaqListBlock: {
+            data: components["schemas"]["FaqListData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "faq_list";
+        };
+        /** FaqListBlockInput */
+        FaqListBlockInput: {
+            data: components["schemas"]["FaqListData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "faq_list";
+        };
+        /**
+         * FaqListData
+         * @description `faq_ids` (chosen FAQs, in this order), or `project_id` (that project's FAQs), or neither
+         *     (the site-wide FAQs).
+         */
+        FaqListData: {
+            /** Faq Ids */
+            faq_ids?: string[];
+            /** Heading */
+            heading?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+        };
+        /**
+         * FaqUpdate
+         * @description PATCH: send only what changes. Moving to another project puts it at the end there.
+         */
+        FaqUpdate: {
+            /** Answer */
+            answer?: string | null;
+            /** Is Visible */
+            is_visible?: boolean | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Question */
+            question?: string | null;
+            /** Sort Order */
+            sort_order?: number | null;
+            translations?: components["schemas"]["Translations"] | null;
         };
         /** FeatureFlag */
         FeatureFlag: {
@@ -2087,6 +2765,77 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /** GalleryBlock */
+        GalleryBlock: {
+            data: components["schemas"]["GalleryData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "gallery";
+        };
+        /** GalleryBlockInput */
+        GalleryBlockInput: {
+            data: components["schemas"]["GalleryData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "gallery";
+        };
+        /** GalleryData */
+        GalleryData: {
+            /** Heading */
+            heading?: string | null;
+            /** Image Ids */
+            image_ids: string[];
+        };
+        /**
+         * GridData
+         * @description Cards of projects (project_grid) or properties (property_grid), filtered.
+         */
+        GridData: {
+            /** City Id */
+            city_id?: string | null;
+            /**
+             * Featured Only
+             * @default false
+             */
+            featured_only: boolean;
+            /** Heading */
+            heading?: string | null;
+            /**
+             * Limit
+             * @default 6
+             */
+            limit: number;
+            /**
+             * Show Status Tabs
+             * @default false
+             */
+            show_status_tabs: boolean;
+            /** Status */
+            status?: ("upcoming" | "ongoing" | "completed") | null;
+        };
         /** Health */
         Health: {
             /**
@@ -2106,6 +2855,107 @@ export interface components {
             time: string;
             /** Version */
             version: string;
+        };
+        /** HeroBlock */
+        HeroBlock: {
+            data: components["schemas"]["HeroData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "hero";
+        };
+        /** HeroBlockInput */
+        HeroBlockInput: {
+            data: components["schemas"]["HeroData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "hero";
+        };
+        /** HeroData */
+        HeroData: {
+            cta?: components["schemas"]["Cta"] | null;
+            /** Eyebrow */
+            eyebrow?: string | null;
+            /** Heading */
+            heading: string;
+            /**
+             * Image Id
+             * @description An image from the library, with an honest label
+             */
+            image_id?: string | null;
+            secondary_cta?: components["schemas"]["Cta"] | null;
+            /** Subheading */
+            subheading?: string | null;
+        };
+        /** ImageBlock */
+        ImageBlock: {
+            data: components["schemas"]["ImageData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "image";
+        };
+        /** ImageBlockInput */
+        ImageBlockInput: {
+            data: components["schemas"]["ImageData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "image";
+        };
+        /** ImageData */
+        ImageData: {
+            /** Caption */
+            caption?: string | null;
+            /**
+             * Image Id
+             * Format: uuid
+             * @description An image from the library, with an honest label
+             */
+            image_id: string;
         };
         ImageUpload: {
             alt_text?: string;
@@ -2346,6 +3196,61 @@ export interface components {
              */
             website: string;
         };
+        /** LeadFormBlock */
+        LeadFormBlock: {
+            data: components["schemas"]["LeadFormData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "lead_form";
+        };
+        /** LeadFormBlockInput */
+        LeadFormBlockInput: {
+            data: components["schemas"]["LeadFormData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "lead_form";
+        };
+        /**
+         * LeadFormData
+         * @description Where an enquiry form appears. Submitting it arrives in Phase 5/6 (public intake).
+         */
+        LeadFormData: {
+            /** Heading */
+            heading?: string | null;
+            /** Intro */
+            intro?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Source
+             * @default contact_form
+             * @enum {string}
+             */
+            source: "contact_form" | "project_form" | "campaign" | "site_visit" | "brochure";
+        };
         /** LeadList */
         LeadList: {
             /** Items */
@@ -2505,7 +3410,7 @@ export interface components {
             alt_text: string | null;
             /**
              * Attached Count
-             * @description How many projects, configurations or updates use it (delete needs 0)
+             * @description How many places use it: project media, share images, page blocks, post covers, offer images and testimonial photos (delete needs 0; see /usage for where)
              */
             readonly attached_count: number;
             /** Bytes */
@@ -2755,6 +3660,53 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** MapBlock */
+        MapBlock: {
+            data: components["schemas"]["MapData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "map";
+        };
+        /** MapBlockInput */
+        MapBlockInput: {
+            data: components["schemas"]["MapData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "map";
+        };
+        /** MapData */
+        MapData: {
+            /** Heading */
+            heading?: string | null;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+        };
         /** MapsResolveRequest */
         MapsResolveRequest: {
             /**
@@ -2827,7 +3779,7 @@ export interface components {
             alt_text: string | null;
             /**
              * Attached Count
-             * @description How many projects, configurations or updates use it (delete needs 0)
+             * @description How many places use it: project media, share images, page blocks, post covers, offer images and testimonial photos (delete needs 0; see /usage for where)
              */
             readonly attached_count: number;
             /** Bytes */
@@ -2942,6 +3894,382 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /**
+         * MediaUse
+         * @description One place a library item is used (GET /admin/media/{id}/usage, an addition in part 4).
+         */
+        MediaUse: {
+            /**
+             * Name
+             * @description The project, page, post or offer title; a buyer's name
+             */
+            name: string;
+            /**
+             * Owner Id
+             * Format: uuid
+             */
+            owner_id: string;
+            /**
+             * Owner Type
+             * @enum {string}
+             */
+            owner_type: "project" | "configuration" | "construction_update" | "page" | "post" | "offer" | "testimonial";
+            /**
+             * Project Id
+             * @description For project, configuration and update owners: the project to open
+             */
+            project_id: string | null;
+            /**
+             * Role
+             * @example gallery
+             * @example floor_plan
+             * @example block
+             * @example cover
+             * @example share_image
+             * @example image
+             * @example photo
+             */
+            role: string;
+        };
+        /**
+         * Offer
+         * @description Shown only between starts_at and ends_at while active. No countdowns: the website shows
+         *     the end date as plain text, next to the terms.
+         */
+        Offer: {
+            /** Body */
+            body: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Cta Label */
+            cta_label: string | null;
+            /** Cta Url */
+            cta_url: string | null;
+            /** Ends At */
+            ends_at: string | null;
+            /**
+             * Has Been Live
+             * @description Once shown, an offer is kept for the record
+             */
+            has_been_live: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            image: components["schemas"]["Media"] | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Sample */
+            is_sample: boolean;
+            /**
+             * Placement
+             * @enum {string}
+             */
+            placement: "banner" | "home" | "project";
+            /** Priority */
+            priority: number;
+            /** Project Id */
+            project_id: string | null;
+            /** Project Name */
+            project_name: string | null;
+            /** Starts At */
+            starts_at: string | null;
+            /**
+             * State
+             * @description Computed now: scheduled, live, ended or inactive
+             * @enum {string}
+             */
+            state: "scheduled" | "live" | "ended" | "inactive";
+            /** Terms */
+            terms: string | null;
+            /** Terms Url */
+            terms_url: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** OfferBannerBlock */
+        OfferBannerBlock: {
+            data: components["schemas"]["OfferBannerData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "offer_banner";
+        };
+        /** OfferBannerBlockInput */
+        OfferBannerBlockInput: {
+            data: components["schemas"]["OfferBannerData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "offer_banner";
+        };
+        /**
+         * OfferBannerData
+         * @description One chosen offer, or the live offers of a placement (highest priority first).
+         */
+        OfferBannerData: {
+            /** Offer Id */
+            offer_id?: string | null;
+            /** Placement */
+            placement?: ("banner" | "home" | "project") | null;
+        };
+        /** OfferInput */
+        OfferInput: {
+            /** Body */
+            body?: string | null;
+            /** Cta Label */
+            cta_label?: string | null;
+            /** Cta Url */
+            cta_url?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Image Media Id */
+            image_media_id?: string | null;
+            /**
+             * Is Active
+             * @description false = saved as a draft
+             * @default false
+             */
+            is_active: boolean;
+            /**
+             * Placement
+             * @enum {string}
+             */
+            placement: "banner" | "home" | "project";
+            /**
+             * Priority
+             * @description Higher shows first
+             * @default 0
+             */
+            priority: number;
+            /** Project Id */
+            project_id?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /**
+             * Terms
+             * @description Short terms line, e.g. what the offer includes and until when
+             */
+            terms?: string | null;
+            /**
+             * Terms Url
+             * @description Terms & conditions page
+             */
+            terms_url?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** OfferList */
+        OfferList: {
+            /** Items */
+            items: components["schemas"]["Offer"][];
+            meta: components["schemas"]["PageMeta"];
+        };
+        /**
+         * OfferUpdate
+         * @description PATCH: send only what changes. The rules are checked on the merged values.
+         */
+        OfferUpdate: {
+            /** Body */
+            body?: string | null;
+            /** Cta Label */
+            cta_label?: string | null;
+            /** Cta Url */
+            cta_url?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Image Media Id */
+            image_media_id?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Placement */
+            placement?: ("banner" | "home" | "project") | null;
+            /** Priority */
+            priority?: number | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Terms */
+            terms?: string | null;
+            /** Terms Url */
+            terms_url?: string | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** Page */
+        Page: {
+            /** Block Count */
+            block_count: number;
+            /** Blocks */
+            blocks: components["schemas"]["Block"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["UserRef"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Draft Text
+             * @description Legal page text is a Claude draft awaiting owner approval (D-017); production refuses to publish it
+             */
+            is_draft_text: boolean;
+            /**
+             * Is Required
+             * @description Comes with the website (system pages and the seeded legal pages): its slug and kind are fixed and it can't be deleted or archived
+             */
+            is_required: boolean;
+            /** Is Sample */
+            is_sample: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "standard" | "landing" | "legal" | "system";
+            /** Legal Version */
+            legal_version: string | null;
+            /**
+             * Media
+             * @description Library items the page uses, for previews: its blocks' files in order of first use, then the share image (seo.og_image_id) if not already listed
+             */
+            media: components["schemas"]["Media"][];
+            /** Nav Order */
+            nav_order: number | null;
+            /** @description The library image seo.og_image_id names */
+            og_image: components["schemas"]["Media"] | null;
+            /**
+             * Path
+             * @description Address on the website: / for the home page, else /<slug>
+             */
+            path: string;
+            /** Publish At */
+            publish_at: string | null;
+            /**
+             * Publish Blockers
+             * @description Why it can't be published now (empty = ready); permissions aside
+             */
+            publish_blockers: string[];
+            /**
+             * Publish State
+             * @enum {string}
+             */
+            publish_state: "draft" | "published" | "archived";
+            /**
+             * Published At
+             * @description First publish; never cleared
+             */
+            published_at: string | null;
+            seo: components["schemas"]["Seo"];
+            /** Seo Warnings */
+            seo_warnings: components["schemas"]["SeoWarning"][];
+            /** Show In Nav */
+            show_in_nav: boolean;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            translations: components["schemas"]["Translations"];
+            /** Unpublish At */
+            unpublish_at: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description Send it back as expected_updated_at when saving, to detect someone else's save in between
+             */
+            updated_at: string;
+            updated_by: components["schemas"]["UserRef"] | null;
+        };
+        /** PageBlocksInput */
+        PageBlocksInput: {
+            /**
+             * Blocks
+             * @description The full ordered list: blocks left out are deleted
+             */
+            blocks: components["schemas"]["BlockInput"][];
+            /**
+             * Expected Updated At
+             * @description The page's updated_at when the editor loaded it. If the page has been saved since, the save is refused (409) instead of overwriting that change. Leave it out to skip the check.
+             */
+            expected_updated_at?: string | null;
+        };
+        /**
+         * PageInput
+         * @description A new draft page. System pages come with the site and can't be created.
+         */
+        PageInput: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "standard" | "landing" | "legal";
+            /**
+             * Legal Version
+             * @description Legal pages only, e.g. 1.0
+             * @example 1.0
+             */
+            legal_version?: string | null;
+            /** Nav Order */
+            nav_order?: number | null;
+            /** Publish At */
+            publish_at?: string | null;
+            seo?: components["schemas"]["Seo"];
+            /**
+             * Show In Nav
+             * @default false
+             */
+            show_in_nav: boolean;
+            /**
+             * Slug
+             * @description Made from the title when left out
+             */
+            slug?: string | null;
+            /** Title */
+            title: string;
+            translations?: components["schemas"]["Translations"];
+            /** Unpublish At */
+            unpublish_at?: string | null;
+        };
+        /** PageList */
+        PageList: {
+            /** Items */
+            items: components["schemas"]["PageSummary"][];
+            meta: components["schemas"]["PageMeta"];
+        };
         /** PageMeta */
         PageMeta: {
             /** Page */
@@ -2952,6 +4280,103 @@ export interface components {
             per_page: number;
             /** Total */
             total: number;
+        };
+        /**
+         * PageSummary
+         * @description A row of the CMS pages list.
+         */
+        PageSummary: {
+            /** Block Count */
+            block_count: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Draft Text
+             * @description Legal page text is a Claude draft awaiting owner approval (D-017); production refuses to publish it
+             */
+            is_draft_text: boolean;
+            /**
+             * Is Required
+             * @description Comes with the website (system pages and the seeded legal pages): its slug and kind are fixed and it can't be deleted or archived
+             */
+            is_required: boolean;
+            /** Is Sample */
+            is_sample: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "standard" | "landing" | "legal" | "system";
+            /** Legal Version */
+            legal_version: string | null;
+            /** Nav Order */
+            nav_order: number | null;
+            /**
+             * Path
+             * @description Address on the website: / for the home page, else /<slug>
+             */
+            path: string;
+            /** Publish At */
+            publish_at: string | null;
+            /**
+             * Publish State
+             * @enum {string}
+             */
+            publish_state: "draft" | "published" | "archived";
+            /**
+             * Published At
+             * @description First publish; never cleared
+             */
+            published_at: string | null;
+            /** Show In Nav */
+            show_in_nav: boolean;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Unpublish At */
+            unpublish_at: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description Send it back as expected_updated_at when saving, to detect someone else's save in between
+             */
+            updated_at: string;
+            updated_by: components["schemas"]["UserRef"] | null;
+        };
+        /**
+         * PageUpdate
+         * @description PATCH: send only what changes. `publish_state: archived` archives, `draft` restores.
+         */
+        PageUpdate: {
+            /**
+             * Expected Updated At
+             * @description The page's updated_at when the editor loaded it. If the page has been saved since, the save is refused (409) instead of overwriting that change. Leave it out to skip the check.
+             */
+            expected_updated_at?: string | null;
+            /** Kind */
+            kind?: ("standard" | "landing" | "legal") | null;
+            /** Legal Version */
+            legal_version?: string | null;
+            /** Nav Order */
+            nav_order?: number | null;
+            /** Publish At */
+            publish_at?: string | null;
+            /** Publish State */
+            publish_state?: ("draft" | "archived") | null;
+            seo?: components["schemas"]["Seo"] | null;
+            /** Show In Nav */
+            show_in_nav?: boolean | null;
+            /** Slug */
+            slug?: string | null;
+            /** Title */
+            title?: string | null;
+            translations?: components["schemas"]["Translations"] | null;
+            /** Unpublish At */
+            unpublish_at?: string | null;
         };
         /** PasswordChange */
         PasswordChange: {
@@ -3029,6 +4454,173 @@ export interface components {
             percent: number;
             /** Sort Order */
             sort_order?: number | null;
+        };
+        /** Post */
+        Post: {
+            author: components["schemas"]["UserRef"] | null;
+            /**
+             * Body
+             * @description FormattedText
+             */
+            body: string;
+            /** Category */
+            category: string | null;
+            cover: components["schemas"]["Media"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Excerpt */
+            excerpt: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Sample */
+            is_sample: boolean;
+            /** @description The library image seo.og_image_id names */
+            og_image: components["schemas"]["Media"] | null;
+            /**
+             * Path
+             * @description Address on the website: /blog/<slug>
+             */
+            path: string;
+            /** Publish Blockers */
+            publish_blockers: string[];
+            /**
+             * Publish State
+             * @enum {string}
+             */
+            publish_state: "draft" | "published" | "archived";
+            /**
+             * Published At
+             * @description First publish (the article's date)
+             */
+            published_at: string | null;
+            seo: components["schemas"]["Seo"];
+            /** Seo Warnings */
+            seo_warnings: components["schemas"]["SeoWarning"][];
+            /** Slug */
+            slug: string;
+            /** Tags */
+            tags: string[];
+            /** Title */
+            title: string;
+            translations: components["schemas"]["Translations"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            updated_by: components["schemas"]["UserRef"] | null;
+        };
+        /** PostInput */
+        PostInput: {
+            /**
+             * Body
+             * Format: formatted-text
+             */
+            body: string;
+            /**
+             * Category
+             * @example Buying guide
+             */
+            category?: string | null;
+            /**
+             * Cover Media Id
+             * @description An image in the library
+             */
+            cover_media_id?: string | null;
+            /** Excerpt */
+            excerpt?: string | null;
+            seo?: components["schemas"]["Seo"];
+            /**
+             * Slug
+             * @description Made from the title when left out
+             */
+            slug?: string | null;
+            /** Tags */
+            tags?: string[];
+            /** Title */
+            title: string;
+            translations?: components["schemas"]["Translations"];
+        };
+        /** PostList */
+        PostList: {
+            /** Items */
+            items: components["schemas"]["PostSummary"][];
+            meta: components["schemas"]["PageMeta"];
+        };
+        /**
+         * PostSummary
+         * @description A row of the CMS posts list.
+         */
+        PostSummary: {
+            author: components["schemas"]["UserRef"] | null;
+            /** Category */
+            category: string | null;
+            cover: components["schemas"]["Media"] | null;
+            /** Excerpt */
+            excerpt: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Sample */
+            is_sample: boolean;
+            /**
+             * Path
+             * @description Address on the website: /blog/<slug>
+             */
+            path: string;
+            /**
+             * Publish State
+             * @enum {string}
+             */
+            publish_state: "draft" | "published" | "archived";
+            /**
+             * Published At
+             * @description First publish (the article's date)
+             */
+            published_at: string | null;
+            /** Slug */
+            slug: string;
+            /** Tags */
+            tags: string[];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * PostUpdate
+         * @description PATCH: send only what changes. `publish_state: archived` archives, `draft` restores.
+         */
+        PostUpdate: {
+            /** Body */
+            body?: string | null;
+            /** Category */
+            category?: string | null;
+            /** Cover Media Id */
+            cover_media_id?: string | null;
+            /** Excerpt */
+            excerpt?: string | null;
+            /** Publish State */
+            publish_state?: ("draft" | "archived") | null;
+            seo?: components["schemas"]["Seo"] | null;
+            /** Slug */
+            slug?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Title */
+            title?: string | null;
+            translations?: components["schemas"]["Translations"] | null;
         };
         /**
          * Price
@@ -3283,6 +4875,43 @@ export interface components {
             /** Amenity Ids */
             amenity_ids: string[];
         };
+        /** ProjectGridBlock */
+        ProjectGridBlock: {
+            data: components["schemas"]["GridData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "project_grid";
+        };
+        /** ProjectGridBlockInput */
+        ProjectGridBlockInput: {
+            data: components["schemas"]["GridData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "project_grid";
+        };
         /**
          * ProjectInput
          * @description Create a project. It always starts as a draft.
@@ -3403,6 +5032,132 @@ export interface components {
             total_units?: number | null;
             translations?: components["schemas"]["Translations"] | null;
         };
+        /** PropertyGridBlock */
+        PropertyGridBlock: {
+            data: components["schemas"]["GridData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "property_grid";
+        };
+        /** PropertyGridBlockInput */
+        PropertyGridBlockInput: {
+            data: components["schemas"]["GridData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "property_grid";
+        };
+        /** Redirect */
+        Redirect: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** From Path */
+            from_path: string;
+            /**
+             * Hits
+             * @description Counted by the website from Phase 5
+             */
+            readonly hits: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Last Hit At */
+            last_hit_at: string | null;
+            /**
+             * Notices
+             * @description What this save also changed, e.g. a chain collapsed; empty in lists
+             */
+            notices: string[];
+            /**
+             * Origin
+             * @description manual, or made automatically when a live page, post or project was renamed
+             * @enum {string}
+             */
+            origin: "manual" | "page" | "post" | "project";
+            /**
+             * Status Code
+             * @enum {string}
+             */
+            status_code: "301" | "308";
+            /** To Path */
+            to_path: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * RedirectInput
+         * @description A new redirect. A trailing / is dropped; an https address on our domains is stored as
+         *     its path. 308 unless you choose 301.
+         */
+        RedirectInput: {
+            /** From Path */
+            from_path: string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * Status Code
+             * @default 308
+             * @enum {string}
+             */
+            status_code: "301" | "308";
+            /** To Path */
+            to_path: string;
+        };
+        /** RedirectList */
+        RedirectList: {
+            /** Items */
+            items: components["schemas"]["Redirect"][];
+            meta: components["schemas"]["PageMeta"];
+        };
+        /**
+         * RedirectUpdate
+         * @description PATCH: send only what changes.
+         */
+        RedirectUpdate: {
+            /** From Path */
+            from_path?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Status Code */
+            status_code?: ("301" | "308") | null;
+            /** To Path */
+            to_path?: string | null;
+        };
         /** ReorderRequest */
         ReorderRequest: {
             /**
@@ -3440,6 +5195,54 @@ export interface components {
             /** Bank Name */
             bank_name?: string | null;
         };
+        /** RichTextBlock */
+        RichTextBlock: {
+            data: components["schemas"]["RichTextData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "rich_text";
+        };
+        /** RichTextBlockInput */
+        RichTextBlockInput: {
+            data: components["schemas"]["RichTextData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "rich_text";
+        };
+        /** RichTextData */
+        RichTextData: {
+            /**
+             * Body
+             * Format: formatted-text
+             * @description FormattedText: *bold*, _italic_, - bullets
+             */
+            body: string;
+            /** Heading */
+            heading?: string | null;
+        };
         /** Role */
         Role: {
             /**
@@ -3467,6 +5270,25 @@ export interface components {
             og_image_id?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /**
+         * SeoWarning
+         * @description One line of the SEO checklist. Warnings never block saving or publishing.
+         */
+        SeoWarning: {
+            /**
+             * Code
+             * @example title_missing
+             * @example description_long
+             */
+            code: string;
+            /**
+             * Field
+             * @example seo.title
+             */
+            field: string;
+            /** Message */
+            message: string;
         };
         /** SiteVisit */
         SiteVisit: {
@@ -3651,6 +5473,308 @@ export interface components {
             sort_order?: number | null;
             /** Text */
             text: string;
+        };
+        /**
+         * StatItem
+         * @description COMPLIANCE: a number on the website must say where it comes from and when it was true.
+         */
+        StatItem: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Label
+             * @example homes handed over
+             */
+            label: string;
+            /**
+             * Source
+             * @example Possession letters register, Sept 2026
+             */
+            source: string;
+            /**
+             * Value
+             * @example 1,200
+             */
+            value: string;
+        };
+        /** StatsBlock */
+        StatsBlock: {
+            data: components["schemas"]["StatsData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "stats";
+        };
+        /** StatsBlockInput */
+        StatsBlockInput: {
+            data: components["schemas"]["StatsData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "stats";
+        };
+        /** StatsData */
+        StatsData: {
+            /** Heading */
+            heading?: string | null;
+            /** Items */
+            items: components["schemas"]["StatItem"][];
+            /** Note */
+            note?: string | null;
+        };
+        /** StepItem */
+        StepItem: {
+            /** Text */
+            text?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** StepsBlock */
+        StepsBlock: {
+            data: components["schemas"]["StepsData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "steps";
+        };
+        /** StepsBlockInput */
+        StepsBlockInput: {
+            data: components["schemas"]["StepsData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "steps";
+        };
+        /** StepsData */
+        StepsData: {
+            /** Heading */
+            heading?: string | null;
+            /** Items */
+            items: components["schemas"]["StepItem"][];
+        };
+        /**
+         * Testimonial
+         * @description Real testimonials only. Showing one requires a source and the consent date.
+         */
+        Testimonial: {
+            /**
+             * Can Show
+             * @description Source and consent date are recorded
+             */
+            can_show: boolean;
+            /** Consent Date */
+            consent_date: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /**
+             * Person Detail
+             * @example Bought in 2025, Tower B
+             */
+            person_detail: string | null;
+            /** Person Name */
+            person_name: string;
+            photo: components["schemas"]["Media"] | null;
+            /** Project Id */
+            project_id: string | null;
+            /** Project Name */
+            project_name: string | null;
+            /** Quote */
+            quote: string;
+            /** Rating */
+            rating: number | null;
+            /**
+             * Source
+             * @example Written feedback form, 2 Mar 2026
+             */
+            source: string;
+            /** Source Url */
+            source_url: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** TestimonialInput */
+        TestimonialInput: {
+            /**
+             * Consent Date
+             * @description When they agreed to publishing
+             */
+            consent_date?: string | null;
+            /**
+             * Is Visible
+             * @default false
+             */
+            is_visible: boolean;
+            /** Person Detail */
+            person_detail?: string | null;
+            /**
+             * Person Name
+             * @description As the person agreed to be shown
+             */
+            person_name: string;
+            /** Photo Media Id */
+            photo_media_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Quote
+             * @description Their words, unedited
+             */
+            quote: string;
+            /** Rating */
+            rating?: number | null;
+            /**
+             * Source
+             * @description Where it came from
+             * @example Written feedback form, 2 Mar 2026
+             */
+            source: string;
+            /** Source Url */
+            source_url?: string | null;
+        };
+        /** TestimonialList */
+        TestimonialList: {
+            /** Items */
+            items: components["schemas"]["Testimonial"][];
+            meta: components["schemas"]["PageMeta"];
+        };
+        /**
+         * TestimonialUpdate
+         * @description PATCH: send only what changes.
+         */
+        TestimonialUpdate: {
+            /** Consent Date */
+            consent_date?: string | null;
+            /** Is Visible */
+            is_visible?: boolean | null;
+            /** Person Detail */
+            person_detail?: string | null;
+            /** Person Name */
+            person_name?: string | null;
+            /** Photo Media Id */
+            photo_media_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Quote */
+            quote?: string | null;
+            /** Rating */
+            rating?: number | null;
+            /** Source */
+            source?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+        };
+        /** TestimonialsBlock */
+        TestimonialsBlock: {
+            data: components["schemas"]["TestimonialsData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "testimonials";
+        };
+        /** TestimonialsBlockInput */
+        TestimonialsBlockInput: {
+            data: components["schemas"]["TestimonialsData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "testimonials";
+        };
+        /**
+         * TestimonialsData
+         * @description `testimonial_ids` (chosen, in this order) or `project_id` (that project's newest), or
+         *     neither (the newest overall). Only real, consented testimonials can ever be shown.
+         */
+        TestimonialsData: {
+            /** Heading */
+            heading?: string | null;
+            /**
+             * Limit
+             * @default 3
+             */
+            limit: number;
+            /** Project Id */
+            project_id?: string | null;
+            /** Testimonial Ids */
+            testimonial_ids?: string[];
         };
         /** Tower */
         Tower: {
@@ -3937,6 +6061,65 @@ export interface components {
             site_visits: number;
             /** Source */
             source: string | null;
+        };
+        /** VideoBlock */
+        VideoBlock: {
+            data: components["schemas"]["VideoData"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "video";
+        };
+        /** VideoBlockInput */
+        VideoBlockInput: {
+            data: components["schemas"]["VideoData"];
+            /**
+             * Id
+             * @description Send it back for existing blocks
+             */
+            id?: string | null;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "video";
+        };
+        /**
+         * VideoData
+         * @description Send `media_id` (a library video) or `url` (YouTube or Vimeo), not both. A link is stored
+         *     as `provider` + `video_id` and returned as the standard watch link.
+         */
+        VideoData: {
+            /** Caption */
+            caption?: string | null;
+            /** Heading */
+            heading?: string | null;
+            /** Media Id */
+            media_id?: string | null;
+            /** Provider */
+            readonly provider?: ("youtube" | "vimeo") | null;
+            /**
+             * Url
+             * @example https://www.youtube.com/watch?v=XXXXXXXXXXX
+             */
+            url?: string | null;
+            /** Video Id */
+            readonly video_id?: string | null;
         };
     };
     responses: never;
@@ -4808,6 +6991,306 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_faqs: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+                /** @description Only the site-wide FAQs (no project); an addition */
+                site_wide?: boolean;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FaqList"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_faq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FaqInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Faq"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    reorder_faqs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Faq"][];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_faq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_faq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FaqUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Faq"];
                 };
             };
             /** @description Not signed in */
@@ -6762,6 +9245,1288 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Media"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    media_usage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaUse"][];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_offers: {
+        parameters: {
+            query?: {
+                /** @description Switched on and running on this IST day */
+                active_on?: string | null;
+                placement?: ("banner" | "home" | "project") | null;
+                state?: ("scheduled" | "live" | "ended" | "inactive") | null;
+                project_id?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferList"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_offer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offer"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_offer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_offer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offer"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_pages: {
+        parameters: {
+            query?: {
+                /** @description Title or slug contains */
+                q?: string | null;
+                kind?: ("standard" | "landing" | "legal" | "system") | null;
+                publish_state?: ("draft" | "published" | "archived") | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageList"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_page: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_page: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_page: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_page: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    set_page_blocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageBlocksInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    publish_page: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    unpublish_page: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_posts: {
+        parameters: {
+            query?: {
+                /** @description Title or slug contains */
+                q?: string | null;
+                publish_state?: ("draft" | "published" | "archived") | null;
+                category?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostList"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Post"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Post"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Post"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Post"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    unpublish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Post"];
                 };
             };
             /** @description Not signed in */
@@ -9339,6 +13104,265 @@ export interface operations {
             };
         };
     };
+    list_redirects: {
+        parameters: {
+            query?: {
+                /** @description Either path contains */
+                q?: string | null;
+                origin?: ("manual" | "page" | "post" | "project") | null;
+                is_active?: boolean | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedirectList"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_redirect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedirectInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Redirect"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_redirect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_redirect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedirectUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Redirect"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     utm_report: {
         parameters: {
             query?: {
@@ -9588,6 +13612,245 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_testimonials: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+                is_visible?: boolean | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestimonialList"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_testimonial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestimonialInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Testimonial"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_testimonial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_testimonial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestimonialUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Testimonial"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

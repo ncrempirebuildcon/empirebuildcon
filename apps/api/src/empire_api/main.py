@@ -18,6 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from empire_api import health
 from empire_api.config import Settings, get_settings
 from empire_api.content import routes as content_routes
+from empire_api.content import routes_marketing as content_marketing_routes
+from empire_api.content import routes_pages as content_page_routes
 from empire_api.dashboard import routes as dashboard_routes
 from empire_api.errors import PROBLEM_MEDIA_TYPE, register_error_handlers
 from empire_api.integrations import routes as internal_routes
@@ -34,6 +36,7 @@ from empire_api.middleware.trailing_slash import StripTrailingSlashMiddleware
 from empire_api.observability import init_sentry
 from empire_api.projects import routes as project_routes
 from empire_api.projects import routes_catalogue, routes_children
+from empire_api.seo import routes as seo_routes
 from empire_api.site_settings import routes as settings_routes
 from empire_api.users import routes_admin, routes_auth
 
@@ -76,6 +79,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lead_visit_routes.router,
         dashboard_routes.router,
         content_routes.router,
+        content_page_routes.router,
+        content_marketing_routes.router,
+        content_marketing_routes.offers_router,
+        seo_routes.router,
         internal_routes.router,
     ):
         app.include_router(router)

@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import date, datetime
-from typing import Annotated, Any, Final, get_args
+from typing import Annotated, Any, Final, Literal, get_args
 
 from pydantic import AfterValidator, Field, ValidationInfo, field_validator
 from pydantic_core import PydanticCustomError
@@ -85,7 +85,8 @@ class Media(OutModel):
     )
     is_sample: bool = Field(description="Sample placeholder from the seed — never shown live")
     attached_count: Annotated[int, READ_ONLY] = Field(
-        description="How many projects, configurations or updates use it (delete needs 0)"
+        description="How many places use it: project media, share images, page blocks, post "
+        "covers, offer images and testimonial photos (delete needs 0; see /usage for where)"
     )
 
 
@@ -97,6 +98,22 @@ class LinkedMedia(Media):
     sort_order: int
     is_cover: bool
     is_visible: bool
+
+
+class MediaUse(OutModel):
+    """One place a library item is used (GET /admin/media/{id}/usage, an addition in part 4)."""
+
+    owner_type: Literal[
+        "project", "configuration", "construction_update", "page", "post", "offer", "testimonial"
+    ]
+    owner_id: uuid.UUID
+    project_id: uuid.UUID | None = Field(
+        description="For project, configuration and update owners: the project to open"
+    )
+    name: str = Field(description="The project, page, post or offer title; a buyer's name")
+    role: str = Field(
+        examples=["gallery", "floor_plan", "block", "cover", "share_image", "image", "photo"]
+    )
 
 
 class MediaList(OutModel):

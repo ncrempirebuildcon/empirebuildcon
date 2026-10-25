@@ -55,7 +55,8 @@ from empire_api.projects.vocab import (
 )
 from empire_api.timeutil import today_ist
 
-CONFIGURATION_TRANSLATABLE: Final = frozenset({"name"})
+# Translatable fields and their English lengths (schemas_shared.check_translation_fields).
+CONFIGURATION_TRANSLATABLE: Final = {"name": 80}
 MAX_STAGES: Final = 30
 Percent = Annotated[int, Field(ge=0, le=100)]
 

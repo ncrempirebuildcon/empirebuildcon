@@ -13,6 +13,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from sqlalchemy.orm import Session
 
+from empire_api.content import faqs as content_faqs
 from empire_api.db import get_db
 from empire_api.errors import problem_responses
 from empire_api.media import queries as media_queries
@@ -62,7 +63,12 @@ def admin_view(db: Session, project_id: uuid.UUID) -> ProjectAdmin:
         photos=media_queries.progress_photos(db, (u.id for u in project.construction_updates)),
         share_image=media_queries.library_item(db, _share_image_id(project)),
     )
-    return present.project_admin(project, blockers.publish_blockers(db, project), media)
+    return present.project_admin(
+        project,
+        blockers.publish_blockers(db, project),
+        media,
+        content_faqs.project_faqs(db, project.id),
+    )
 
 
 def _share_image_id(project: Project) -> uuid.UUID | None:

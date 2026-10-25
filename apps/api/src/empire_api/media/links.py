@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 from empire_api.errors import ApiProblem
 from empire_api.media import events
 from empire_api.media.models import Media, MediaLink
-from empire_api.media.rules import LABEL_FIRST, Owner, check_role, needs_label
+from empire_api.media.rules import CONTENT_LINK, LABEL_FIRST, Owner, check_role, needs_label
 from empire_api.media.schemas import MediaLinkUpdate
 from empire_api.media.vocab import COVER_ROLES, SINGLE_ROLES
 from empire_api.projects.common import (
@@ -80,6 +80,8 @@ def _locked_link(db: Session, link_id: uuid.UUID) -> tuple[MediaLink, Owner, Pro
     if link is None:
         raise ApiProblem(404, NO_LINK)
     owner = Owner.of(link)
+    if owner.is_content:
+        raise conflict(CONTENT_LINK)
     project = lock_owner_project(db, owner.type, owner.id)
     # WHY `of`: `MediaLink.media` is eager-loaded with a LEFT OUTER JOIN, and PostgreSQL refuses
     # FOR UPDATE on the nullable side of an outer join; lock the link row only.
@@ -271,6 +273,8 @@ def reorder(db: Session, actor: Actor, ids: list[uuid.UUID]) -> None:
     if first is None:
         raise invalid([FieldError("ids", "Unknown item in the list.")])
     owner, role = Owner.of(first), first.role
+    if owner.is_content:
+        raise conflict(CONTENT_LINK)
     project = lock_owner_project(db, owner.type, owner.id)
     links = owner_links(db, owner, role)
     by_id = {link.id: link for link in links}

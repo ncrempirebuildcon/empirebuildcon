@@ -61,6 +61,13 @@ from empire_api.users.models import User
 API_ROOT = Path(__file__).resolve().parents[1]
 GOOD_PASSWORD = "correct horse battery staple"
 TABLES = (
+    "block",
+    "page",
+    "post",
+    "faq",
+    "offer",
+    "testimonial",
+    "redirect",
     "lead_activity",
     "lead_note",
     "lead_consent",
