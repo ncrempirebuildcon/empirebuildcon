@@ -40,6 +40,7 @@ import { AmenitiesTab } from "./AmenitiesTab";
 import { ConfigurationsTab } from "./ConfigurationsTab";
 import { DetailsTab, type OffMarketLock } from "./DetailsTab";
 import { DocumentsTab } from "./DocumentsTab";
+import { FaqsTab } from "./FaqsTab";
 import { LocationTab } from "./LocationTab";
 import { MediaTab } from "./MediaTab";
 import { PaymentPlansTab } from "./PaymentPlansTab";
@@ -70,6 +71,7 @@ const TABS = [
   { id: "location", label: "Location" },
   { id: "progress", label: "Progress" },
   { id: "payment-plans", label: "Payment plans" },
+  { id: "faqs", label: "FAQs" },
   { id: "documents", label: "Documents" },
   { id: "seo", label: "SEO" },
 ] as const;
@@ -362,6 +364,9 @@ function EditorBody({
           </TabPanel>
           <TabPanel idPrefix="project" tabId="payment-plans" selected={tab === "payment-plans"}>
             <PaymentPlansTab {...childProps} />
+          </TabPanel>
+          <TabPanel idPrefix="project" tabId="faqs" selected={tab === "faqs"}>
+            <FaqsTab project={project} reportDirty={reportDirty} />
           </TabPanel>
           <TabPanel idPrefix="project" tabId="documents" selected={tab === "documents"}>
             <DocumentsTab

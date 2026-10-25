@@ -8,6 +8,7 @@ import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { CMS_STATE, apiCall, runId } from "../lib/auth";
 import {
+  cancelEarlierTestVisits,
   currentConsent,
   istDate,
   manualLead,
@@ -137,6 +138,7 @@ test("a public site-visit request goes from the inbox to a confirmed visit and a
   ).toContainText("Confirmed · 12:30 pm");
 
   // 6. The dashboard: the visit is upcoming, and the "this week" tile opens the calendar.
+  await cancelEarlierTestVisits(page);
   await page.goto("/admin");
   const upcoming = page.getByRole("region", { name: "Upcoming site visits" });
   await expect(upcoming.getByRole("link", { name: lead.name })).toBeVisible();

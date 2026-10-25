@@ -15,7 +15,7 @@
  * have one; an artist's impression never does. The label is never filled in for the user
  * (lib/media/labels.ts).
  */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Alert, Button, Dialog, Select, TextField, Textarea } from "@empire/ui";
 import { api, call } from "@/lib/api";
 import { DATED_LABELS, HONEST_LABEL, firstOfMonth, type HonestLabel } from "@/lib/media/labels";
@@ -56,15 +56,17 @@ export interface MediaDetailsDialogProps {
   onClose: () => void;
   /** Called with the saved item. */
   onSaved: (media: Media) => Promise<unknown> | void;
+  /** A sentence above the fields saying why the dialog opened (e.g. a label is needed). */
+  intro?: ReactNode;
+  /** A photo must leave with an honest label (where the website shows it with one; L11). */
+  labelRequired?: boolean;
 }
 
-export function MediaDetailsDialog({ media, onClose, onSaved }: MediaDetailsDialogProps) {
+export function MediaDetailsDialog({ media, ...rest }: MediaDetailsDialogProps) {
   return (
     <>
       {/* WHY keyed: each item opens with a fresh draft taken from its saved values. */}
-      {media ? (
-        <DetailsForm key={media.id} media={media} onClose={onClose} onSaved={onSaved} />
-      ) : null}
+      {media ? <DetailsForm key={media.id} media={media} {...rest} /> : null}
     </>
   );
 }
@@ -73,11 +75,9 @@ function DetailsForm({
   media,
   onClose,
   onSaved,
-}: {
-  media: Media;
-  onClose: () => void;
-  onSaved: (media: Media) => Promise<unknown> | void;
-}) {
+  intro,
+  labelRequired = false,
+}: Omit<MediaDetailsDialogProps, "media"> & { media: Media }) {
   const [draft, setDraftState] = useState<Draft>(() => toDraft(media));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +91,7 @@ function DetailsForm({
   function validate(): FieldErrors {
     const found: FieldErrors = {};
     if (!draft.title.trim()) found.title = `Give the ${noun.toLowerCase()} a title.`;
+    if (isImage && labelRequired && !draft.label) found.label = "Choose what this photo is.";
     const month = dated ? monthProblem(draft.month, draft.year, monthRequired) : null;
     if (month) found.label_month = month;
     return found;
@@ -161,6 +162,7 @@ function DetailsForm({
         </div>
         <fieldset disabled={saving} className="flex min-w-0 flex-[1_1_260px] flex-col gap-4">
           <legend className="sr-only">{`${noun} details`}</legend>
+          {intro ? <p className="text-small">{intro}</p> : null}
           {error ? <Alert tone="error">{error}</Alert> : null}
           <TextField
             label="Title"
@@ -186,6 +188,7 @@ function DetailsForm({
             <>
               <Select
                 label="Honest label"
+                required={labelRequired}
                 value={draft.label}
                 placeholder="Not labelled yet"
                 options={optionsOf(HONEST_LABEL)}

@@ -24,8 +24,10 @@ import { ROLE_LABELS } from "@/lib/labels";
 import { unreadLeadCount } from "@/lib/leads/dashboard";
 import {
   CATALOGUE_PATH,
+  CONTENT_SECTIONS,
   LEADS_PATH,
   MEDIA_PATH,
+  PAGES_PATH,
   PROJECTS_PATH,
   SIGN_IN_PATH,
   SITE_VISITS_PATH,
@@ -36,11 +38,21 @@ import { AdminSessionContext, type AdminSession, type DashboardState } from "./s
 import { NavIcon, type NavIconName } from "./NavIcon";
 
 export type AdminSection =
-  "dashboard" | "leads" | "site_visits" | "reports" | "projects" | "catalogue" | "media";
+  | "dashboard"
+  | "leads"
+  | "site_visits"
+  | "reports"
+  | "projects"
+  | "catalogue"
+  | "media"
+  | "pages"
+  | "content";
 
 interface MenuItem {
   label: string;
+  /** The permission the item needs; `anyOf` items need at least one of several instead. */
   permission: string;
+  anyOf?: readonly string[];
   icon: NavIconName;
   /** Built screens link here; the others are labelled with the part that brings them. */
   href?: string;
@@ -52,8 +64,7 @@ interface MenuItem {
 }
 
 // Menu items from the CMS boards with the permission each one needs (ARCHITECTURE.md §11).
-// TODO(phase-4): link Pages, Offers & blog, Users, Settings and Audit log as their screens arrive
-// in parts 4 and 5 of Phase 4.
+// TODO(phase-4): link Users, Settings and Audit log as their screens arrive in part 5.
 const MENU: MenuItem[] = [
   {
     label: "Dashboard",
@@ -105,8 +116,24 @@ const MENU: MenuItem[] = [
     href: MEDIA_PATH,
     section: "media",
   },
-  { label: "Pages", permission: "content.read", icon: "pages" },
-  { label: "Offers & blog", permission: "offers.manage", icon: "offers" },
+  {
+    label: "Pages",
+    permission: "content.read",
+    icon: "pages",
+    href: PAGES_PATH,
+    section: "pages",
+  },
+  {
+    // WHY anyOf: offers, posts/FAQs/testimonials and redirects need different permissions
+    // (offers.manage, content.read, seo.manage); a content editor has no offers.manage but still
+    // needs the blog. The link opens the first section the role can use (see `hrefFor`).
+    label: "Offers & blog",
+    permission: "offers.manage",
+    anyOf: [...new Set(CONTENT_SECTIONS.map((section) => section.permission))],
+    icon: "offers",
+    href: CONTENT_SECTIONS[0].href,
+    section: "content",
+  },
   { label: "Users & roles", permission: "users.manage", icon: "users", divider: true },
   { label: "Settings", permission: "settings.read", icon: "settings" },
   { label: "Audit log", permission: "audit.read", icon: "audit" },
@@ -174,7 +201,16 @@ export function AdminShell({ me, section, heading, breadcrumb, children }: Admin
     }),
     [me, permissions, dashboard],
   );
-  const visible = MENU.filter((item) => session.can(item.permission));
+  const visible = MENU.filter((item) =>
+    item.anyOf ? item.anyOf.some((p) => session.can(p)) : session.can(item.permission),
+  ).map((item) =>
+    item.section === "content"
+      ? {
+          ...item,
+          href: CONTENT_SECTIONS.find((entry) => session.can(entry.permission))?.href ?? item.href,
+        }
+      : item,
+  );
   const unread = dashboard?.data ? unreadLeadCount(dashboard.data) : null;
 
   useEffect(() => {

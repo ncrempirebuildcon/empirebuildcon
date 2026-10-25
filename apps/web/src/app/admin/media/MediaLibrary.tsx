@@ -6,7 +6,7 @@
  *
  * Each item can be renamed and given alt text and an honest label (the same "details" dialog as
  * the project editor). "Delete from library" is offered only with `media.manage` and only for
- * files attached to nothing ("Attached in N places" explains the others); the API refuses
+ * files attached to nothing ("Used in N places" lists the others); the API refuses
  * anything else (409, also for a project's share image) and deletes the file from the store
  * afterwards (`media.removed`).
  *
@@ -36,14 +36,21 @@ import {
   TextField,
   type TableColumn,
 } from "@empire/ui";
-import { api, call } from "@/lib/api";
+import { api, call, type Schema } from "@/lib/api";
 import { formatDateTime } from "@/lib/dates";
 import { keyOf } from "@/lib/labels";
 import { formatBytes, type MediaKind } from "@/lib/media/files";
 import { HONEST_LABEL_TONE, honestLabelText } from "@/lib/media/labels";
 import type { Media } from "@/lib/media/upload";
 import { problemMessage } from "@/lib/problems";
-import { MEDIA_PATH } from "@/lib/routes";
+import {
+  MEDIA_PATH,
+  OFFERS_PATH,
+  TESTIMONIALS_PATH,
+  pagePath,
+  postPath,
+  projectPath,
+} from "@/lib/routes";
 import { EmptyState, ErrorPanel, LoadingPanel } from "@/components/admin/states";
 import { MediaDetailsDialog } from "@/components/admin/media/MediaDetailsDialog";
 import { MediaThumb } from "@/components/admin/media/MediaThumb";
@@ -400,14 +407,94 @@ function LabelLine({ media }: { media: Media }) {
   );
 }
 
+/**
+ * "Not attached to anything", or "Used in N places" that opens (native <details>) to list them
+ * from `GET /admin/media/{id}/usage`: projects, pages, posts, offers and testimonials, each a link
+ * to where it is used (spec Phase 4 part 4 §10), so staff know what to change before deleting.
+ */
 function UsesLine({ media }: { media: Media }) {
   const uses = media.attached_count;
+  const [open, setOpen] = useState(false);
+  if (uses === 0) return <span className="text-xs text-muted">Not attached to anything</span>;
   return (
-    <span className="text-xs text-muted">
-      {uses === 0
-        ? "Not attached to anything"
-        : `Attached in ${uses} ${uses === 1 ? "place" : "places"}`}
-    </span>
+    <details
+      className="text-xs text-muted"
+      onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
+    >
+      <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-gold-400">
+        Used in {uses} {uses === 1 ? "place" : "places"}
+      </summary>
+      {open ? <UsageList mediaId={media.id} /> : null}
+    </details>
+  );
+}
+
+const USE_ROLE: Record<string, string> = {
+  gallery: "photo",
+  floor_plan: "floor plan",
+  brochure: "brochure",
+  rera_qr: "RERA QR code",
+  video: "video",
+  document: "document",
+  share_image: "share image",
+  block: "in a block",
+  cover: "cover",
+  image: "image",
+  photo: "photo",
+};
+
+function hrefOfUse(use: Schema<"MediaUse">): string | null {
+  switch (use.owner_type) {
+    case "project":
+    case "configuration":
+    case "construction_update":
+      return use.project_id ? projectPath(use.project_id) : null;
+    case "page":
+      return pagePath(use.owner_id);
+    case "post":
+      return postPath(use.owner_id);
+    case "offer":
+      return `${OFFERS_PATH}?offer=${use.owner_id}`;
+    case "testimonial":
+      return `${TESTIMONIALS_PATH}?testimonial=${use.owner_id}`;
+  }
+}
+
+function UsageList({ mediaId }: { mediaId: string }) {
+  const usage = useLoad(`media-usage:${mediaId}`, () =>
+    call(api.GET("/api/v1/admin/media/{id}/usage", { params: { path: { id: mediaId } } })),
+  );
+  if (usage.error) {
+    return (
+      <p className="text-danger">
+        {problemMessage(usage.error, "Couldn't load where it is used.")}
+      </p>
+    );
+  }
+  if (!usage.data) return <p role="status">Loading…</p>;
+  return (
+    <ul className="mt-1 flex flex-col gap-1">
+      {usage.data.map((use) => {
+        const href = hrefOfUse(use);
+        // WHY: a testimonial's name already says "Testimonial photo (R. K. S.)" (initials only,
+        // never the buyer's name; review L9), so its role isn't repeated.
+        const text =
+          use.owner_type === "testimonial"
+            ? use.name
+            : `${use.name} (${USE_ROLE[use.role] ?? use.role})`;
+        return (
+          <li key={`${use.owner_type}:${use.owner_id}:${use.role}`}>
+            {href ? (
+              <Link href={href} className="underline underline-offset-2">
+                {text}
+              </Link>
+            ) : (
+              text
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -422,8 +509,9 @@ function ItemActions({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  // INVARIANT (mirrors the API's 409): a file still attached somewhere is never offered for
-  // deletion; "Attached in N places" says why. A project's share image is refused by the API.
+  // INVARIANT (mirrors the API's 409): a file still used somewhere is never offered for
+  // deletion; "Used in N places" says where. The API refuses it too (blocks, covers, share
+  // images, offer images and testimonial photos count since part 4).
   const unattached = media.attached_count === 0;
   return (
     <span className="flex flex-wrap items-center gap-1.5">

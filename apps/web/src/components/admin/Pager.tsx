@@ -19,6 +19,12 @@ export interface PagerProps {
   singular: string;
 }
 
+/** The `?page=` value of an address as a page number (1 when missing or not a whole number). */
+export function pageFrom(value: string | null): number {
+  const page = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(page) && page > 0 ? page : 1;
+}
+
 const linkClasses =
   "inline-flex min-h-11 items-center rounded-tile border px-4 text-caption font-bold";
 

@@ -130,6 +130,40 @@ export async function requestSiteVisit(
   }
 }
 
+/**
+ * Cancels the site visits that earlier runs left open, so the dashboard's "Upcoming site visits"
+ * (the next five open visits from today on) has room for this run's visit.
+ *
+ * WHY: the browser suite shares `empire_dev`, and every run confirms a visit for tomorrow. After
+ * a few runs on one day those earlier visits fill the five places and push this run's visit off
+ * the dashboard, although it is there. Only test visits ("E2E Lead …") made more than
+ * `olderThanMinutes` ago are cancelled, so visits other specs of this run made, and the seeded
+ * sample visits, stay as they are.
+ */
+export async function cancelEarlierTestVisits(page: Page, olderThanMinutes = 20): Promise<void> {
+  const response = await apiCall(
+    page,
+    "GET",
+    `/api/v1/admin/site-visits?open=true&from=${istDate(-7)}&to=${istDate(60)}`,
+  );
+  expect(response.status()).toBe(200);
+  const visits = (await response.json()) as Array<{
+    id: string;
+    lead_name: string;
+    is_sample: boolean;
+    created_at: string;
+  }>;
+  const cutoff = Date.now() - olderThanMinutes * 60_000;
+  for (const visit of visits) {
+    if (visit.is_sample || !visit.lead_name.startsWith("E2E Lead ")) continue;
+    if (Date.parse(visit.created_at) >= cutoff) continue;
+    const cancelled = await apiCall(page, "PATCH", `/api/v1/admin/site-visits/${visit.id}`, {
+      status: "cancelled",
+    });
+    expect(cancelled.status(), await cancelled.text()).toBe(200);
+  }
+}
+
 /** A lead typed in by staff (`POST /admin/leads`), optionally given to someone. */
 export async function manualLead(
   page: Page,

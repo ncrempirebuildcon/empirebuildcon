@@ -78,7 +78,10 @@ test("an admin renames and deletes an unattached file, and can't delete an attac
   // and the API refuses it too.
   await page.goto(`/admin/media?q=${encodeURIComponent(`E2E attached ${id}`)}&view=list`);
   const row = page.getByRole("row", { name: new RegExp(`E2E attached ${id}`) });
-  await expect(row.getByText("Attached in 1 place")).toBeVisible();
+  await expect(row.getByText("Used in 1 place")).toBeVisible();
+  // Opening it lists where, with a link to the project (GET /admin/media/{id}/usage).
+  await row.getByText("Used in 1 place").click();
+  await expect(row.getByRole("link", { name: new RegExp(`^E2E Library ${id} \\(`) })).toBeVisible();
   await expect(row.getByRole("button", { name: /^Edit details/ })).toBeVisible();
   await expect(row.getByRole("button", { name: /^Delete from library/ })).toHaveCount(0);
   const { id: mediaId } = (await attached.json()) as { id: string };

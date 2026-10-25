@@ -13,14 +13,27 @@ export interface CheckboxProps extends Omit<
   "type" | "id" | "defaultChecked"
 > {
   label: ReactNode;
+  /** Short help under the label, linked with `aria-describedby` (e.g. why it is locked). */
+  hint?: ReactNode;
   error?: ReactNode;
   id?: string;
 }
 
-export function Checkbox({ label, error, id, className, required, ...rest }: CheckboxProps) {
+export function Checkbox({
+  label,
+  hint,
+  error,
+  id,
+  className,
+  required,
+  "aria-describedby": extraDescribedBy,
+  ...rest
+}: CheckboxProps) {
   const autoId = useId();
   const fieldId = id ?? autoId;
+  const hintId = hint ? `${fieldId}-hint` : undefined;
   const errorId = error ? `${fieldId}-error` : undefined;
+  const describedBy = [extraDescribedBy, hintId, errorId].filter(Boolean).join(" ") || undefined;
   return (
     <div className={cx("flex flex-col gap-1", className)}>
       <div className="flex items-start gap-2.5">
@@ -30,7 +43,7 @@ export function Checkbox({ label, error, id, className, required, ...rest }: Che
           type="checkbox"
           required={required}
           aria-invalid={error ? true : undefined}
-          aria-describedby={errorId}
+          aria-describedby={describedBy}
           className="mt-0.5 size-5 shrink-0 accent-gold-500"
         />
         <label htmlFor={fieldId} className="text-caption text-ivory">
@@ -38,6 +51,11 @@ export function Checkbox({ label, error, id, className, required, ...rest }: Che
           {required ? " (Required)" : null}
         </label>
       </div>
+      {hint ? (
+        <p id={hintId} className="pl-7.5 text-caption text-muted">
+          {hint}
+        </p>
+      ) : null}
       {error ? (
         <p id={errorId} className="pl-7.5 text-caption text-danger">
           {error}

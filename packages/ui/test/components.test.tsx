@@ -46,6 +46,30 @@ describe("Checkbox", () => {
     expect(box.checked).toBe(false);
     expect(screen.getByText(/\(Required\)/)).toBeTruthy();
   });
+
+  it("links its hint and error, and keeps a caller's own description", () => {
+    render(
+      <>
+        <p id="outside">Why it is locked</p>
+        <Checkbox
+          label="Show on the website"
+          hint="Locked until the consent date is filled in."
+          error="Record the consent date first."
+          aria-describedby="outside"
+        />
+      </>,
+    );
+    const box = screen.getByRole("checkbox", { name: "Show on the website" });
+    const described = (box.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toEqual([
+      "Why it is locked",
+      "Locked until the consent date is filled in.",
+      "Record the consent date first.",
+    ]);
+    expect(box.getAttribute("aria-invalid")).toBe("true");
+  });
 });
 
 describe("Chip and Alert", () => {

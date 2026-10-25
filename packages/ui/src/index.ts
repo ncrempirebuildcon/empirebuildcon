@@ -6,6 +6,13 @@ export { Checkbox, type CheckboxProps } from "./components/Checkbox";
 export { Chip, type ChipProps, type ChipVariant } from "./components/Chip";
 export { ConfirmDialog, type ConfirmDialogProps } from "./components/ConfirmDialog";
 export { Dialog, type DialogProps } from "./components/Dialog";
+export { FormattedText, type FormattedTextProps } from "./components/FormattedText";
+export {
+  FORMATTING_HINT,
+  FormattedTextEditor,
+  lengthText,
+  type FormattedTextEditorProps,
+} from "./components/FormattedTextEditor";
 export {
   FileButton,
   FileDropZone,
