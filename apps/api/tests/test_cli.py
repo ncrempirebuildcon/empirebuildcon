@@ -32,7 +32,7 @@ runner = CliRunner()
 def test_create_superadmin_prints_a_setup_link_once(db: Session) -> None:
     first = runner.invoke(app, ["create-superadmin", "--email", "Admin@EmpireBuildcon.com"])
     assert first.exit_code == 0, first.output
-    assert "/admin/setup?token=" in first.output
+    assert "/admin/setup#token=" in first.output
     user = db.scalar(select(User).where(User.role == "super_admin"))
     assert user is not None and user.email == "admin@empirebuildcon.com"
     assert user.password_hash is None

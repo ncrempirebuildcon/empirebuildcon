@@ -23,7 +23,7 @@
 | 1 | Architecture, data model, API contract, security plan | Done |
 | 2 | Brand, design system, page and CMS templates | Done; approved by the owner on 22 Oct 2026 |
 | 3 | Foundation: monorepo, CI, auth, roles, outbox | Done; merged on 22 Oct 2026 (PR #1) |
-| 4 | CMS core, in five parts: projects and catalogue · media · leads · content · settings and users | In progress: part 1 merged 22 Oct 2026 (PR #4), part 2 merged 23 Oct 2026 (PR #5); part 3 merged 26 Oct 2026 (PR #7); part 4 (content and SEO) in review |
+| 4 | CMS core, in five parts: projects and catalogue · media · leads · content · settings and users | In progress: part 1 merged 22 Oct 2026 (PR #4), part 2 merged 23 Oct 2026 (PR #5); part 3 merged 26 Oct 2026 (PR #7); part 4 merged 26 Oct 2026 (PR #8); part 5 (settings, users, two-factor, email) in review |
 | 5–10 | Public site, marketing, AI layer, QA, go-live, handover | Planned |
 
 The owner keeps the live task list (a private tracker page). Ask the owner for access.

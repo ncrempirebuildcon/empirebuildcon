@@ -4,6 +4,7 @@ export { Alert, type AlertProps, type AlertTone } from "./components/Alert";
 export { Button, buttonClasses, type ButtonProps, type ButtonVariant } from "./components/Button";
 export { Checkbox, type CheckboxProps } from "./components/Checkbox";
 export { Chip, type ChipProps, type ChipVariant } from "./components/Chip";
+export { CodeList, spellCode, type CodeListProps } from "./components/CodeList";
 export { ConfirmDialog, type ConfirmDialogProps } from "./components/ConfirmDialog";
 export { Dialog, type DialogProps } from "./components/Dialog";
 export { FormattedText, type FormattedTextProps } from "./components/FormattedText";
@@ -34,6 +35,12 @@ export {
   type ReorderButtonsProps,
   type ReorderListProps,
 } from "./components/Reorder";
+export {
+  OneTimeCodeField,
+  codeDigits,
+  type OneTimeCodeFieldProps,
+} from "./components/OneTimeCodeField";
+export { PasswordField, type PasswordFieldProps } from "./components/PasswordField";
 export { ProgressBar, type ProgressBarProps } from "./components/ProgressBar";
 export {
   SegmentedControl,

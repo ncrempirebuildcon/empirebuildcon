@@ -30,7 +30,7 @@ from empire_api.config import get_settings
 from empire_api.db import rows_affected
 from empire_api.platform.crypto import constant_time_equals, keyed_digest
 from empire_api.timeutil import utcnow
-from empire_api.users.models import User, UserSession
+from empire_api.users.models import SignInChallenge, User, UserSession
 
 COOKIE_NAME = "__Host-empire_session"
 IDLE_LIMIT = timedelta(hours=8)
@@ -124,15 +124,29 @@ def resolve_session(db: Session, token: str | None) -> SessionInfo | None:
 def revoke_sessions(
     db: Session, user_id: uuid.UUID, *, keep: uuid.UUID | None = None, now: datetime | None = None
 ) -> int:
-    """Revoke every live session of a user (optionally keeping one). Caller commits."""
+    """Revoke every live session of a user (optionally keeping one), and close every open
+    sign-in challenge of theirs. Returns how many sessions were revoked. Caller commits.
+
+    SECURITY (part 5 review M1): a sign-in challenge (users/sign_in.py) is a session in waiting:
+    whoever holds its cookie can finish it with a code, or with their own phone at a forced
+    set-up. So every path that signs someone out everywhere (password reset or change, "sign out
+    everywhere", deactivation, role change, two-factor reset or switch-on) closes those too.
+    """
+    when = now or utcnow()
     stmt = (
         update(UserSession)
         .where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
-        .values(revoked_at=now or utcnow())
+        .values(revoked_at=when)
     )
     if keep is not None:
         stmt = stmt.where(UserSession.id != keep)
-    return rows_affected(db.execute(stmt))
+    revoked = rows_affected(db.execute(stmt))
+    db.execute(
+        update(SignInChallenge)
+        .where(SignInChallenge.user_id == user_id, SignInChallenge.used_at.is_(None))
+        .values(used_at=when)
+    )
+    return revoked
 
 
 def set_session_cookie(response: Response, token: str) -> None:

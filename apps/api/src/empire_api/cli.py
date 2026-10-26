@@ -3,13 +3,16 @@
 Commands:
   create-superadmin  One-time: create the owner's account and print a setup link (D-009).
   create-user        Development/test only: a staff account with a password from stdin.
+  reset-two-factor   Break-glass: remove an account's two-factor when nobody can sign in to
+                     reset it in the CMS (lost phone and recovery codes). Audited, emailed.
   seed               Feature flags, default settings, the amenity catalogue, and the system and
                      legal pages as drafts (legal text: the D-017 placeholder) (idempotent);
                      in development and test also the draft consent texts (D-017).
                      --sample also adds sample projects (development and demos; D-015),
                      with the fake media store SAMPLE placeholder tiles in their photos,
-                     twelve sample leads with a few site visits, and a sample post, offer and
-                     FAQs (no testimonials, ever).
+                     twelve sample leads with a few site visits, a sample post, offer and
+                     FAQs (no testimonials, ever), and four "Sample …" staff accounts in
+                     development and test (invited: no password, can't sign in).
   openapi            Write the OpenAPI spec for the typed web client (D-020).
   gen-secrets        Print fresh random values for your own local .env.
 
@@ -46,6 +49,7 @@ from empire_api.site_settings.flags import seed_flags
 from empire_api.users import passwords, service
 from empire_api.users.models import User
 from empire_api.users.roles import ROLE_KEYS
+from empire_api.users.seed import SampleUsersRefusedError, seed_sample_users
 
 app = typer.Typer(help="Empire API admin commands.", no_args_is_help=True, add_completion=False)
 
@@ -108,6 +112,29 @@ def create_user(
     _out(f"Created {role} account for {service.normalise_email(email)}.")
 
 
+@app.command("reset-two-factor")
+def reset_two_factor(
+    email: Annotated[str, typer.Option(help="The account whose authenticator is lost")],
+) -> None:
+    """Break-glass: remove an account's two-factor and sign it out everywhere.
+
+    For when the only super-admin lost both their phone and their recovery codes, so nobody can
+    use the CMS's "Reset two-factor". Needs shell access to the server (the same trust as
+    create-superadmin). Audited with no actor, and the person gets the security email. With the
+    admin_2fa flag on, their next sign-in asks them to set two-factor up again.
+    """
+    with get_sessionmaker()() as db:
+        user = service.find_user_by_email(db, email)
+        if user is None:
+            _fail("No staff account with this email.")
+            return
+        service.admin_reset_two_factor(db, user, actor_id=None, meta=None)
+    _out(
+        "Two-factor removed and every session signed out. The security email goes out with the "
+        "next outbox run."
+    )
+
+
 @app.command("seed")
 def seed(
     sample: Annotated[
@@ -126,7 +153,8 @@ def seed(
     `--sample` adds "Sample City" and "Sample — Project A/B" for development and demos, twelve
     "Sample Lead N" leads with site visits, and a SAMPLE post, offer and FAQs. They are marked
     is_sample, stay drafts (or switched off), and all of it is refused when APP_ENV is
-    production (D-015). It never adds a testimonial.
+    production (D-015). It never adds a testimonial. In development and test it also adds four
+    "Sample …" staff accounts with no password (they can't sign in, and no email is queued).
     """
     if sample and get_settings().app_env == "production":
         _fail("Sample data is never added in production (D-015).")
@@ -157,6 +185,21 @@ def seed(
         _seed_sample_media()
         _seed_sample_leads()
         _seed_sample_content()
+        _seed_sample_users()
+
+
+def _seed_sample_users() -> None:
+    with get_sessionmaker()() as db:
+        try:
+            result = seed_sample_users(db)
+        except SampleUsersRefusedError as exc:
+            _out(f"Sample accounts skipped: {exc}")
+            return
+        db.commit()
+    _out(
+        f"Sample accounts: {result.added} added, {result.skipped} already there (invited, no "
+        "password, can't sign in)."
+    )
 
 
 def _seed_sample_content() -> None:
@@ -206,13 +249,15 @@ def openapi(
 ) -> None:
     """Write the OpenAPI spec generated from the code (source of truth from Phase 3, D-020).
 
-    WHY the fake media store is forced: the spec then always lists the development-only
-    dev-media routes, whatever CLOUDINARY_URL a developer has set, so the committed client
-    never changes with someone's local settings.
+    WHY the fake media store, the dev email transport and APP_ENV=development are forced: the
+    spec then always lists the development-only dev-media and dev-mail routes, whatever
+    CLOUDINARY_URL, EMAIL_API_KEY or APP_ENV a developer has set, so the committed client never
+    changes with someone's local settings.
     """
     from empire_api.main import create_app  # noqa: PLC0415 — only this command needs the app
 
-    settings = Settings(**{**get_settings().model_dump(), "media_store": "fake"})
+    forced = {"media_store": "fake", "email_transport": "dev", "app_env": "development"}
+    settings = Settings(**{**get_settings().model_dump(), **forced})
     spec = create_app(settings).openapi()
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(spec, indent=2, sort_keys=True, ensure_ascii=False) + "\n")

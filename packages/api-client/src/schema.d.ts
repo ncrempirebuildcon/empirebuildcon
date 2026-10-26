@@ -92,7 +92,8 @@ export interface paths {
         };
         /**
          * Audit Log
-         * @description Audit log, newest first. Dates are whole days in UTC; `to` is inclusive.
+         * @description Audit log, newest first. Dates are whole days in India time (IST); `to` is inclusive.
+         *     IP addresses are masked; the actor comes with their name and current role.
          */
         get: operations["audit_log"];
         put?: never;
@@ -163,6 +164,26 @@ export interface paths {
          * @description A new, unpublished version. It takes effect only when published.
          */
         post: operations["create_consent_text"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/consent-texts/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Each purpose with its current version (contract addition, part 5)
+         * @description Every purpose, even one with no text yet, with the version the forms show now.
+         */
+        get: operations["consent_text_kinds"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -280,7 +301,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Flags */
+        /**
+         * List Flags
+         * @description Every flag with what it does, who may switch it, and whether you can now.
+         */
         get: operations["list_flags"];
         put?: never;
         post?: never;
@@ -305,7 +329,10 @@ export interface paths {
         head?: never;
         /**
          * Set Flag
-         * @description Switch a feature on or off. Locked features (not built yet) answer 409.
+         * @description Switch a feature on or off. Locked features (not built yet) answer 409. `admin_2fa`:
+         *     super-admins only (403), and switching it on needs your own two-factor on (409); switching
+         *     it on signs out every admin and super-admin without two-factor (audited), so they set it up
+         *     at their next sign-in.
          */
         patch: operations["set_flag"];
         trace?: never;
@@ -319,7 +346,7 @@ export interface paths {
         };
         /**
          * People a lead can be assigned to
-         * @description Active accounts whose role can open leads. Contract addition (Phase 4 part 3).
+         * @description Active accounts that have set their password (not just invited) and whose role can open leads. Contract addition (Phase 4 part 3).
          */
         get: operations["list_lead_owners"];
         put?: never;
@@ -873,6 +900,26 @@ export interface paths {
         put?: never;
         /** Unpublish */
         post: operations["unpublish_page"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The role table: each permission, what it allows and which roles have it
+         * @description In the order of ARCHITECTURE §11, grouped as on the users and roles board.
+         */
+        get: operations["list_permissions"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1497,7 +1544,8 @@ export interface paths {
         };
         /**
          * List Roles
-         * @description The five roles and their permissions (ARCHITECTURE §11).
+         * @description The five roles, what each is for, their permissions and how many active accounts have
+         *     each (ARCHITECTURE §11).
          */
         get: operations["list_roles"];
         put?: never;
@@ -1506,6 +1554,47 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All settings groups, who can change each, the round-robin table and the integrations status (never a key) */
+        get: operations["get_settings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/settings/{group}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update one group (send only what changes; null clears a field)
+         * @description Each group checks its own permission (module header): 403 without it. Tracking needs
+         *     marketing.tracking; SEO defaults need seo.manage, and the route itself needs settings.read,
+         *     so content editors (seo.manage without settings.read) can't save them; retention (privacy)
+         *     needs the super-admin. Every change is audited with before and after, and announced as
+         *     `settings.updated`.
+         */
+        patch: operations["update_settings_group"];
         trace?: never;
     };
     "/api/v1/admin/site-visits": {
@@ -1602,13 +1691,14 @@ export interface paths {
         };
         /**
          * List Users
-         * @description Staff accounts, newest first. `q` matches name or email.
+         * @description Staff accounts, newest first. `q` matches name or email; `role` and `status` filter.
          */
         get: operations["list_users"];
         put?: never;
         /**
          * Create User
-         * @description Invite a staff member. They get a one-time setup link to choose their own password.
+         * @description Invite a staff member. They get a one-time setup link by email to choose their own
+         *     password. SECURITY: the link is never in this answer (or any other).
          */
         post: operations["create_user"];
         delete?: never;
@@ -1633,9 +1723,32 @@ export interface paths {
         head?: never;
         /**
          * Update User
-         * @description Edit name, email, phone, role or active state. Role changes sign the person out.
+         * @description Edit name, email, phone, role or active state (deactivate: `is_active: false`;
+         *     reactivate: `true`). Role changes and deactivation sign the person out.
          */
         patch: operations["update_user"];
+        trace?: never;
+    };
+    "/api/v1/admin/users/{id}/reset-2fa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove someone's two-factor (lost phone); signs them out everywhere
+         * @description Audited, and the person gets a security email. With the admin_2fa flag on, their next
+         *     sign-in asks them to set it up again. Not for your own account (409): My account turns it
+         *     off with your password and a code, which this route doesn't ask for.
+         */
+        post: operations["reset_user_two_factor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/users/{id}/revoke-sessions": {
@@ -1692,6 +1805,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/2fa/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn two-factor off (password and a code or recovery code) */
+        post: operations["two_factor_disable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/enrol": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forced set-up at sign-in, part 1: the key and QR code
+         * @description For `login`'s 202 with `step: setup` (the admin_2fa flag is on and this admin has no
+         *     two-factor yet). Each call makes a new key; only the newest one can be confirmed.
+         */
+        post: operations["two_factor_enrol_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/enrol/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forced set-up at sign-in, part 2: confirm a code, get recovery codes, sign in
+         * @description A right code turns two-factor on, starts the session (cookie) and returns the ten
+         *     recovery codes, shown only this once.
+         */
+        post: operations["two_factor_enrol_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/recovery-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** New recovery codes (a code or recovery code); the old ones stop working */
+        post: operations["two_factor_recovery_codes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn two-factor on, part 1 (needs your password)
+         * @description Admins and super-admins only (403 otherwise); 409 when it is already on.
+         */
+        post: operations["two_factor_setup_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/setup/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn two-factor on, part 2: confirm a code, get recovery codes
+         * @description Other sessions of this account are signed out. The codes are shown only this once.
+         */
+        post: operations["two_factor_setup_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign-in step 2: a code from the app, or a recovery code
+         * @description Completes the sign-in started by `login`'s 202 (`step: verify`): sets the session cookie
+         *     and clears the challenge cookie. A wrong code answers 401 and counts toward the lockout.
+         */
+        post: operations["two_factor_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -1703,7 +1953,9 @@ export interface paths {
         put?: never;
         /**
          * Login
-         * @description Sign in. Sets the session cookie; 5 failed attempts lock the account for 15 minutes.
+         * @description Sign in. 5 failed attempts (passwords or codes) lock the account for 15 minutes on that
+         *     network. With two-factor, a right password answers 202 and the session starts only after
+         *     the code (POST /auth/2fa/verify) or the forced set-up (/auth/2fa/enrol…).
          */
         post: operations["login"];
         delete?: never;
@@ -1741,7 +1993,7 @@ export interface paths {
         };
         /**
          * Me
-         * @description Current user, permissions and CSRF token.
+         * @description Current user, permissions, two-factor state and CSRF token.
          */
         get: operations["me"];
         put?: never;
@@ -1806,6 +2058,23 @@ export interface paths {
          * @description Set a new password with a reset or account-setup token. Signs out everywhere.
          */
         post: operations["password_reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dev-mail/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The newest message to an address (dev transport only; development and test) */
+        get: operations["dev_mail_latest"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1998,11 +2267,27 @@ export interface components {
             /** Min Sqm */
             min_sqm?: number | null;
         };
+        /**
+         * AuditActor
+         * @description `UserRef` plus the role the person has now (null for a removed account).
+         */
+        AuditActor: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role: ("super_admin" | "admin" | "sales" | "marketing" | "content_editor") | null;
+        };
         /** AuditEntry */
         AuditEntry: {
             /** Action */
             action: string;
-            actor: components["schemas"]["UserRef"] | null;
+            /** @description Null: done by the system (no person) */
+            actor: components["schemas"]["AuditActor"] | null;
             /** Changes */
             changes: {
                 [key: string]: unknown;
@@ -2018,7 +2303,10 @@ export interface components {
             entity_type: string;
             /** Id */
             id: number;
-            /** Ip */
+            /**
+             * Ip
+             * @description Masked: the first two parts of an IPv4 address (49.36.xxx.xxx) or the /32 of an IPv6 address. The full address is never stored.
+             */
             ip: string | null;
         };
         /** AuditList */
@@ -2239,6 +2527,33 @@ export interface components {
             /** Heading */
             heading?: string | null;
         };
+        /** CompanySettings */
+        CompanySettings: {
+            /**
+             * Brand Name
+             * @description The name visitors know
+             */
+            brand_name: string | null;
+            /**
+             * Corporate Address
+             * @description Shown in the footer and on the Contact page
+             */
+            corporate_address: string | null;
+            /**
+             * Gstin
+             * @description 15 characters; the last one is a check character
+             */
+            gstin: string | null;
+            /**
+             * Legal Name
+             * @description As registered, e.g. on the GST record
+             */
+            legal_name: string | null;
+            /** Registered Address */
+            registered_address: string | null;
+            /** Tagline */
+            tagline: string | null;
+        };
         /**
          * Configuration
          * @description A floor-plan type; a "property" on the public site (D-004).
@@ -2339,6 +2654,34 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * ConsentKindSummary
+         * @description One purpose (kind) for the consent-text screen: which version is current.
+         */
+        ConsentKindSummary: {
+            /** @description What the forms show now; null = none yet */
+            current: components["schemas"]["ConsentText"] | null;
+            /** Current Version */
+            current_version: number | null;
+            /**
+             * Has Unpublished Newer
+             * @description A version newer than the current one exists but isn't published
+             */
+            has_unpublished_newer: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "lead_form" | "marketing" | "brochure" | "cookies" | "chat";
+            /** Label */
+            label: string;
+            /** Latest Version */
+            latest_version: number | null;
+            /** Purpose */
+            purpose: string;
+            /** Versions */
+            versions: number;
+        };
         /** ConsentText */
         ConsentText: {
             /** Body */
@@ -2360,9 +2703,14 @@ export interface components {
             is_current: boolean;
             /**
              * Is Draft
-             * @description The wording still says it awaits the owner's approval (D-017). Production refuses to publish such a text.
+             * @description The wording still says it awaits the owner's approval (D-017). Production refuses to publish such a text. Same as is_draft_text (kept for the part 3 CMS).
              */
             is_draft: boolean;
+            /**
+             * Is Draft Text
+             * @description The wording still says it awaits the owner's approval (D-017), as on pages.
+             */
+            is_draft_text: boolean;
             /**
              * Kind
              * @enum {string}
@@ -2370,6 +2718,8 @@ export interface components {
             kind: "lead_form" | "marketing" | "brochure" | "cookies" | "chat";
             /** Published At */
             published_at: string | null;
+            /** @description Who first published this version (with published_at); null for seeded texts */
+            published_by: components["schemas"]["UserRef"] | null;
             /** Version */
             version: number;
         };
@@ -2447,6 +2797,45 @@ export interface components {
              * Format: date
              */
             update_date: string;
+        };
+        /** ContactSettings */
+        ContactSettings: {
+            /** Customer Care Email */
+            customer_care_email: string | null;
+            /** Customer Care Phone */
+            customer_care_phone: string | null;
+            /**
+             * Grievance Officer Name
+             * @description Named in the privacy notice (DPDP Act)
+             */
+            grievance_officer_name: string | null;
+            /**
+             * Office Hours
+             * @description E.g. Mon–Sat, 10:00–19:00
+             */
+            office_hours: string | null;
+            /**
+             * Privacy Email
+             * @description Where buyers ask to see, correct or erase their data
+             */
+            privacy_email: string | null;
+            /** Sales Email */
+            sales_email: string | null;
+            /**
+             * Sales Phone
+             * @description Stored as +91XXXXXXXXXX
+             */
+            sales_phone: string | null;
+            /**
+             * Whatsapp Message
+             * @description The opening message; {page} becomes the page the visitor is on
+             */
+            whatsapp_message: string | null;
+            /**
+             * Whatsapp Number
+             * @description Every WhatsApp button and the mobile bar
+             */
+            whatsapp_number: string | null;
         };
         /**
          * Cta
@@ -2565,6 +2954,35 @@ export interface components {
              */
             link: string;
         };
+        /** DevMail */
+        DevMail: {
+            /** Id */
+            id: string;
+            /**
+             * Links
+             * @description Every link in the message, in order
+             */
+            links: string[];
+            /**
+             * Sent At
+             * Format: date-time
+             */
+            sent_at: string;
+            /** Subject */
+            subject: string;
+            /**
+             * Template
+             * @description e.g. setup_link, reset_link, lead_alert, account_locked
+             */
+            template: string;
+            /**
+             * Text
+             * @description The plain-text version
+             */
+            text: string;
+            /** To */
+            to: string;
+        };
         /** DividerBlock */
         DividerBlock: {
             data: components["schemas"]["DividerData"];
@@ -2615,6 +3033,43 @@ export interface components {
             processed: number;
             /** Remaining */
             remaining: number;
+        };
+        /** EmailIntegration */
+        EmailIntegration: {
+            /** Failed Last 7 Days */
+            failed_last_7_days: number;
+            /**
+             * From Address
+             * @description EMAIL_FROM; the key itself is never shown
+             */
+            from_address: string | null;
+            /**
+             * Status
+             * @description connected: the key and sender are set (sending problems show in failed_last_7_days); not_configured: something is missing; dev: development mailbox, nothing is sent
+             * @enum {string}
+             */
+            status: "connected" | "not_configured" | "dev";
+            /**
+             * Transport
+             * @enum {string}
+             */
+            transport: "resend" | "dev";
+        };
+        /**
+         * EmailSettings
+         * @description The From address itself is the EMAIL_FROM environment variable.
+         */
+        EmailSettings: {
+            /**
+             * Reply To
+             * @description Where replies to alerts go
+             */
+            reply_to: string | null;
+            /**
+             * Sender Name
+             * @description Shown as the sender; empty = 'Empire CMS'
+             */
+            sender_name: string | null;
         };
         /** Faq */
         Faq: {
@@ -2746,6 +3201,13 @@ export interface components {
         };
         /** FeatureFlag */
         FeatureFlag: {
+            /**
+             * Can Switch
+             * @description Whether you can switch it now
+             */
+            can_switch: boolean;
+            /** Cannot Switch Reason */
+            cannot_switch_reason: string | null;
             /** Description */
             description: string;
             /** Enabled */
@@ -2756,9 +3218,13 @@ export interface components {
             is_public: boolean;
             /** Key */
             key: string;
+            /** Title */
+            title: string;
             /** Updated At */
             updated_at: string | null;
             updated_by: components["schemas"]["UserRef"] | null;
+            /** Who Can Switch */
+            who_can_switch: string;
         };
         /** FlagSwitch */
         FlagSwitch: {
@@ -2973,6 +3439,13 @@ export interface components {
             /** @enum {string} */
             role?: "gallery" | "floor_plan" | "brochure" | "rera_qr" | "video" | "document" | "hero" | "og_image";
             title?: string;
+        };
+        /** IntegrationsStatus */
+        IntegrationsStatus: {
+            crm: components["schemas"]["PlannedIntegration"];
+            email: components["schemas"]["EmailIntegration"];
+            webhooks: components["schemas"]["PlannedIntegration"];
+            whatsapp_alerts: components["schemas"]["PlannedIntegration"];
         };
         /** Lead */
         Lead: {
@@ -3361,6 +3834,38 @@ export interface components {
              */
             source: "project_form" | "contact_form" | "brochure" | "site_visit" | "campaign" | "chat" | "whatsapp" | "phone" | "manual";
         };
+        /**
+         * LeadRoutingSettings
+         * @description D-016 (leads/routing.py applies it): `single` → the person in `single_owner_user_id`, or
+         *     the sales inbox when empty; `round_robin` → in turn through `round_robin_user_ids` (empty:
+         *     every active sales user), skipping anyone in `round_robin_paused_user_ids`; `manual` →
+         *     unassigned until an admin assigns.
+         */
+        LeadRoutingSettings: {
+            /**
+             * Inbox Email
+             * @description Every new lead is emailed here; when empty, to every active super-admin
+             */
+            inbox_email: string | null;
+            /**
+             * Mode
+             * @default single
+             * @enum {string}
+             */
+            mode: "single" | "round_robin" | "manual";
+            /**
+             * Round Robin Paused User Ids
+             * @description In the list but out of rotation for now
+             */
+            round_robin_paused_user_ids: string[];
+            /**
+             * Round Robin User Ids
+             * @description The rotation, in order
+             */
+            round_robin_user_ids: string[];
+            /** Single Owner User Id */
+            single_owner_user_id: string | null;
+        };
         /** LeadStatusCounts */
         LeadStatusCounts: {
             /** Booked */
@@ -3739,6 +4244,11 @@ export interface components {
         /** Me */
         Me: {
             /**
+             * Can Use Two Factor
+             * @description This role may turn two-factor on (admin and super-admin).
+             */
+            can_use_two_factor: boolean;
+            /**
              * Created At
              * Format: date-time
              */
@@ -3752,9 +4262,17 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Invite Sent At
+             * @description When the newest setup link was sent (invited accounts only).
+             */
+            invite_sent_at?: string | null;
             /** Is Active */
             is_active: boolean;
-            /** Last Login At */
+            /**
+             * Last Login At
+             * @description Last completed sign-in (the board's 'Last sign-in').
+             */
             last_login_at?: string | null;
             /** Locked Until */
             locked_until?: string | null;
@@ -3765,10 +4283,31 @@ export interface components {
             /** Phone */
             phone?: string | null;
             /**
+             * Recovery Codes Left
+             * @description Unused recovery codes; null when two-factor is off.
+             */
+            recovery_codes_left: number | null;
+            /**
              * Role
              * @enum {string}
              */
             role: "super_admin" | "admin" | "sales" | "marketing" | "content_editor";
+            /**
+             * Status
+             * @description deactivated (is_active false), invited (no password set yet), locked (locked_until is in the future: locked from at least one network) or active.
+             * @enum {string}
+             */
+            status: "active" | "invited" | "locked" | "deactivated";
+            /**
+             * Two Factor Enabled
+             * @description Two-factor sign-in is set up and confirmed with a code.
+             */
+            two_factor_enabled: boolean;
+            /**
+             * Two Factor Required
+             * @description The admin_2fa flag is on and this role must use two-factor.
+             */
+            two_factor_required: boolean;
         };
         /**
          * Media
@@ -4385,6 +4924,11 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /** PasswordConfirm */
+        PasswordConfirm: {
+            /** Current Password */
+            current_password: string;
+        };
         /** PasswordForgot */
         PasswordForgot: {
             /**
@@ -4454,6 +4998,30 @@ export interface components {
             percent: number;
             /** Sort Order */
             sort_order?: number | null;
+        };
+        /**
+         * Permission
+         * @description One row of the role table: a permission, what it allows, and which roles have it.
+         */
+        Permission: {
+            /** Allows */
+            allows: string;
+            /** Group */
+            group: string;
+            /** Key */
+            key: string;
+            /** Roles */
+            roles: ("super_admin" | "admin" | "sales" | "marketing" | "content_editor")[];
+        };
+        /** PlannedIntegration */
+        PlannedIntegration: {
+            /** Note */
+            note: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "none" | "phase_6";
         };
         /** Post */
         Post: {
@@ -4652,6 +5220,17 @@ export interface components {
             rate_inr?: number | null;
             /** Rate Unit */
             rate_unit?: ("sqft" | "sqyd" | "sqm") | null;
+        };
+        /**
+         * PrivacySettings
+         * @description COMPLIANCE (module header): super-admin only, 1–10 years.
+         */
+        PrivacySettings: {
+            /**
+             * Lead Retention Years
+             * @default 3
+             */
+            lead_retention_years: number;
         };
         /**
          * Problem
@@ -5069,6 +5648,14 @@ export interface components {
              */
             type: "property_grid";
         };
+        /**
+         * RecoveryCodes
+         * @description Shown once. SECURITY: never stored in plain text; only keyed hashes are kept.
+         */
+        RecoveryCodes: {
+            /** Recovery Codes */
+            recovery_codes: string[];
+        };
         /** Redirect */
         Redirect: {
             /**
@@ -5157,6 +5744,63 @@ export interface components {
             status_code?: ("301" | "308") | null;
             /** To Path */
             to_path?: string | null;
+        };
+        /**
+         * RegulatorView
+         * @description The regulator group as the RERA section shows it (names spelled out, fixed fields).
+         */
+        RegulatorView: {
+            /**
+             * Authority
+             * @default UP-RERA
+             * @constant
+             */
+            authority: "UP-RERA";
+            /**
+             * Authority Name
+             * @default Uttar Pradesh Real Estate Regulatory Authority
+             */
+            authority_name: string;
+            /**
+             * Locked Fields
+             * @description Shown locked; a PATCH that changes them is refused (COMPLIANCE)
+             * @default [
+             *       "state",
+             *       "authority",
+             *       "website",
+             *       "show_rera_everywhere"
+             *     ]
+             */
+            locked_fields: string[];
+            /**
+             * Promoter Registration Number
+             * @description Only if Empire holds one
+             */
+            promoter_registration_number: string | null;
+            /**
+             * Show Rera Everywhere
+             * @description Always on (UP-RERA's advertising directions); can't be off
+             * @default true
+             * @constant
+             */
+            show_rera_everywhere: true;
+            /**
+             * State
+             * @default UP
+             * @constant
+             */
+            state: "UP";
+            /**
+             * State Name
+             * @default Uttar Pradesh
+             */
+            state_name: string;
+            /**
+             * Website
+             * @default https://www.up-rera.in
+             * @constant
+             */
+            website: "https://www.up-rera.in";
         };
         /** ReorderRequest */
         ReorderRequest: {
@@ -5254,6 +5898,41 @@ export interface components {
             name: string;
             /** Permissions */
             permissions: string[];
+            /**
+             * Summary
+             * @description What the role is for, in a sentence (the role table)
+             */
+            summary: string;
+            /**
+             * User Count
+             * @description Active accounts with this role
+             */
+            user_count: number;
+        };
+        /** RotationRow */
+        RotationRow: {
+            /**
+             * Can Own
+             * @description Active, own password set, role can open leads
+             */
+            can_own: boolean;
+            /** Gets Next */
+            gets_next: boolean;
+            /**
+             * In Rotation
+             * @description False: paused, or can't be given leads now
+             */
+            in_rotation: boolean;
+            /** Open Leads */
+            open_leads: number;
+            /**
+             * Position
+             * @description 1 = first in the rotation
+             */
+            position: number;
+            /** Role */
+            role: ("super_admin" | "admin" | "sales" | "marketing" | "content_editor") | null;
+            user: components["schemas"]["UserRef"];
         };
         /** Seo */
         Seo: {
@@ -5270,6 +5949,21 @@ export interface components {
             og_image_id?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /** SeoDefaultsSettings */
+        SeoDefaultsSettings: {
+            /** Default Description */
+            default_description: string | null;
+            /**
+             * Default Title
+             * @description Used when a page has no title of its own
+             */
+            default_title: string | null;
+            /**
+             * Title Suffix
+             * @description Added after every page title, e.g. ' · Empire'
+             */
+            title_suffix: string | null;
         };
         /**
          * SeoWarning
@@ -5289,6 +5983,52 @@ export interface components {
             field: string;
             /** Message */
             message: string;
+        };
+        /** SettingsGroupMeta */
+        SettingsGroupMeta: {
+            /**
+             * Can Edit
+             * @description Whether you can change it
+             */
+            can_edit: boolean;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "company" | "contacts" | "social" | "tracking" | "lead_routing" | "seo_defaults" | "regulator" | "email" | "privacy";
+            /** Label */
+            label: string;
+            /**
+             * Permission
+             * @description What changing this group needs
+             */
+            permission: string;
+            /** Super Admin Only */
+            super_admin_only: boolean;
+            /** Updated At */
+            updated_at: string | null;
+            updated_by: components["schemas"]["UserRef"] | null;
+        };
+        /**
+         * SettingsOverview
+         * @description Every group (typed), plus read-only blocks: per-group meta, the round-robin table and
+         *     the integrations status. Contract change: the contract's free-form map, typed.
+         */
+        SettingsOverview: {
+            company: components["schemas"]["CompanySettings"];
+            contacts: components["schemas"]["ContactSettings"];
+            email: components["schemas"]["EmailSettings"];
+            /** Groups */
+            groups: components["schemas"]["SettingsGroupMeta"][];
+            integrations: components["schemas"]["IntegrationsStatus"];
+            /** Lead Rotation */
+            lead_rotation: components["schemas"]["RotationRow"][];
+            lead_routing: components["schemas"]["LeadRoutingSettings"];
+            privacy: components["schemas"]["PrivacySettings"];
+            regulator: components["schemas"]["RegulatorView"];
+            seo_defaults: components["schemas"]["SeoDefaultsSettings"];
+            social: components["schemas"]["SocialSettings"];
+            tracking: components["schemas"]["TrackingSettings"];
         };
         /** SiteVisit */
         SiteVisit: {
@@ -5437,6 +6177,17 @@ export interface components {
             notes?: string | null;
             /** Status */
             status?: ("requested" | "confirmed" | "completed" | "no_show" | "cancelled") | null;
+        };
+        /** SocialSettings */
+        SocialSettings: {
+            /** Facebook */
+            facebook: string | null;
+            /** Instagram */
+            instagram: string | null;
+            /** Linkedin */
+            linkedin: string | null;
+            /** Youtube */
+            youtube: string | null;
         };
         /** SourceCount */
         SourceCount: {
@@ -5841,6 +6592,21 @@ export interface components {
             units_count?: number | null;
         };
         /**
+         * TrackingSettings
+         * @description Stored only. Nothing loads on the website until the consent banner (Phase 6), and then
+         *     each tag only after the visitor accepts the matching cookie choice.
+         */
+        TrackingSettings: {
+            /** Ga4 Id */
+            ga4_id: string | null;
+            /** Google Ads Id */
+            google_ads_id: string | null;
+            /** Gtm Id */
+            gtm_id: string | null;
+            /** Meta Pixel Id */
+            meta_pixel_id: string | null;
+        };
+        /**
          * Translations
          * @description Per-locale overlay of translatable fields, e.g. {"hi": {"name": "…"}}. English lives in
          *     the base fields and missing translations fall back to it (D-014).
@@ -5849,6 +6615,96 @@ export interface components {
             [key: string]: {
                 [key: string]: string;
             };
+        };
+        /**
+         * TwoFactorChallenge
+         * @description 202 from `login`: the password was right, but there is a second step (no session yet).
+         *     The `__Host-empire_2fa` cookie (HttpOnly, 5 minutes) carries the challenge.
+         */
+        TwoFactorChallenge: {
+            /** Email */
+            email: string;
+            /** Expires In Seconds */
+            expires_in_seconds: number;
+            /**
+             * Status
+             * @default two_factor_required
+             * @constant
+             */
+            status: "two_factor_required";
+            /**
+             * Step
+             * @description verify: enter a code (POST /auth/2fa/verify). setup: two-factor must be set up now (POST /auth/2fa/enrol, then /auth/2fa/enrol/confirm).
+             * @enum {string}
+             */
+            step: "verify" | "setup";
+        };
+        /**
+         * TwoFactorCode
+         * @description A 6-digit code from the authenticator app.
+         */
+        TwoFactorCode: {
+            /** Code */
+            code: string;
+        };
+        /** TwoFactorDisable */
+        TwoFactorDisable: {
+            /** Code */
+            code?: string | null;
+            /** Current Password */
+            current_password: string;
+            /** Recovery Code */
+            recovery_code?: string | null;
+        };
+        /**
+         * TwoFactorEnrolled
+         * @description The forced set-up at sign-in is done: recovery codes (shown once) and the session.
+         */
+        TwoFactorEnrolled: {
+            me: components["schemas"]["Me"];
+            /** Recovery Codes */
+            recovery_codes: string[];
+        };
+        /**
+         * TwoFactorProof
+         * @description Exactly one: a code from the app, or one of the recovery codes.
+         */
+        TwoFactorProof: {
+            /** Code */
+            code?: string | null;
+            /** Recovery Code */
+            recovery_code?: string | null;
+        };
+        /**
+         * TwoFactorSetup
+         * @description Shown once while setting two-factor up. SECURITY: holds the secret; never cached.
+         */
+        TwoFactorSetup: {
+            /**
+             * Digits
+             * @default 6
+             */
+            digits: number;
+            /**
+             * Otpauth Uri
+             * @description otpauth://totp/… for apps that open links
+             */
+            otpauth_uri: string;
+            /**
+             * Period Seconds
+             * @default 30
+             */
+            period_seconds: number;
+            /**
+             * Qr Svg Data Url
+             * @description data:image/svg+xml QR code of otpauth_uri
+             */
+            qr_svg_data_url: string;
+            /**
+             * Secret
+             * @description The key to type into the app, in groups of four
+             */
+            secret: string;
         };
         /** UploadConfirm */
         UploadConfirm: {
@@ -5929,7 +6785,7 @@ export interface components {
         };
         /**
          * User
-         * @description `User` in the design contract.
+         * @description `User` in the design contract, plus status and two-factor (part 5).
          */
         User: {
             /**
@@ -5944,9 +6800,17 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Invite Sent At
+             * @description When the newest setup link was sent (invited accounts only).
+             */
+            invite_sent_at?: string | null;
             /** Is Active */
             is_active: boolean;
-            /** Last Login At */
+            /**
+             * Last Login At
+             * @description Last completed sign-in (the board's 'Last sign-in').
+             */
             last_login_at?: string | null;
             /** Locked Until */
             locked_until?: string | null;
@@ -5959,6 +6823,17 @@ export interface components {
              * @enum {string}
              */
             role: "super_admin" | "admin" | "sales" | "marketing" | "content_editor";
+            /**
+             * Status
+             * @description deactivated (is_active false), invited (no password set yet), locked (locked_until is in the future: locked from at least one network) or active.
+             * @enum {string}
+             */
+            status: "active" | "invited" | "locked" | "deactivated";
+            /**
+             * Two Factor Enabled
+             * @description Two-factor sign-in is set up and confirmed with a code.
+             */
+            two_factor_enabled: boolean;
         };
         /** UserInput */
         UserInput: {
@@ -6446,11 +7321,19 @@ export interface operations {
     audit_log: {
         parameters: {
             query?: {
+                /** @description One person */
                 actor_id?: string | null;
+                /** @description Only entries made by the system (no person) */
+                system?: boolean;
                 entity_type?: string | null;
                 entity_id?: string | null;
+                /** @description Exact action */
                 action?: string | null;
+                /** @description Actions starting with this, e.g. auth. or user. */
+                action_prefix?: string | null;
+                /** @description First IST day */
                 from?: string | null;
+                /** @description Last IST day (inclusive) */
                 to?: string | null;
                 page?: number;
                 per_page?: number;
@@ -6859,6 +7742,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConsentText"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    consent_text_kinds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentKindSummary"][];
                 };
             };
             /** @description Not signed in */
@@ -10098,6 +11037,71 @@ export interface operations {
             };
             /** @description Not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_permissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Permission"][];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13492,6 +14496,146 @@ export interface operations {
             };
         };
     };
+    get_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOverview"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_settings_group: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group: "company" | "contacts" | "social" | "tracking" | "lead_routing" | "seo_defaults" | "regulator" | "email" | "privacy";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_site_visits: {
         parameters: {
             query?: {
@@ -13873,6 +15017,8 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
+                role?: ("super_admin" | "admin" | "sales" | "marketing" | "content_editor") | null;
+                status?: ("active" | "invited" | "locked" | "deactivated") | null;
                 page?: number;
                 per_page?: number;
             };
@@ -14145,6 +15291,71 @@ export interface operations {
             };
         };
     };
+    reset_user_two_factor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     revoke_user_sessions: {
         parameters: {
             query?: never;
@@ -14340,6 +15551,546 @@ export interface operations {
             };
         };
     };
+    two_factor_disable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorDisable"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    two_factor_enrol_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorSetup"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    two_factor_enrol_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorCode"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorEnrolled"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    two_factor_recovery_codes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorProof"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodes"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    two_factor_setup_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorSetup"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    two_factor_setup_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorCode"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodes"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    two_factor_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorProof"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -14360,6 +16111,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description Password right; a two-factor step comes next (no session yet). Sets the __Host-empire_2fa cookie (HttpOnly, SameSite=Strict, 5 minutes). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorChallenge"];
                 };
             };
             /** @description Not signed in */
@@ -14675,6 +16435,47 @@ export interface operations {
             };
             /** @description Too many requests */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    dev_mail_latest: {
+        parameters: {
+            query: {
+                to: string;
+                template?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevMail"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

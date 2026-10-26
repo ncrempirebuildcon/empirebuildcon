@@ -27,6 +27,7 @@ from empire_api.leads import routes as lead_routes
 from empire_api.leads import routes_public as lead_public_routes
 from empire_api.leads import routes_visits as lead_visit_routes
 from empire_api.logs import configure_logging
+from empire_api.mail import routes_dev as mail_dev_routes
 from empire_api.media import routes as media_routes
 from empire_api.media import routes_dev as media_dev_routes
 from empire_api.middleware.edge_guard import EdgeGuardMiddleware
@@ -38,7 +39,7 @@ from empire_api.projects import routes as project_routes
 from empire_api.projects import routes_catalogue, routes_children
 from empire_api.seo import routes as seo_routes
 from empire_api.site_settings import routes as settings_routes
-from empire_api.users import routes_admin, routes_auth
+from empire_api.users import routes_admin, routes_auth, routes_two_factor
 
 _DESCRIPTION = (
     "Empire website and CMS API. The browser calls `/api/*` on the site and Next.js forwards "
@@ -68,6 +69,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     for router in (
         health.router,
         routes_auth.router,
+        routes_two_factor.router,
         routes_admin.router,
         settings_routes.router,
         project_routes.router,
@@ -90,6 +92,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # SECURITY: the fake store's file and upload routes exist only while it is active,
         # which config.py refuses in staging and production (D-033).
         app.include_router(media_dev_routes.router)
+    if settings.email_transport_kind == "dev" and settings.app_env in ("development", "test"):
+        # SECURITY: the dev mailbox shows setup and reset links to anyone who asks, so it
+        # exists only with the dev transport (refused in staging and production by config.py)
+        # AND in development or test (mail/routes_dev.py).
+        app.include_router(mail_dev_routes.router)
 
     if settings.cors_origins:
         app.add_middleware(

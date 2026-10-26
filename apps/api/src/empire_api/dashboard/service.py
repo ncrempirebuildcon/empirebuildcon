@@ -1,8 +1,8 @@
 """The dashboard: counts that link to filtered lists, the latest leads, upcoming visits and tasks
 (ARCHITECTURE §8 "dashboard counts link to the filtered inbox").
 
-Collaborators: leads/queries.py, projects/queries.py, media/queries.py, content/consent.py;
-dashboard/routes.py (HTTP).
+Collaborators: leads/queries.py, projects/queries.py, media/queries.py, content/consent.py,
+mail/status.py (emails that couldn't be sent); dashboard/routes.py (HTTP).
 Implements: ARCHITECTURE §8, §11 (each part is shown only to roles that can open it), D-015
 (warn while sample data exists), D-017 (consent wording awaiting approval), D-002 (RERA QR).
 
@@ -31,6 +31,7 @@ from empire_api.leads import queries as lead_queries
 from empire_api.leads.access import Staff
 from empire_api.leads.filters import LeadFilters
 from empire_api.leads.visits import VisitFilters
+from empire_api.mail import status as mail_status
 from empire_api.media import queries as media_queries
 from empire_api.projects import queries as project_queries
 from empire_api.projects.blockers import RERA_QR_MISSING
@@ -41,6 +42,7 @@ UPCOMING: Final = 5
 SOURCE_DAYS: Final = 30
 MAX_TASKS: Final = 20
 CONSENT_LINK: Final = "/admin/settings?tab=consent"
+EMAIL_LINK: Final = "/admin/settings?tab=integrations"
 
 
 def _plural(count: int, one: str, many: str) -> str:
@@ -149,6 +151,22 @@ def _consent_tasks(db: Session) -> list[DashboardTask]:
     return tasks
 
 
+def _email_tasks(db: Session) -> list[DashboardTask]:
+    """Emails that went dead (mail/status.py). COMPLIANCE: a count only, nobody named."""
+    failed = mail_status.failed_emails(db)
+    if not failed:
+        return []
+    return [
+        DashboardTask(
+            key="email.failed",
+            label=_plural(failed, "email", "emails") + " couldn't be sent",
+            detail="In the last 7 days. Lead alerts, password links or security notices may "
+            "not have arrived. Check the email status under Settings → Integrations.",
+            link=EMAIL_LINK,
+        )
+    ]
+
+
 def _project_tasks(
     db: Session, blocked: list[project_queries.BlockedProject], staff: Staff
 ) -> list[DashboardTask]:
@@ -207,6 +225,8 @@ def dashboard(db: Session, staff: Staff) -> Dashboard:
         tasks += _project_tasks(db, blocked, staff)
     if staff.can("legal.publish"):
         tasks = _consent_tasks(db) + tasks
+    if staff.can("integrations.manage"):
+        tasks = _email_tasks(db) + tasks
     today = today_ist()
     latest = lead_queries.latest_leads(db, staff, LATEST) if reads_leads else []
     upcoming = (

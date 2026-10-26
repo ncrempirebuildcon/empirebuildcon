@@ -21,6 +21,7 @@ INVARIANT: each write commits once, together with its audit row and event.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from typing import Final
 
 from sqlalchemy import func, select, text, update
@@ -28,7 +29,7 @@ from sqlalchemy.orm import Session
 
 from empire_api.config import get_settings
 from empire_api.content.models import ConsentText
-from empire_api.content.vocab import DRAFT_MARK, ConsentKind
+from empire_api.content.vocab import CONSENT_KINDS, DRAFT_MARK, ConsentKind
 from empire_api.errors import ApiProblem
 from empire_api.platform import audit, outbox
 from empire_api.projects.common import Actor
@@ -65,6 +66,30 @@ DRAFT_TEXTS: Final[dict[str, tuple[str, str]]] = {
 def is_draft(row: ConsentText) -> bool:
     """COMPLIANCE (D-017): the wording still says it awaits the owner's approval."""
     return "[draft" in f"{row.body}\n{row.checkbox_label}".lower()
+
+
+@dataclass(frozen=True)
+class KindSummary:
+    """One purpose's state for the CMS (part 5): its current text and its versions."""
+
+    kind: str
+    current: ConsentText | None
+    versions: int
+    latest: ConsentText | None
+
+
+def kinds_summary(db: Session) -> list[KindSummary]:
+    """Every purpose (kind), even those with no text yet, in CONSENT_KINDS order."""
+    found = []
+    for kind in CONSENT_KINDS:
+        texts = list_texts(db, kind)
+        current = next((t for t in texts if t.is_current), None)
+        found.append(
+            KindSummary(
+                kind=kind, current=current, versions=len(texts), latest=texts[0] if texts else None
+            )
+        )
+    return found
 
 
 def list_texts(db: Session, kind: ConsentKind | None = None) -> list[ConsentText]:
@@ -123,8 +148,8 @@ def publish(db: Session, text_id: uuid.UUID, actor: Actor) -> ConsentText:
       1. Lock the kind (advisory) and the row, so two publishes can't both end up current.
       2. In production, refuse a text that still carries the draft mark (D-017).
       3. Clear the previous current text of the kind, then mark this one current; set
-         `published_at` on its first publish only. Audit and `consent_text.published` commit
-         with it.
+         `published_at` and `published_by` on its first publish only. Audit and
+         `consent_text.published` commit with it.
     """
     row = db.get(ConsentText, text_id, with_for_update=True, populate_existing=True)
     if row is None:
@@ -143,7 +168,9 @@ def publish(db: Session, text_id: uuid.UUID, actor: Actor) -> ConsentText:
     )
     db.flush()
     row.is_current = True
-    row.published_at = row.published_at or utcnow()
+    if row.published_at is None:
+        row.published_at = utcnow()
+        row.published_by = actor.user_id
     db.flush()
     audit.record(
         db,

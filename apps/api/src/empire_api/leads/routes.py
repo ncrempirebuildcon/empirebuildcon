@@ -17,12 +17,13 @@ import uuid
 from datetime import date
 from typing import Annotated, Final
 
-from fastapi import APIRouter, Depends, Path, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Path, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from empire_api.db import get_db
 from empire_api.errors import ApiProblem, problem_responses
+from empire_api.integrations.outbox_drain import drain_soon
 from empire_api.leads import erasure, export, present, service
 from empire_api.leads.access import Staff, load_lead
 from empire_api.leads.filters import GENERAL, ME, UNASSIGNED, LeadFilters
@@ -239,10 +240,16 @@ def get_lead(lead_id: LeadId, actor: Reader, request: Request, db: Db) -> Lead:
     **staff("leads.update", write=True),
 )
 def update_lead(
-    lead_id: LeadId, body: LeadUpdate, actor: Updater, request: Request, db: Db
+    lead_id: LeadId,
+    body: LeadUpdate,
+    actor: Updater,
+    request: Request,
+    background: BackgroundTasks,
+    db: Db,
 ) -> Lead:
     viewer = Staff.of(actor, request)
     service.update_lead(db, viewer, lead_id, body)
+    drain_soon(background)  # a new owner gets their email now, not at the next sweep
     return _one(db, lead_id, viewer)
 
 
@@ -350,7 +357,8 @@ def lead_activity(lead_id: LeadId, actor: Reader, request: Request, db: Db) -> l
     response_model=list[LeadOwner],
     operation_id="list_lead_owners",
     summary="People a lead can be assigned to",
-    description="Active accounts whose role can open leads. Contract addition (Phase 4 part 3).",
+    description="Active accounts that have set their password (not just invited) and whose "
+    "role can open leads. Contract addition (Phase 4 part 3).",
     **staff("leads.read"),
 )
 def list_lead_owners(actor: Reader, db: Db) -> list[LeadOwner]:

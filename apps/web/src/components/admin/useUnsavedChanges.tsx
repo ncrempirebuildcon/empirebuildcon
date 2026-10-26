@@ -6,7 +6,8 @@
  *   1. Closing the tab, reloading or typing a new address: the browser's own "Leave site?"
  *      prompt, through `beforeunload` (browsers ignore custom text there).
  *   2. Clicking a link inside the CMS: the click is held and our ConfirmDialog asks
- *      "Leave without saving?"; "Leave" continues to the link.
+ *      "Leave without saving?"; "Leave" continues to the link. Downloads and blob:, mailto: and
+ *      tel: links pass through: they don't leave the page.
  *   3. Sign out (a button, not a link): the shell is told through `setUnsaved` and asks too.
  *   4. A screen that moves on by itself (e.g. "Mark unread" back to the inbox, or picking another
  *      visit on the calendar) calls `leave(href)`: with changes it asks the same question first;
@@ -40,7 +41,11 @@ export function useUnsavedChanges(dirty: boolean) {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = (event.target as Element | null)?.closest?.("a[href]");
       if (!(anchor instanceof HTMLAnchorElement) || anchor.target === "_blank") return;
+      // WHY: a download (`<a download>`, e.g. recovery codes as a text file) and blob:, mailto:
+      // or tel: links don't leave the page, so nothing typed is lost.
+      if (anchor.hasAttribute("download")) return;
       const url = new URL(anchor.href, window.location.href);
+      if (url.protocol !== "http:" && url.protocol !== "https:") return;
       if (url.origin !== window.location.origin) return;
       // Same page (e.g. "#main" skip link): nothing is lost.
       if (url.pathname === window.location.pathname && url.search === window.location.search)

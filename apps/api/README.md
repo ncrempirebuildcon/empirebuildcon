@@ -14,7 +14,9 @@ apps/api/
 │                          0002_catalogue = projects, their children, cities, localities, amenities,
 │                          0003_media = media library, upload intents, media links,
 │                          0004_leads = consent texts, leads, consent records, notes, timeline,
-│                          site visits)
+│                          site visits, 0005_content = pages, blocks, posts, FAQs, offers,
+│                          testimonials, redirects, 0006_settings_auth = two-factor, sign-in
+│                          challenges, the sent-mail log, consent_text.published_by)
 ├─ scripts/                make_common_passwords.py (regenerates the weak-password list)
 ├─ src/empire_api/
 │  ├─ main.py              create_app(): routers, middleware, error handlers, OpenAPI tweaks
@@ -26,7 +28,26 @@ apps/api/
 │  ├─ middleware/          trailing-slash strip (no redirects), request id, security headers
 │  ├─ platform/            audit log, outbox writer, PostgreSQL rate limits, crypto helpers
 │  ├─ users/               sign-in, sessions, CSRF, passwords, roles matrix, staff admin
-│  ├─ site_settings/       feature flags, default settings groups
+│  │  ├─ sign_in.py        the password step and the two-factor step or forced set-up after it
+│  │  ├─ lockout.py        D-027 counting (passwords AND codes, per account and network)
+│  │  ├─ totp.py           our own RFC 6238 codes; two_factor.py = set-up, proofs, recovery
+│  │  │                    codes, reset; my_account.py = the signed-in two-factor operations;
+│  │  │                    qr.py = the set-up QR (segno); two_factor_cookie.py = __Host-empire_2fa
+│  │  ├─ routes_auth.py, routes_two_factor.py, routes_admin.py   HTTP only
+│  │  ├─ audit_log.py      the audit-log reader (filters, IST days, masked IPs); present.py
+│  │  ├─ role_docs.py      plain-English wording for the role table (roles.py is the matrix)
+│  │  └─ seed.py           four "Sample …" accounts for `seed --sample` (dev/test, invited only)
+│  ├─ site_settings/       settings groups and feature flags (Phase 4 part 5)
+│  │  ├─ groups.py         one strict model per group and who may change it; fields.py = GSTIN,
+│  │  │                    phones, social hosts, tracking ids, sender name
+│  │  ├─ service.py        read typed, update one group (permission, checks, audit, event)
+│  │  ├─ flags.py          flags, their titles and the one switching rule (admin_2fa)
+│  │  └─ routes.py         /admin/settings, /admin/settings/{group}, /admin/flags
+│  ├─ mail/                email (Phase 4 part 5, D-007): transport.py (interface), resend.py
+│  │  │                    (httpx, no SDK), dev.py (dev mailbox, never sends), templates.py,
+│  │  │                    brand.py (company lines from Settings), delivery.py (once per
+│  │  │                    recipient), handlers.py (who gets what), status.py, models.py
+│  │  └─ routes_dev.py     GET /api/v1/dev-mail/latest (dev transport in development/test only)
 │  ├─ projects/            projects, towers, configurations, … and the catalogue (Phase 4)
 │  │  ├─ models.py         tables (0002_catalogue); vocab.py = the allowed values (enums)
 │  │  ├─ schemas*.py       request/response shapes: shared values, project, children, catalogue
@@ -118,8 +139,10 @@ uv run empire-api seed                         # flags, settings, amenity catalo
                                                #   also the DRAFT consent texts, current
 uv run empire-api seed --sample                # + "Sample — Project A/B" (dev/demo only; refused in production),
                                                #   SAMPLE placeholder tiles in their photos (fake store only)
-                                               #   12 "Sample Lead N" leads with 4 site visits, and a
-                                               #   SAMPLE post, offer and FAQs (never a testimonial)
+                                               #   12 "Sample Lead N" leads with 4 site visits, a
+                                               #   SAMPLE post, offer and FAQs (never a testimonial),
+                                               #   and 4 "Sample …" staff accounts (dev/test; invited,
+                                               #   no password, no email)
 uv run uvicorn empire_api.main:app --reload    # API on http://localhost:8000 (docs at /api/docs)
 uv run empire-worker                           # optional: worker loop (schedule tick + drain + daily clean-up)
 
@@ -130,10 +153,13 @@ uv export --frozen --no-emit-project --all-groups -o /tmp/req.txt && uv run pip-
 
 uv run empire-api gen-secrets                  # fresh values for YOUR local .env
 uv run empire-api create-superadmin --email admin@empirebuildcon.com   # once per environment
+uv run empire-api reset-two-factor --email someone@empirebuildcon.com   # break-glass: lost phone AND recovery codes
 uv run empire-api openapi --out ../../packages/api-client/openapi.json  # after changing routes
 ```
 
-`create-superadmin` prints a one-time setup link (24 hours). Nobody ever types a password for someone else; staff invited from the CMS get the same kind of link.
+`create-superadmin` prints a one-time setup link (24 hours). Nobody ever types a password for someone else; staff invited from the CMS get the same kind of link, by email only (the API never returns it).
+
+`reset-two-factor` is for when nobody can sign in to use the CMS's "Reset two-factor" (the only super-admin lost both their phone and their recovery codes). It needs shell access to the server, is audited without an actor, signs the account out everywhere and queues the security email.
 
 ## Tests
 
@@ -149,12 +175,22 @@ Important guards:
 - `test_erasure_leaves_a_stub_and_nothing_personal_anywhere` scans every table for the erased person's details.
 - The part 4 review fixes have their regression tests next to the feature: `tests/test_seo_redirects.py` (no `//host` targets, case-insensitive reserved paths, query kept when a chain collapses, no redirect from a live address), `tests/test_content_legal.py` (scheduled legal pages need `legal.publish`, no DRAFT text on a live legal page in production, required pages), `tests/test_content_edits.py` (stale saves, `canonical_path`, HTML and limits in SEO and translations), `tests/test_content_references.py` (FOR SHARE reads, project delete refused while content names it), `tests/test_content_schedule.py` (a stale `publish_at` never brings a page back) and `tests/test_content_media_use.py` (relabel events, labels on covers and offer images, testimonial initials).
 - `tests/test_leads_review_privacy.py` and `tests/test_leads_review_rules.py` hold the regression tests from the part 3 review: duplicate links never name another owner's lead, erasure leaves no free text (scanned across every table) and covers the duplicate group or the whole person, the export audit keeps no search text, the export needs `X-CSRF-Token`, an IPv6 /64 is one network for every limit, editing a confirmed visit doesn't move its lead again, every dashboard count equals the total of the list its link opens, BHK is in half steps, and "fancy" numbers operators sell (99999 99999, 98765 43210) stay accepted.
-- `test_dev_media_routes_exist_only_with_the_fake_store` fails if the fake store's routes could exist with the real store.
+- `test_dev_media_routes_exist_only_with_the_fake_store` fails if the fake store's routes could exist with the real store, and `test_the_dev_mailbox_exists_only_with_the_dev_transport_in_dev_or_test` does the same for `/api/v1/dev-mail/latest`.
+- Part 5 (settings, users, two-factor, email):
+  - `tests/test_two_factor.py`: the RFC 6238 Appendix B vectors, replay refusal (each 30-second step once), the 202 second step and its cookie, single use, expiry and network binding, lockout on wrong codes (a right password doesn't reset the counter), forced set-up with the flag on, recovery codes, turning it off, the super-admin's reset and the break-glass CLI, the `admin_2fa` rule, and no secret, code or token in logs, audit rows or events.
+  - `tests/test_mail_transport.py`: Resend's request shape and headers against a mocked httpx, retried versus permanent failures, a stable idempotency key, a retry reaching only the people not yet reached, the dev mailbox, and the staging/production configuration rules.
+  - `tests/test_mail_handlers.py`: every email event's handler, `alert: false` sends nothing, no full phone, email or message in any lead email, links never logged, dead links and inactive accounts skipped, the lock notice once an hour, and the dashboard's "emails couldn't be sent".
+  - `tests/test_settings.py`: every group's rules and permissions (marketing.tracking, seo.manage, super-admin for retention), the fixed RERA fields, lead routing checks, audit diffs and the integrations block without the key.
+  - `tests/test_settings_contract.py`: the Auth, Settings and Users operations against the design contract, with the additions and the one changed permission listed.
+  - `tests/test_part5_review_fixes.py`: the part 5 review's findings (M1–L11), each named: open sign-in challenges die with the sessions and with a password change, the password-change endpoint counts on the lockout, a rotation member who left never blocks saving, only the newest setup/reset link works, switching `admin_2fa` on signs out admins without two-factor, the database refuses UPDATE/DELETE on `audit_log`, and link tokens travel in the URL fragment.
+  - `tests/test_lead_owners_and_reset_quota.py`: invited (and deactivated) accounts are never given leads on any path, and password-reset requests are capped at 5 per email per UTC day on top of 3 an hour, with identical answers for real and unknown emails.
 - `tests/test_display.py` runs the same money and area vectors as `packages/ui/test/format.test.ts`; change both together.
 
 Fixtures worth knowing (tests/conftest.py):
 - `no_network` (automatic): the maps resolver's real HTTP client fails any test that reaches it. Short-link tests inject a fake client (`httpx.MockTransport`).
 - `no_network` also replaces the Cloudinary SDK's HTTP clients with ones that fail the test. Cloudinary-store tests replace the SDK functions (`cloudinary.uploader.upload`, `cloudinary.api.resource`, …) instead.
+- `no_network` also makes the Resend transport's default httpx client fail the test; transport tests pass a client with `httpx.MockTransport`. Email in tests goes to the dev transport in a temporary `MAIL_DEV_DIR`, emptied before each test; `two_factor_support.mail_to(address)` drains the outbox and reads it.
+- `two_factor_support.use_clock(monkeypatch)`: the two-factor module's clock, so a test can move to the next 30-second step (a code is accepted once per step).
 - Media tests run on the fake store (no `CLOUDINARY_URL`), writing to a temporary `MEDIA_DEV_DIR`.
 - `qr_present`: pretends every project has its RERA QR image, for publish tests that aren't about media. `tests/test_media_projects.py` uploads a real QR through the fake store instead.
 - `texts`: the draft lead-form and marketing consent texts, current, as `empire-api seed` makes them in development; returns `{kind: {id, version}}` for the public form bodies (`tests/leads_support.py` builds them).
@@ -207,15 +243,27 @@ All settings are environment variables. They are listed in the repo's `.env.exam
 | `CLOUDINARY_URL` | empty | `cloudinary://<api_key>:<api_secret>@<cloud_name>`. Required in staging and production. The secret stays on the server; only the cloud name and API key reach the browser, inside an upload signature (SECURITY.md §7). |
 | `MEDIA_STORE` | empty | `cloudinary` or `fake`. Empty: `cloudinary` when `CLOUDINARY_URL` is set, otherwise `fake`. Staging and production refuse `fake`. |
 | `MEDIA_DEV_DIR` | `apps/api/.media-dev/` | Where the fake store keeps files (git-ignored). Served at `/api/v1/dev-media/files/…`, which exists only while the fake store is active, as does its Cloudinary-shaped `/api/v1/dev-media/upload/{resource_type}`. |
+| `EMAIL_API_KEY` | empty | The Resend API key. Required in staging and production. Sent only to `api.resend.com` in the Authorization header; never logged, stored or returned (Settings shows "set in the server environment"). |
+| `EMAIL_FROM` | empty | The plain sender address (no display name; that comes from the `email` settings group) on a domain verified at Resend. Required in staging and production. |
+| `EMAIL_TRANSPORT` | empty | `resend` or `dev`. Empty: `resend` when `EMAIL_API_KEY` is set, otherwise `dev`. Staging and production refuse `dev`. |
+| `MAIL_DEV_DIR` | `apps/api/.mail-dev/` | Where the dev transport keeps messages as JSON (git-ignored; they hold setup and reset links). `GET /api/v1/dev-mail/latest?to=<email>` reads the newest one; it exists only with the dev transport and `APP_ENV` development or test. |
 | `DB_POOL_SIZE` | `5` | Connections per process |
 | `WORKER_DRAIN_INTERVAL_SECONDS` | `30` | Tick length of `empire-worker` |
 
-Lead settings live in the database (`setting` rows), not in the environment, until the Settings screen arrives in part 5:
-- `lead_routing`: `mode` is `single` (default: the sales inbox, or the person in `single_owner_user_id`), `round_robin` (the people in `round_robin_user_ids`, or every active sales user when empty) or `manual`. The round-robin turn is kept in `system.lead_round_robin`.
-- `privacy.lead_retention_years` (default 3): the daily clean-up anonymises leads with no activity for that long (SECURITY.md §8).
+Business settings live in the database (`setting` rows, one per group), edited in the CMS's Settings screen (`/admin/settings`); `site_settings/groups.py` lists every group's fields and who may change it. Two that the API itself acts on:
+- `lead_routing`: `mode` is `single` (default: the sales inbox, or the person in `single_owner_user_id`), `round_robin` (the people in `round_robin_user_ids`, or every sales user who can sign in when empty, skipping `round_robin_paused_user_ids`) or `manual`. Only accounts that are active, have set their own password (not just invited) and can open leads are ever given a lead (`leads/routing.owner_refusal`): routing skips the others, and Settings, assignment and manual leads refuse them with 422. The round-robin turn is kept in `system.lead_round_robin`. `inbox_email` gets every new-lead and site-visit email; when it is empty they go to every active super-admin.
+- `privacy.lead_retention_years` (default 3, 1–10, super-admin only): the daily clean-up anonymises leads with no activity for that long (SECURITY.md §8).
 - Public intake answers 503 until a `lead_form` consent text is published. `empire-api seed` publishes DRAFT texts in development and test only.
 
 The maps resolver (`POST /api/v1/admin/maps/resolve`) needs outbound HTTPS to Google's short-link hosts only (`maps.app.goo.gl`, `goo.gl`); long links and plus codes are read without any network call.
+
+Email needs outbound HTTPS to `api.resend.com` only (`POST /emails`, 10-second timeout). Events that send email are retried on the outbox schedule (1 min … 24 h) when Resend is down, rate-limits, or the Free plan's 100-a-day quota is used up (it resets at midnight UTC); a message Resend refuses as invalid makes its event dead at once, and the dashboard's "Needs attention" counts emails that couldn't be sent in the last 7 days.
+
+Setup and reset links are `<SITE_URL>/admin/setup#token=…` and `/admin/reset#token=…`: the token is in the fragment, which browsers never send to a server, so it stays out of the web host's request logs. Only the newest link of an account works.
+
+The audit log is append-only in the database as well: a trigger from migration 0006 refuses UPDATE and DELETE on `audit_log` (tests empty it with TRUNCATE, which row triggers don't see).
+
+Two-factor sign-in (TOTP) is for admin and super-admin accounts: asked whenever an account has it on, and, with the `admin_2fa` flag on, set up at sign-in by anyone in those roles who hasn't. The flag can be switched on only by a super-admin who has it on. Secrets are stored encrypted with `DATA_ENCRYPTION_KEY` and recovery codes as keyed hashes of it, so changing that key means everyone sets two-factor up again.
 
 The Cloudinary store needs outbound HTTPS to `api.cloudinary.com` (uploads, Admin API, destroy). Files are delivered from `res.cloudinary.com`. Videos and documents go from the browser straight to `api.cloudinary.com`, so the Phase 5 CSP needs `connect-src https://api.cloudinary.com` and `img-src https://res.cloudinary.com`.
 

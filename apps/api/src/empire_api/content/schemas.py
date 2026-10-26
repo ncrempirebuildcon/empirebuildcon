@@ -29,10 +29,31 @@ class ConsentText(OutModel):
     is_current: bool
     is_draft: bool = Field(
         description="The wording still says it awaits the owner's approval (D-017). Production "
-        "refuses to publish such a text."
+        "refuses to publish such a text. Same as is_draft_text (kept for the part 3 CMS)."
+    )
+    is_draft_text: bool = Field(
+        description="The wording still says it awaits the owner's approval (D-017), as on pages."
     )
     created_at: datetime
     created_by: UserRef | None
+    published_by: UserRef | None = Field(
+        description="Who first published this version (with published_at); null for seeded texts"
+    )
+
+
+class ConsentKindSummary(OutModel):
+    """One purpose (kind) for the consent-text screen: which version is current."""
+
+    kind: ConsentKind
+    label: str
+    purpose: str
+    current: ConsentText | None = Field(description="What the forms show now; null = none yet")
+    current_version: int | None
+    latest_version: int | None
+    versions: int
+    has_unpublished_newer: bool = Field(
+        description="A version newer than the current one exists but isn't published"
+    )
 
 
 class ConsentTextInput(StrictModel):

@@ -8,12 +8,13 @@ Register with the decorator; handlers receive the open session and the event row
 INVARIANT: delivery is at-least-once (a crash after a handler ran but before the row was marked
 delivered runs it again), so every handler must be idempotent, e.g. keyed on `event.event_id`.
 
-Phase 3 has one handler: a structured log line per event, so delivery can be watched.
-TODO(phase-4): email for `user.setup_link_issued` / `user.password_reset_requested`.
-TODO(phase-4): part 5 emails the sales inbox (or the owner) on `lead.created`, but ONLY when
-`data.alert` is true: duplicates (same phone and project within 24 h), manual leads and samples
-carry `alert: false` and must not alert again (ARCHITECTURE §8). Also email the new owner on
-`lead.assigned`, and sales on `site_visit.requested`.
+A handler that fails raises: any exception is retried on the drain's schedule, except
+`PermanentDeliveryError`, which marks the event dead at once with an alert log line (a retry
+can't help, e.g. the email provider refused the message as invalid).
+
+Handlers: a structured log line per event (here), media clean-up (media/handlers.py), and the
+emails (mail/handlers.py: password links, security notices, lead and visit alerts; a lead alert
+only when `data.alert` is true, ARCHITECTURE §8).
 TODO(phase-5): web revalidation on publish events. TODO(phase-6): webhooks and WhatsApp.
 """
 
@@ -28,6 +29,13 @@ from empire_api.logs import get_logger
 from empire_api.platform.models import OutboxEvent
 
 Handler = Callable[[Session, OutboxEvent], None]
+
+
+class PermanentDeliveryError(Exception):
+    """A failure no retry can fix. SECURITY: the message is stored in `last_error` and logged,
+    so it must name a reason only (an error code), never an address, link or personal data."""
+
+
 WILDCARD = "*"
 
 _registry: defaultdict[str, list[Handler]] = defaultdict(list)

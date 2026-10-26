@@ -13,12 +13,19 @@ Generated from [openapi-v1.yaml](openapi-v1.yaml). Permission keys are explained
 
 | Method | Path | Needs | What it does |
 |---|---|---|---|
-| POST | `/api/v1/auth/login` | public | Sign in |
+| POST | `/api/v1/auth/login` | public | Sign in. 202 with no session when a two-factor code is needed (sets the 5-minute `__Host-empire_2fa` cookie) |
+| POST | `/api/v1/auth/2fa/verify` | public (2fa cookie) | Sign-in step 2: an app code or a recovery code; creates the session |
+| POST | `/api/v1/auth/2fa/enrol` | public (2fa cookie) | Forced set-up at sign-in, part 1: the key and QR code |
+| POST | `/api/v1/auth/2fa/enrol/confirm` | public (2fa cookie) | Forced set-up, part 2: confirm a code, get recovery codes, sign in |
 | POST | `/api/v1/auth/logout` | signed in | Sign out (revokes the session) |
 | GET | `/api/v1/auth/me` | signed in | Current user, permissions and CSRF token |
 | POST | `/api/v1/auth/password/forgot` | public | Email a reset link (same reply whether or not the email exists) |
 | POST | `/api/v1/auth/password/reset` | public | Set a new password with a reset token |
 | POST | `/api/v1/auth/password/change` | signed in | Change own password (revokes other sessions) |
+| POST | `/api/v1/auth/2fa/setup` | signed in | Turn two-factor on, part 1 (needs the password) |
+| POST | `/api/v1/auth/2fa/setup/confirm` | signed in | Turn two-factor on, part 2: confirm a code, get recovery codes |
+| POST | `/api/v1/auth/2fa/disable` | signed in | Turn two-factor off (password and a code) |
+| POST | `/api/v1/auth/2fa/recovery-codes` | signed in | New recovery codes; the old ones stop working |
 
 ## Public
 
@@ -208,10 +215,11 @@ Generated from [openapi-v1.yaml](openapi-v1.yaml). Permission keys are explained
 | Method | Path | Needs | What it does |
 |---|---|---|---|
 | GET | `/api/v1/admin/consent-texts` | settings.read | All versions |
+| GET | `/api/v1/admin/consent-texts/current` | settings.read | Each purpose with its current version |
 | POST | `/api/v1/admin/consent-texts` | legal.publish | New draft version |
 | POST | `/api/v1/admin/consent-texts/{id}/publish` | legal.publish | Make this version current |
 | GET | `/api/v1/admin/settings` | settings.read | All settings groups |
-| PATCH | `/api/v1/admin/settings/{group}` | settings.write | Update one group (tracking IDs need marketing.tracking) |
+| PATCH | `/api/v1/admin/settings/{group}` | per group | Update one group: settings.write; tracking needs marketing.tracking, SEO defaults seo.manage, privacy the super-admin |
 | GET | `/api/v1/admin/flags` | settings.read | Feature flags |
 | PATCH | `/api/v1/admin/flags/{key}` | flags.manage | Switch a feature on or off |
 
@@ -240,7 +248,9 @@ Generated from [openapi-v1.yaml](openapi-v1.yaml). Permission keys are explained
 | POST | `/api/v1/admin/users/{id}/unlock` | users.manage | Clear lockout |
 | POST | `/api/v1/admin/users/{id}/send-reset` | users.manage | Email a password-reset link |
 | POST | `/api/v1/admin/users/{id}/revoke-sessions` | users.manage | Sign the user out everywhere |
+| POST | `/api/v1/admin/users/{id}/reset-2fa` | users.manage | Remove someone's two-factor (lost phone); signs them out everywhere |
 | GET | `/api/v1/admin/roles` | users.manage | Roles and their permissions |
+| GET | `/api/v1/admin/permissions` | users.manage | The role table: each permission, what it allows and which roles have it |
 | GET | `/api/v1/admin/audit-log` | audit.read | Audit log, newest first |
 
 ## Internal

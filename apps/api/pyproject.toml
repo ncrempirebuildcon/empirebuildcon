@@ -32,6 +32,9 @@ dependencies = [
     "cloudinary==1.46.3",
     "pillow==13.0.0",
     "python-multipart==0.0.32",
+    # Two-factor set-up (users/qr.py): the QR code as an inline SVG. Pure Python, no
+    # dependencies, BSD. 1.6.6 (12 Mar 2025) was the newest on PyPI when checked, 25 Oct 2026.
+    "segno==1.6.6",
 ]
 
 [project.scripts]

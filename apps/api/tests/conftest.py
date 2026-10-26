@@ -9,11 +9,14 @@ How it works:
      then seed the feature flags.
   4. Media: the fake store (no CLOUDINARY_URL), writing to a temporary MEDIA_DEV_DIR; the
      Cloudinary SDK's HTTP clients fail any test that would reach the network.
+  5. Email: the dev transport (no EMAIL_API_KEY), writing to a temporary MAIL_DEV_DIR that is
+     emptied before every test; httpx calls to Resend fail any test that doesn't mock them.
 """
 
 from __future__ import annotations
 
 import os
+import shutil
 import tempfile
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -34,6 +37,10 @@ os.environ["EDGE_PROXY_KEY"] = ""
 os.environ.pop("CLOUDINARY_URL", None)
 os.environ.pop("MEDIA_STORE", None)
 os.environ["MEDIA_DEV_DIR"] = tempfile.mkdtemp(prefix="empire-media-test-")
+os.environ.pop("EMAIL_API_KEY", None)
+os.environ.pop("EMAIL_FROM", None)
+os.environ.pop("EMAIL_TRANSPORT", None)
+os.environ["MAIL_DEV_DIR"] = tempfile.mkdtemp(prefix="empire-mail-test-")
 
 # The imports below come after the environment on purpose: settings are read at import time.
 import cloudinary.api_client.call_api
@@ -51,6 +58,8 @@ from empire_api.content.consent import seed_consent_texts
 from empire_api.content.models import ConsentText
 from empire_api.db import get_engine, get_sessionmaker, reset_engine
 from empire_api.leads import intake as lead_intake
+from empire_api.mail import resend
+from empire_api.mail.transport import get_transport
 from empire_api.main import create_app
 from empire_api.media.store import get_store
 from empire_api.projects import blockers, maps, routes_catalogue
@@ -61,6 +70,10 @@ from empire_api.users.models import User
 API_ROOT = Path(__file__).resolve().parents[1]
 GOOD_PASSWORD = "correct horse battery staple"
 TABLES = (
+    "email_message",
+    "sign_in_challenge",
+    "two_factor_recovery_code",
+    "user_two_factor",
     "block",
     "page",
     "post",
@@ -121,6 +134,8 @@ def clean_tables(database: None) -> None:
     with get_sessionmaker()() as db:
         seed_flags(db)
         db.commit()
+    get_transport.cache_clear()
+    shutil.rmtree(os.environ["MAIL_DEV_DIR"], ignore_errors=True)
 
 
 @pytest.fixture(autouse=True)
@@ -139,6 +154,11 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(cloudinary.uploader._http, "request", no_cloudinary)
     monkeypatch.setattr(cloudinary.api_client.call_api._http, "request", no_cloudinary)
+
+    def no_resend() -> httpx.Client:
+        raise AssertionError("A test tried to reach Resend; pass a mocked client instead.")
+
+    monkeypatch.setattr(resend, "_default_client", no_resend)
 
 
 @pytest.fixture

@@ -5,15 +5,17 @@ Implements: SECURITY.md §7 (secrets only in the environment), D-009 (session se
 D-033 (media store).
 
 SECURITY: in staging and production the app refuses to start when a secret is missing, too short
-or still a `change-me` placeholder from `.env.example`, without CLOUDINARY_URL, or with the fake
-media store. Development and test fall back to fixed, clearly-named insecure values (and the
-fake media store) so a new developer can run the app with no setup at all.
+or still a `change-me` placeholder from `.env.example`, without CLOUDINARY_URL, EMAIL_API_KEY or
+EMAIL_FROM, or with the fake media store or the dev email transport. Development and test fall
+back to fixed, clearly-named insecure values (and the fake media store and dev email transport)
+so a new developer can run the app with no setup at all.
 """
 
 from __future__ import annotations
 
 import base64
 import hashlib
+import re
 from functools import lru_cache
 from typing import Literal, Self
 
@@ -35,6 +37,7 @@ _DEV_SECRETS = {
     "ip_hash_salt": "dev-only-insecure-ip-salt",
 }
 _MIN_SECRET_BYTES = 32
+_PLAIN_ADDRESS = re.compile(r"[^@\s<>\"',;]+@[^@\s<>\"',;]+\.[A-Za-z]{2,}")
 
 
 class Settings(BaseSettings):
@@ -82,16 +85,38 @@ class Settings(BaseSettings):
     media_store: Literal["cloudinary", "fake"] | None = None
     media_dev_dir: str = ""
 
+    # Email (mail/transport.py, D-007 Resend). SECURITY: EMAIL_API_KEY is the Resend API key. It
+    # is only ever sent to api.resend.com in the Authorization header; it is never logged,
+    # stored or returned (the Settings screen shows only "set in the server environment").
+    # EMAIL_FROM is the sender address on a domain verified at Resend (the display name and
+    # reply-to come from the `email` settings group). EMAIL_TRANSPORT picks the transport:
+    # "resend", or "dev" (never sends: messages go to MAIL_DEV_DIR, default apps/api/.mail-dev/,
+    # for development, tests and the browser suite). Left empty: resend when EMAIL_API_KEY is
+    # set, otherwise dev. Staging and production refuse to start without EMAIL_API_KEY and
+    # EMAIL_FROM, or with the dev transport.
+    email_api_key: SecretStr = SecretStr("")
+    email_from: str = ""
+    email_transport: Literal["resend", "dev"] | None = None
+    mail_dev_dir: str = ""
+
     @property
     def is_production_like(self) -> bool:
         """Staging and production get the strict checks, HSTS and hidden API docs."""
         return self.app_env in ("staging", "production")
 
-    @field_validator("media_store", mode="before")
+    @field_validator("media_store", "email_transport", mode="before")
     @classmethod
     def _blank_store_is_unset(cls, value: object) -> object:
-        # WHY: `.env.example` lists `MEDIA_STORE=` empty; that means "choose for me".
+        # WHY: `.env.example` lists `MEDIA_STORE=` and `EMAIL_TRANSPORT=` empty; that means
+        # "choose for me".
         return None if isinstance(value, str) and not value.strip() else value
+
+    @property
+    def email_transport_kind(self) -> Literal["resend", "dev"]:
+        """The active email transport (validated in `_email_problems`)."""
+        if self.email_transport is not None:
+            return self.email_transport
+        return "resend" if self.email_api_key.get_secret_value().strip() else "dev"
 
     @property
     def media_store_kind(self) -> Literal["cloudinary", "fake"]:
@@ -143,6 +168,25 @@ class Settings(BaseSettings):
                 problems.append("MEDIA_STORE=fake is for development and tests only")
         return problems
 
+    def _email_problems(self) -> list[str]:
+        """SECURITY: a live site sends real email with a real key, from a plain address."""
+        problems: list[str] = []
+        key = self.email_api_key.get_secret_value().strip()
+        sender = self.email_from.strip()
+        if sender and not _PLAIN_ADDRESS.fullmatch(sender):
+            # WHY plain: the display name comes from Settings; a name here would be doubled.
+            problems.append("EMAIL_FROM must be a plain address like alerts@example.com")
+        if self.email_transport == "resend" and not key:
+            problems.append("EMAIL_TRANSPORT=resend needs EMAIL_API_KEY")
+        if self.is_production_like:
+            if not key:
+                problems.append("EMAIL_API_KEY must be set")
+            if not sender:
+                problems.append("EMAIL_FROM must be set")
+            if self.email_transport == "dev":
+                problems.append("EMAIL_TRANSPORT=dev is for development and tests only")
+        return problems
+
     def _secret_problems(self) -> list[str]:
         problems: list[str] = []
         if len(self.edge_proxy_key.get_secret_value().encode()) < _MIN_SECRET_BYTES:
@@ -161,7 +205,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _check_secrets(self) -> Self:
-        problems = self._media_problems()
+        problems = self._media_problems() + self._email_problems()
         if self.is_production_like:
             problems += self._secret_problems()
         if problems:

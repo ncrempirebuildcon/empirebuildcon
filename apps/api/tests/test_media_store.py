@@ -40,6 +40,8 @@ def production(**overrides: Any) -> Settings:
         "data_encryption_key": SecretStr(Fernet.generate_key().decode()),
         "edge_proxy_key": SecretStr("e" * 48),
         "cloudinary_url": SecretStr(URL),
+        "email_api_key": SecretStr("not-a-real-resend-key"),
+        "email_from": "alerts@example.com",
     }
     return Settings(**{**values, **overrides})
 

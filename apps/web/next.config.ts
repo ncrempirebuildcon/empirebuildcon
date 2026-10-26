@@ -55,6 +55,14 @@ const nextConfig: NextConfig = {
       // SECURITY: CMS pages hold personal data (leads); never cache them anywhere.
       { source: "/admin/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
       { source: "/admin", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      // SECURITY: the setup and reset pages are opened from a link carrying a one-time token (in
+      // the fragment, or the query for older links).
+      // `no-referrer` means no other site (and no request of ours) ever sees that address in a
+      // Referer header. WHY listed last: when two rules set the same header, the last one wins.
+      ...["/admin/setup", "/admin/reset"].map((source) => ({
+        source,
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      })),
     ];
   },
 };

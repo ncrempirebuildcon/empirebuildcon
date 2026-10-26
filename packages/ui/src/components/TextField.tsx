@@ -18,6 +18,8 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   /** Extra element inside the field frame on the right (e.g. a show/hide password button). */
   trailing?: ReactNode;
   id?: string;
+  /** Extra classes for the input itself (e.g. the large spaced digits of a one-time code). */
+  inputClassName?: string;
 }
 
 export function TextField({
@@ -27,6 +29,7 @@ export function TextField({
   trailing,
   id,
   className,
+  inputClassName,
   required,
   ...rest
 }: TextFieldProps) {
@@ -54,7 +57,10 @@ export function TextField({
           required={required}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
-          className="min-h-11 w-full min-w-0 flex-1 rounded-input bg-transparent px-3.5 py-3 text-base text-ivory placeholder:text-muted"
+          className={cx(
+            "min-h-11 w-full min-w-0 flex-1 rounded-input bg-transparent px-3.5 py-3 text-base text-ivory placeholder:text-muted",
+            inputClassName,
+          )}
         />
         {trailing ? <div className="pr-1.5">{trailing}</div> : null}
       </div>

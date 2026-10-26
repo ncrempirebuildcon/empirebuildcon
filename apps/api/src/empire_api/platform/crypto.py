@@ -100,6 +100,23 @@ def keyed_digest(purpose: str, value: str) -> str:
     return base64.urlsafe_b64encode(mac).rstrip(b"=").decode()
 
 
+def data_digest(purpose: str, value: str) -> str:
+    """Hex HMAC-SHA256 of `value` under a key derived from DATA_ENCRYPTION_KEY, per `purpose`.
+
+    For values we must recognise but never read back: two-factor recovery codes, and the
+    recipient of an email in the sent-mail log (mail/models.py).
+
+    SECURITY / WHY this key and not SESSION_SECRET: the runbook rotates SESSION_SECRET to sign
+    everyone out (SECURITY.md §11); that must not also void every recovery code. Rotating
+    DATA_ENCRYPTION_KEY already means re-enrolling two-factor (the TOTP secrets are encrypted
+    with it), so tying these digests to it adds no new break. WHY keyed: a recovery code has
+    50 bits of randomness; an unkeyed hash of it could be brute-forced from a database copy.
+    """
+    raw = get_settings().data_encryption_key.get_secret_value().encode()
+    key = hashlib.sha256(b"empire data digest:" + purpose.encode() + b":" + raw).digest()
+    return hmac.new(key, value.encode(), hashlib.sha256).hexdigest()
+
+
 def constant_time_equals(a: str, b: str) -> bool:
     """Compare secrets without leaking how many leading characters matched."""
     return hmac.compare_digest(a.encode(), b.encode())

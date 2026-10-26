@@ -12,6 +12,14 @@ export const OFFERS_PATH = "/admin/offers";
 export const FAQS_PATH = "/admin/faqs";
 export const TESTIMONIALS_PATH = "/admin/testimonials";
 export const REDIRECTS_PATH = "/admin/redirects";
+export const USERS_PATH = "/admin/users";
+export const SETTINGS_PATH = "/admin/settings";
+export const AUDIT_PATH = "/admin/audit";
+export const ACCOUNT_PATH = "/admin/account";
+/** Signed-out pages: ask for a reset link, and choose a password from a setup or reset link. */
+export const FORGOT_PATH = "/admin/forgot";
+export const SETUP_PATH = "/admin/setup";
+export const RESET_PATH = "/admin/reset";
 
 /** The editor for one project. */
 export const projectPath = (id: string) => `${PROJECTS_PATH}/${id}`;
@@ -57,9 +65,7 @@ export function isCmsPath(link: string): boolean {
 }
 
 // CMS screens that exist today. WHY: the API's dashboard tasks may point at screens that arrive
-// in later parts (e.g. /admin/settings in part 5); those tasks are shown without a link rather
-// than leading to a "page not found".
-// TODO(phase-4): add /admin/settings, /admin/users and /admin/audit with part 5.
+// in later phases; those tasks are shown without a link rather than leading to "page not found".
 const BUILT_SCREENS = [
   "/admin/leads",
   "/admin/site-visits",
@@ -73,6 +79,10 @@ const BUILT_SCREENS = [
   FAQS_PATH,
   TESTIMONIALS_PATH,
   REDIRECTS_PATH,
+  USERS_PATH,
+  SETTINGS_PATH,
+  AUDIT_PATH,
+  ACCOUNT_PATH,
 ];
 
 /** True for a CMS link to a screen that exists in this version of the CMS (see BUILT_SCREENS). */

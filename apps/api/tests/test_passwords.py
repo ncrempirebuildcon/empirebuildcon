@@ -85,7 +85,7 @@ def test_forgot_answers_the_same_for_unknown_emails(client: TestClient, db: Sess
     event = events[0]
     assert event.contains_personal_data is True
     link = get_settings().fernet().decrypt(event.payload["link_encrypted"].encode()).decode()
-    assert "/admin/reset?token=" in link
+    assert "/admin/reset#token=" in link
     assert "token" not in str({k: v for k, v in event.payload.items() if k != "link_encrypted"})
 
 

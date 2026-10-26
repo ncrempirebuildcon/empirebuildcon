@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from conftest import SignedIn
 from content_support import OFFERS, block, create_offer, create_page, offer_body, put_blocks, soon
+from empire_api.timeutil import today_ist
 from media_support import document, photo, signed_as
 from projects_support import create_project, ok
 
@@ -82,7 +83,8 @@ def test_states(owner: SignedIn) -> None:
         for state in ("inactive", "live", "scheduled", "ended")
     }
     assert by_state == {"inactive": 1, "live": 1, "scheduled": 1, "ended": 1}
-    today = ok(owner.client.get(OFFERS, params={"active_on": now.date().isoformat()}))
+    # WHY today_ist: `active_on` is an IST day; the UTC date is a different day after 18:30 UTC.
+    today = ok(owner.client.get(OFFERS, params={"active_on": today_ist().isoformat()}))
     assert today["meta"]["total"] == 1  # the live one without dates
 
 

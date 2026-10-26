@@ -23,14 +23,18 @@ import { api, call, setCsrfToken, type SessionUser } from "@/lib/api";
 import { ROLE_LABELS } from "@/lib/labels";
 import { unreadLeadCount } from "@/lib/leads/dashboard";
 import {
+  ACCOUNT_PATH,
+  AUDIT_PATH,
   CATALOGUE_PATH,
   CONTENT_SECTIONS,
   LEADS_PATH,
   MEDIA_PATH,
   PAGES_PATH,
   PROJECTS_PATH,
+  SETTINGS_PATH,
   SIGN_IN_PATH,
   SITE_VISITS_PATH,
+  USERS_PATH,
   UTM_REPORT_PATH,
 } from "@/lib/routes";
 import { useLoad } from "@/components/admin/useLoad";
@@ -46,7 +50,11 @@ export type AdminSection =
   | "catalogue"
   | "media"
   | "pages"
-  | "content";
+  | "content"
+  | "users"
+  | "settings"
+  | "audit"
+  | "account";
 
 interface MenuItem {
   label: string;
@@ -54,9 +62,8 @@ interface MenuItem {
   permission: string;
   anyOf?: readonly string[];
   icon: NavIconName;
-  /** Built screens link here; the others are labelled with the part that brings them. */
-  href?: string;
-  section?: AdminSection;
+  href: string;
+  section: AdminSection;
   /** Draw a divider above this item (board: before "Users & roles"). */
   divider?: boolean;
   /** Show the unread-leads badge from the dashboard counts. */
@@ -64,7 +71,6 @@ interface MenuItem {
 }
 
 // Menu items from the CMS boards with the permission each one needs (ARCHITECTURE.md §11).
-// TODO(phase-4): link Users, Settings and Audit log as their screens arrive in part 5.
 const MENU: MenuItem[] = [
   {
     label: "Dashboard",
@@ -134,9 +140,28 @@ const MENU: MenuItem[] = [
     href: CONTENT_SECTIONS[0].href,
     section: "content",
   },
-  { label: "Users & roles", permission: "users.manage", icon: "users", divider: true },
-  { label: "Settings", permission: "settings.read", icon: "settings" },
-  { label: "Audit log", permission: "audit.read", icon: "audit" },
+  {
+    label: "Users & roles",
+    permission: "users.manage",
+    icon: "users",
+    href: USERS_PATH,
+    section: "users",
+    divider: true,
+  },
+  {
+    label: "Settings",
+    permission: "settings.read",
+    icon: "settings",
+    href: SETTINGS_PATH,
+    section: "settings",
+  },
+  {
+    label: "Audit log",
+    permission: "audit.read",
+    icon: "audit",
+    href: AUDIT_PATH,
+    section: "audit",
+  },
 ];
 
 export interface AdminShellProps {
@@ -313,6 +338,14 @@ export function AdminShell({ me, section, heading, breadcrumb, children }: Admin
               <span className="text-small text-body">
                 Signed in as <strong className="text-ivory">{me.name}</strong>
               </span>
+              {/* Every role has an account page (password, two-factor), so no permission check. */}
+              <Link
+                href={ACCOUNT_PATH}
+                aria-current={section === "account" ? "page" : undefined}
+                className="inline-flex min-h-11 items-center px-1 text-small font-bold"
+              >
+                My account
+              </Link>
               <Chip variant="draft">{roleLabel}</Chip>
               <Button
                 variant="secondary"
@@ -356,37 +389,26 @@ function MenuEntry({
   badge: number | null;
 }) {
   const base = "flex min-h-11 items-center gap-2.5 rounded-tile px-3 text-small font-semibold";
-  if (item.href) {
-    return (
-      <Link
-        href={item.href}
-        aria-current={current ? "page" : undefined}
-        className={
-          current
-            ? `${base} bg-gold-tint text-gold-300 shadow-[inset_3px_0_0_var(--color-gold-500)]`
-            : `${base} text-body hover:bg-noir-800 hover:text-gold-300`
-        }
-      >
-        <NavIcon name={item.icon} />
-        {item.label}
-        {badge ? (
-          // WHY the words in the link: "Leads 12 unread" is the link's name for screen readers,
-          // and the visible number starts with the visible label (WCAG 2.5.3 Label in Name).
-          <span className="ml-auto rounded-pill bg-gold-500 px-2 text-xs font-extrabold text-noir-900 tabular-nums">
-            {badge > 99 ? "99+" : badge}
-            <span className="sr-only"> unread</span>
-          </span>
-        ) : null}
-      </Link>
-    );
-  }
   return (
-    <span className={`${base} justify-between text-body`}>
-      <span className="flex items-center gap-2.5">
-        <NavIcon name={item.icon} />
-        {item.label}
-      </span>
-      <span className="text-xs font-normal text-muted">Soon</span>
-    </span>
+    <Link
+      href={item.href}
+      aria-current={current ? "page" : undefined}
+      className={
+        current
+          ? `${base} bg-gold-tint text-gold-300 shadow-[inset_3px_0_0_var(--color-gold-500)]`
+          : `${base} text-body hover:bg-noir-800 hover:text-gold-300`
+      }
+    >
+      <NavIcon name={item.icon} />
+      {item.label}
+      {badge ? (
+        // WHY the words in the link: "Leads 12 unread" is the link's name for screen readers,
+        // and the visible number starts with the visible label (WCAG 2.5.3 Label in Name).
+        <span className="ml-auto rounded-pill bg-gold-500 px-2 text-xs font-extrabold text-noir-900 tabular-nums">
+          {badge > 99 ? "99+" : badge}
+          <span className="sr-only"> unread</span>
+        </span>
+      ) : null}
+    </Link>
   );
 }
