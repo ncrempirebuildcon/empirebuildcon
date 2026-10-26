@@ -25,6 +25,8 @@ test("the pages list and the new-page form are accessible", async ({ page }) => 
 });
 
 test("the page editor, its palette and every block form are accessible", async ({ page }) => {
+  // WHY: axe runs on about 20 states of a heavy editor here; 30 s was tight on a busy machine.
+  test.setTimeout(90_000);
   const draft = await draftPage(page, "landing");
   await page.goto(`/admin/pages/${draft.id}`);
   await expect(page.getByRole("tablist", { name: "Page sections" })).toBeVisible();

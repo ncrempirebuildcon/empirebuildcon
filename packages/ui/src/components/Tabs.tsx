@@ -1,10 +1,12 @@
 /**
  * Tabs: a tab list and its panels (WAI-ARIA Authoring Practices "Tabs", automatic activation),
- * styled like the CMS editor boards: gold text and a gold underline on the selected tab.
+ * styled like the CMS editor boards: gold text and a gold underline on the selected tab. With
+ * `orientation="vertical"` the list is a column of sections with a gold bar on the selected one
+ * (board NoirCmsSettings).
  *
  * Accessibility:
- * - Only the selected tab is in the Tab order; Arrow Left/Right, Home and End move between tabs
- *   and select them (DESIGN_SYSTEM §9: `aria-selected` on tabs).
+ * - Only the selected tab is in the Tab order; Arrow Left/Right (Up/Down when vertical), Home and
+ *   End move between tabs and select them (DESIGN_SYSTEM §9: `aria-selected` on tabs).
  * - Each panel is labelled by its tab and focusable, so keyboard users land on the content.
  *
  * Use the same `idPrefix` on `Tabs` and every `TabPanel` so the ids line up.
@@ -28,23 +30,36 @@ export interface TabsProps {
   onSelect: (id: string) => void;
   /** Prefix for the tab and panel ids; must match the panels' `idPrefix`. */
   idPrefix: string;
+  /** "vertical" for a column of sections (Arrow Up/Down); horizontal by default. */
+  orientation?: "horizontal" | "vertical";
   className?: string;
 }
 
 export const tabId = (prefix: string, id: string) => `${prefix}-tab-${id}`;
 export const panelId = (prefix: string, id: string) => `${prefix}-panel-${id}`;
 
-export function Tabs({ label, tabs, selected, onSelect, idPrefix, className }: TabsProps) {
+export function Tabs({
+  label,
+  tabs,
+  selected,
+  onSelect,
+  idPrefix,
+  orientation = "horizontal",
+  className,
+}: TabsProps) {
   const refs = useRef(new Map<string, HTMLButtonElement>());
+  const vertical = orientation === "vertical";
+  const nextKey = vertical ? "ArrowDown" : "ArrowRight";
+  const previousKey = vertical ? "ArrowUp" : "ArrowLeft";
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     const last = tabs.length - 1;
     const target =
-      event.key === "ArrowRight"
+      event.key === nextKey
         ? index === last
           ? 0
           : index + 1
-        : event.key === "ArrowLeft"
+        : event.key === previousKey
           ? index === 0
             ? last
             : index - 1
@@ -65,7 +80,13 @@ export function Tabs({ label, tabs, selected, onSelect, idPrefix, className }: T
     <div
       role="tablist"
       aria-label={label}
-      className={cx("flex flex-wrap gap-1 border-b border-line", className)}
+      aria-orientation={vertical ? "vertical" : undefined}
+      className={cx(
+        vertical
+          ? "flex flex-col gap-0.5 rounded-card border border-line bg-noir-800 p-2"
+          : "flex flex-wrap gap-1 border-b border-line",
+        className,
+      )}
     >
       {tabs.map((tab, index) => {
         const isSelected = tab.id === selected;
@@ -86,8 +107,11 @@ export function Tabs({ label, tabs, selected, onSelect, idPrefix, className }: T
             onKeyDown={(event) => onKeyDown(event, index)}
             className={cx(
               "min-h-11 px-3.5 text-small font-bold transition-colors duration-150",
+              vertical && "rounded-tile py-2 text-left",
               isSelected
-                ? "text-gold-300 shadow-[inset_0_-2px_0_var(--color-gold-500)]"
+                ? vertical
+                  ? "bg-gold-tint text-gold-300 shadow-[inset_3px_0_0_var(--color-gold-500)]"
+                  : "text-gold-300 shadow-[inset_0_-2px_0_var(--color-gold-500)]"
                 : "text-body hover:text-gold-300",
             )}
           >
