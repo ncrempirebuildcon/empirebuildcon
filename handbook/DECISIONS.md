@@ -580,3 +580,46 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 - No new dependencies in the API or the web app.
 - YouTube links are accepted as `watch?v=`, `youtu.be/`, `embed/`, `shorts/`, `live/` and `v/`; Vimeo as `vimeo.com/<id>` and `player.vimeo.com/video/<id>`. Assumed from the providers' current URL formats; not checked against their APIs.
 - The SEO warning lengths (60 and 160 characters) are where search results usually cut titles and descriptions. They are guidance, not limits.
+
+## D-036 · Phase 4 part 5: settings, users, two-factor sign-in and email (Accepted, 2026-10-26)
+
+**Context:** Part 5 finishes the CMS core: settings, users and roles, the audit log, the consent-text screen, the forgot/setup/reset pages, two-factor sign-in for admins, and email. There is no Resend key yet, so email runs through a local dev mailbox until staging (Phase 9).
+**Decision:**
+- **Two-factor (TOTP):**
+  - Our own RFC 6238 code (no library), tested with the RFC's vectors. Secrets Fernet-encrypted; ten recovery codes stored as keyed hashes and shown once; each time step accepted once per account.
+  - An account with two-factor on is **always** asked for a code, not only while flag `admin_2fa` is on. That is stricter than the spec's wording: someone who turned it on expects it, and it lets the browser suite test it without switching the shared flag. The flag additionally forces admins and super-admins without it to set it up at sign-in.
+  - Switching `admin_2fa` on is refused unless the super-admin doing it has two-factor on, so the switch can't lock them out.
+  - With two-factor, `login` answers 202 with no session and a 5-minute single-use `__Host-empire_2fa` cookie bound to the account and network (a contract deviation: the contract only had 200).
+  - Wrong codes share the D-027 per-account-and-network lockout counter. A correct password with a code still pending doesn't reset it; otherwise password plus four wrong codes, repeated, would never stop. Codes are also capped at 20 per account per hour across networks. The code step doesn't count toward the 10-per-network sign-in limit.
+  - Proof while signed in: setting up needs the password; turning off needs the password and a code; new recovery codes need a code. Turning it on signs out the account's other sessions.
+  - The recovery-code hash key is derived from `DATA_ENCRYPTION_KEY`, not `SESSION_SECRET`, because the runbook rotates `SESSION_SECRET`. Rotating the data key means everyone sets two-factor up again.
+  - Known limit of forced set-up: whoever knows the password before the person enrols can enrol their own phone. The "two-factor was turned on" email is the warning.
+  - Break-glass: `empire-api reset-two-factor --email …` on the server, for a lone super-admin who lost both phone and codes. Audited; signs the account out everywhere.
+- **Email:**
+  - One interface, two transports: Resend over the existing `httpx` (no SDK) and a dev mailbox (`apps/api/.mail-dev/`, git-ignored) for development, tests and the browser suite. Staging and production refuse to start without `EMAIL_API_KEY` and `EMAIL_FROM`, or with the dev mailbox. `GET /api/v1/dev-mail/latest` exists only with the dev mailbox in development or test.
+  - Idempotency: Resend's `Idempotency-Key` (event, template and recipient) plus a local `email_message` log of keyed hashes, because Resend keeps keys for 24 hours while outbox retries run for about 32.
+  - Errors: 401/403, 429 (including the Free plan's daily quota), 5xx and network errors are retried on the outbox schedule; a 409 "request body changed for this key" counts as sent; other 4xx go dead at once with an alert line (a new permanent-failure branch in the drain). Dead emails show on the dashboard.
+  - Who gets what: setup and reset links to the person; security notices (locked at most once an hour, password changed, two-factor on, off or reset); new leads only when `data.alert` is true, to the sales inbox or, when it is empty, every active super-admin; "now yours" to an assigned owner (not on self-assignment); one email per site-visit request. Nothing for sample, spam or erased leads. `user.created` sends no separate email, because the setup-link email covers it.
+  - COMPLIANCE: lead emails carry the name and a masked phone with a link to the CMS, never the full phone, email or message.
+- **Settings:**
+  - Nine typed groups following the Settings board, with checks (GSTIN format and check character, the leads phone rule, social links on each network's own hosts, tracking-ID formats, a `{page}` token in the WhatsApp message, a sender name that can't inject mail headers).
+  - Per-group permissions: the PATCH route is marked `settings.read` and each group checks its own permission (`x-permission-by-group`), so marketing can save tracking and SEO defaults (a contract deviation). Lead retention is super-admin only, 1–10 years.
+  - The RERA authority and portal are fixed, and "show RERA everywhere" can't be switched off (D-002).
+  - `GET /admin/settings` returns a typed overview with the round-robin preview and an integrations status that never shows a key. "Connected" means the key and sender are set, not checked live with Resend.
+  - Placeholder keys were renamed (only placeholders were stored): `company.address` became registered and corporate addresses; `contacts.whatsapp`/`hours` became `whatsapp_number`/`office_hours`; `seo_defaults.description` became `default_description`.
+- **Lead routing:** one rule decides who can own a lead: an active account that has set its own password and whose role can open leads. Round robin, the single owner, duplicates, `GET /admin/lead-owners`, reassignment and manual leads all use it, so an invited account never gets leads. Round robin can pause a person without removing them.
+- **Password-reset requests:** at most 3 per hour and 5 per UTC day per email (counted before the account is looked up), so one targeted address can't use up the Free plan's 100 emails a day.
+- **Users and audit:** invites never return the link; the role table comes from `GET /admin/permissions`; the audit log shows IPs masked, filters on IST days (`from`/`to` were UTC in the contract) and by action prefix, and nothing in this part writes to it except the usual audit rows.
+- **CMS:**
+  - Settings sections keep the open section in the address (`?tab=`), so dashboard tasks land on the right section; rights come from the API's `can_edit`.
+  - Setup and reset pages read the token once, remove it from the address bar, send `Referrer-Policy: no-referrer` and load nothing from other sites.
+  - The unsaved-changes guard lets downloads and `blob:`, `mailto:` and `tel:` links through (it used to block the recovery-codes download).
+  - Audit filters are presets the API can answer (sign-ins, accounts, settings, flags, consent texts, leads, exports, erasures, projects, pages) instead of the board's six chips, two of which aren't prefixes.
+  - The browser suite never switches `admin_2fa` on (the database is shared and specs run in parallel). It tests an account with two-factor on, end to end. A run now uses 6 sign-ins.
+- **Where the CMS differs from the design boards, and why:** no "+ Add a state", webhook table, share-image upload or sitemap links yet (no API for them); lead routing is a mode choice; no "Keep me signed in" (session lifetimes are fixed); the invite form asks for a name (the API needs it); sample accounts are marked by their "Sample …" name.
+- **After review:** open sign-in challenges close whenever sessions are revoked; a wrong current password on password change counts on the lockout; a new link burns older ones (and so do email changes and deactivate/reactivate); links carry the token in the URL fragment; forced set-up and switching `admin_2fa` on sign out password-only sessions; a super-admin can't reset their own two-factor through the admin endpoint; lead routing checks only newly added people, so a deactivated person in the list never blocks saving, and they can be removed; a database trigger refuses UPDATE and DELETE on `audit_log` (TRUNCATE stays possible for tests); the sender name allows letters, digits, spaces and `. - & '` only, and the From header is built with `formataddr`; SEO defaults need `seo.manage` and `settings.read`, so content editors can't save them.
+- **Not built yet:** webhooks, CRM and WhatsApp alerts (Phase 6); `/public/site` and a default share image (Phase 5); a list of everyone who appears in the audit log for admins without `users.manage` (`TODO(phase-6)`).
+**Verified / assumed:**
+- Resend (resend.com/docs, read 25 Oct 2026): `POST https://api.resend.com/emails`; `Idempotency-Key` up to 256 characters, kept 24 hours; 10 requests per second per team; the Free plan's daily quota resets at midnight UTC and answers 429 `daily_quota_exceeded`. Free plan 100 a day and 3,000 a month (D-007). The error body's `name` field is assumed; the docs don't name it.
+- segno 1.6.6 (PyPI, released 12 Mar 2025, still the newest on 25 Oct 2026; BSD, pure Python, no dependencies) draws the QR code as an SVG data URL.
+- No real email has been sent: there is no key yet.

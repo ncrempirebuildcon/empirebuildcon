@@ -187,7 +187,7 @@ Envelope: `{id, type, occurred_at, actor_id, aggregate: {type, id, slug}, data}`
 | `construction_update.published` | Update goes live | Revalidate project · webhooks |
 | `media.added` / `media.updated` / `media.removed` | Upload, reorder, cover, show/hide, delete | Revalidate the owner if published |
 | `media.upload_discarded` | A direct upload was refused or never confirmed | Destroy the file at the store (retried) |
-| `lead.created` | Lead saved (`data.alert` is false for duplicates and manual leads) | Email alert · WhatsApp alert (flag) · CRM webhooks · Meta Conversions API + Google Ads conversion (only with marketing consent and flag on) |
+| `lead.created` | Lead saved (`data.alert` is false for duplicates and manual leads) | Email alert to `lead_routing.inbox_email`, or every active super-admin when it is empty (only when `data.alert` is true) · WhatsApp alert (flag) · CRM webhooks · Meta Conversions API + Google Ads conversion (only with marketing consent and flag on) |
 | `lead.status_changed` / `lead.assigned` | Pipeline move / owner change | CRM webhooks · email to new owner |
 | `site_visit.requested` / `site_visit.updated` | Visit form / CMS change | Sales alert · webhooks |
 | `page.published` / `page.unpublished` / `page.updated` | Incl. scheduled publish; `updated` for edits while live | Revalidate page, nav, sitemap · AI index |
@@ -195,7 +195,10 @@ Envelope: `{id, type, occurred_at, actor_id, aggregate: {type, id, slug}, data}`
 | `faq.changed`, `testimonial.changed` | | Revalidate · AI index (FAQs) |
 | `offer.started` / `offer.ended` / `offer.changed` | Scheduler tick or edit | Revalidate banners |
 | `settings.updated`, `flag.changed`, `redirect.changed`, `consent_text.published` | | Revalidate `site` tag |
-| `user.created`, `user.locked` | | Security emails to that user |
+| `user.setup_link_issued`, `user.password_reset_requested` | Invite, resend, forgot password | Email the link (decrypted only in the handler, never logged) |
+| `user.locked`, password changed, `user.two_factor_enabled` / `_disabled` / `_reset` | | Security notices to that user (lock notices at most once an hour) |
+
+**Email (D-036).** Handlers send through one interface with two transports: Resend (`POST https://api.resend.com/emails` over `httpx`, with an `Idempotency-Key` from the event, template and recipient) in staging and production, and a dev mailbox (`apps/api/.mail-dev/`, never sends) in development and tests. A local `email_message` log (keyed hashes, no content) stops a retried event from sending twice after Resend's 24-hour key memory. Rate limits, quota (Free plan: 100 a day, resetting at midnight UTC), auth and server errors are retried on the outbox schedule; other 4xx answers go dead at once with an alert line. Dead emails show on the dashboard ("N emails couldn't be sent"). Templates are plain text plus simple HTML: no images, remote fonts or tracking.
 
 ## 10. Background jobs
 
@@ -243,7 +246,9 @@ Five roles. One super-admin at launch: `admin@empirebuildcon.com` (the owner). P
 | `audit.read` | Audit log | ✓ | ✓ | | | |
 | `users.manage` | Accounts and roles | ✓ | | | | |
 
-Every create, update, delete, publish, export, login and permission change writes an `audit_log` row (who, what, before/after diff, IP).
+**Settings groups** each check their own permission (`x-permission-by-group` in the OpenAPI spec): company, contacts, social, lead routing, regulator and email need `settings.write`; tracking needs `marketing.tracking`; SEO defaults need `seo.manage`; privacy (lead retention) needs `settings.write` and the super-admin role. The route itself is marked `settings.read`, so marketing can save tracking (D-036).
+
+Every create, update, delete, publish, export, login and permission change writes an `audit_log` row (who, what, before/after diff, IP). The CMS shows the IP masked.
 
 ## 12. Media
 
@@ -361,4 +366,4 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 | Performance | Lighthouse CI (mobile) ≥ 90 for performance, accessibility, best practices, SEO | On main |
 | Visual | Playwright screenshots, mobile + desktop | Before each gate |
 
-The browser suite signs in as few times as possible: a Playwright setup project signs in the super-admin and a sales user once each and saves their sessions to `qa/.auth/` (git-ignored); the journeys reuse them. With the sign-in tests, a run uses 4 sign-ins, because the API allows 10 per network in 15 minutes, successful ones included (D-027). Locally that is about two full runs per 15 minutes. Public lead intake is limited too (5 per 10 minutes per network), so a run makes one public submission and adds other test leads through the staff API (`qa/README.md`).
+The browser suite signs in as few times as possible: a Playwright setup project signs in the super-admin and a sales user once each and saves their sessions to `qa/.auth/` (git-ignored); the journeys reuse them. With the sign-in tests and the account journeys (an invited admin's first sign-in and a two-factor sign-in), a run uses 6 sign-ins, because the API allows 10 per network in 15 minutes, successful ones included (D-027). Locally that is one full run per 15 minutes. The two-factor code step doesn't count toward that limit. Emails go to the dev mailbox, which the journeys read through `/api/v1/dev-mail/latest` (development and test only); password-reset requests use a fresh address each run. Public lead intake is limited too (5 per 10 minutes per network), so a run makes one public submission and adds other test leads through the staff API (`qa/README.md`).
