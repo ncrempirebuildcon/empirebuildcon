@@ -623,3 +623,16 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 - Resend (resend.com/docs, read 25 Oct 2026): `POST https://api.resend.com/emails`; `Idempotency-Key` up to 256 characters, kept 24 hours; 10 requests per second per team; the Free plan's daily quota resets at midnight UTC and answers 429 `daily_quota_exceeded`. Free plan 100 a day and 3,000 a month (D-007). The error body's `name` field is assumed; the docs don't name it.
 - segno 1.6.6 (PyPI, released 12 Mar 2025, still the newest on 25 Oct 2026; BSD, pure Python, no dependencies) draws the QR code as an SVG data URL.
 - No real email has been sent: there is no key yet.
+
+## D-037 · From Phase 5: a developer agent builds, Claude manages and tests (Accepted, 2026-10-26)
+
+**Context:** The owner wants the remaining phases built by another AI agent (Antigravity, on the owner's computer), with Claude managing and testing the work the way it ran Phase 4. Claude still has no GitHub access (D-029).
+**Decision:**
+- **Roles:** the developer agent builds one task at a time on its own `feat/…` branch in the owner's working copy and pushes that branch from the owner's computer. Claude writes the task docs and prompts, reviews every pushed branch, runs all checks, has an independent reviewer read the code, and tells the owner whether to merge. The owner opens or approves the PR and merges with Squash and merge.
+- **Where things live:**
+  - Committed: the process ([agents/WORKFLOW.md](agents/WORKFLOW.md)), the task docs ([tasks/](tasks/README.md)), and the phase plans.
+  - Private, in the owner's `docs/` folder: the developer's reports (`docs/agent-reports/`), the manager's reviews (`docs/reviews/`), the paste-in prompts (`docs/agent-prompts/`) and the design boards (`docs/design-boards/`).
+- **Task size:** Phase 5 is split into seven tasks instead of five parts, because one agent works serially and smaller pull requests are easier to review. Each task doc is written after the previous task merges.
+- **Decisions:** the developer proposes the next `D-0xx` as "(Proposed)"; the manager accepts or changes it at review.
+- **Gate:** a merge needs a green CI and the manager's "Merge" verdict. The owner can always overrule.
+**Verified / assumed:** Antigravity reads a root `AGENTS.md` (since IDE 1.20.5, per a third-party guide dated 5 Aug 2026; Google's own docs weren't checked), so the agent rules stay in `AGENTS.md`. Each rules file is limited to 12,000 characters; `AGENTS.md` is about 3,600.

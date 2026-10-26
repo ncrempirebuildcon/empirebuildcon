@@ -139,10 +139,7 @@ Some files are generated, such as the typed API client from the OpenAPI spec ([D
 AI assistants follow every rule above, plus these:
 
 - Always pull the latest `main` before starting, and work on a branch.
-- **Pushing:** Claude has no GitHub access (D-029).
-  - Claude builds and tests in its own workspace, then commits on a feature branch in the owner's working copy.
-  - The owner pushes the branch, opens the PR and merges.
-  - Other AI assistants work the same way, unless the owner gives them their own access.
+- **Roles from Phase 5 (D-037):** a developer agent builds each task on its own branch in the owner's working copy and pushes that branch from the owner's computer. Claude (no GitHub access, D-029) is the manager and tester: it writes the task docs, reviews the pushed branch from the owner's folder, runs every check and tells the owner whether to merge. The owner opens or approves the PR and merges. The full process is [agents/WORKFLOW.md](agents/WORKFLOW.md).
 - **Before new work,** the owner fetches from GitHub (GitHub Desktop: **Fetch origin**), so Claude starts from the latest `main`.
 - Claude never commits on `main`. The only exception is the one-time bootstrap commit that created it (handbook and brand files, no code), so that pull requests have a base.
 - Never type, store or ask for passwords or tokens. The owner does account and sign-in steps.

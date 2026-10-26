@@ -23,8 +23,9 @@
 | 1 | Architecture, data model, API contract, security plan | Done |
 | 2 | Brand, design system, page and CMS templates | Done; approved by the owner on 22 Oct 2026 |
 | 3 | Foundation: monorepo, CI, auth, roles, outbox | Done; merged on 22 Oct 2026 (PR #1) |
-| 4 | CMS core, in five parts: projects and catalogue · media · leads · content · settings and users | In progress: part 1 merged 22 Oct 2026 (PR #4), part 2 merged 23 Oct 2026 (PR #5); part 3 merged 26 Oct 2026 (PR #7); part 4 merged 26 Oct 2026 (PR #8); part 5 (settings, users, two-factor, email) in review |
-| 5–10 | Public site, marketing, AI layer, QA, go-live, handover | Planned |
+| 4 | CMS core, in five parts: projects and catalogue · media · leads · content · settings and users | Done; merged 22–26 Oct 2026 (PR #4, #5, #7, #8, #9) |
+| 5 | Public website, in seven tasks ([tasks/phase-5/PLAN.md](tasks/phase-5/PLAN.md)), built by a developer agent and reviewed by Claude ([agents/WORKFLOW.md](agents/WORKFLOW.md)) | Next |
+| 6–10 | Marketing, AI layer, QA, go-live, handover | Planned |
 
 The owner keeps the live task list (a private tracker page). Ask the owner for access.
 
@@ -39,6 +40,7 @@ The owner keeps the live task list (a private tracker page). Ask the owner for a
 7. [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md): colour tokens, type, components and accessibility.
 8. [api/ENDPOINTS.md](api/ENDPOINTS.md): the API at a glance. [api/openapi-v1.yaml](api/openapi-v1.yaml) is the design contract until Phase 3 code takes over ([D-020](DECISIONS.md)).
 9. [SETUP.md](SETUP.md): running everything locally (from Phase 3).
+10. [agents/WORKFLOW.md](agents/WORKFLOW.md) and [tasks/](tasks/README.md): how work is handed out, built, reviewed and merged from Phase 5.
 
 ## Repository map
 
