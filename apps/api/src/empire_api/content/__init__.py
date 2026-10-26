@@ -1,6 +1,7 @@
-"""Content module (ARCHITECTURE §4). Phase 4 part 3 adds the consent texts (`consent.py`), which
-the leads module checks every enquiry against. Pages, posts, FAQs, offers and testimonials
-arrive in part 4.
+"""Content module (ARCHITECTURE §4): consent texts (`consent.py`, Phase 4 part 3), which the
+leads module checks every enquiry against; and pages with their blocks, posts, FAQs, offers and
+testimonials (Phase 4 part 4). Redirects and the `seo` checks are the `seo` module.
 
-TODO(phase-4): part 4 adds Page, Block, Post, Faq, Offer and Testimonial here.
+TODO(phase-5): the public endpoints (`/api/v1/public/pages/{slug}`, `/posts`, `/faqs`,
+`/testimonials`) and rendering blocks on the website.
 """

@@ -8,12 +8,17 @@
  * For single-valued roles (brochure, rera_qr, hero, og_image, floor_plan) the API replaces the
  * old link in the same transaction, so "Replace" is just another upload; the old file stays in
  * the library.
+ *
+ * With `askPhotoLabel`, photos wait for the honest-label question (PhotoLabelDialog) and upload
+ * with the answer, for places the website shows a photo with its label (block photos, post
+ * covers, offer images; review L11). COMPLIANCE: nothing is pre-selected.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { FileButton, type ButtonVariant } from "@empire/ui";
 import { acceptFor, type MediaKind } from "@/lib/media/files";
 import type { ImageEncoding } from "@/lib/media/resize";
 import type { AttachTarget, Media } from "@/lib/media/upload";
+import { PhotoLabelDialog } from "./PhotoLabelDialog";
 import { UploadQueue } from "./UploadQueue";
 import { useUploads, type PhotoLabel } from "./useUploads";
 
@@ -32,6 +37,8 @@ export interface SlotUploaderProps {
   encoding?: ImageEncoding;
   /** The honest label saved with each photo (progress photos of a dated update). */
   photoLabel?: PhotoLabel;
+  /** Ask for the honest label before photos upload (when `photoLabel` isn't given). */
+  askPhotoLabel?: boolean;
   /** Re-reads the owner after a cancel that may have raced the save (useUploads step 5). */
   reconcile?: () => Promise<unknown>;
   /** Button text, e.g. "Upload QR image". */
@@ -64,9 +71,12 @@ export function SlotUploader(props: SlotUploaderProps) {
     reconcile: props.reconcile,
   });
   const { onBusyChange } = props;
+  // Photos chosen while `askPhotoLabel` is on, waiting for their label.
+  const [unlabelled, setUnlabelled] = useState<File[] | null>(null);
   useEffect(() => {
-    onBusyChange?.(uploads.busy);
-  }, [uploads.busy, onBusyChange]);
+    onBusyChange?.(uploads.busy || unlabelled !== null);
+  }, [uploads.busy, unlabelled, onBusyChange]);
+  const ask = Boolean(props.askPhotoLabel) && !props.photoLabel;
   return (
     <div className={props.className}>
       <FileButton
@@ -76,11 +86,25 @@ export function SlotUploader(props: SlotUploaderProps) {
         multiple={props.multiple}
         disabled={props.disabled || (!props.multiple && uploads.busy)}
         aria-label={props["aria-label"]}
-        onFiles={(files) => uploads.add(props.multiple ? files : files.slice(0, 1))}
+        onFiles={(chosen) => {
+          const files = props.multiple ? chosen : chosen.slice(0, 1);
+          // WHY by the slot's kinds, not the file's type: a phone photo (HEIC) may come with no
+          // type at all, and only photo slots ask (videos and documents carry no label).
+          if (ask && props.kinds.includes("image") && files.length > 0) setUnlabelled(files);
+          else uploads.add(files);
+        }}
       >
         {props.children}
       </FileButton>
       <UploadQueue uploads={uploads} className="mt-2" />
+      <PhotoLabelDialog
+        files={unlabelled}
+        onCancel={() => setUnlabelled(null)}
+        onConfirm={(label) => {
+          if (unlabelled) uploads.add(unlabelled, label);
+          setUnlabelled(null);
+        }}
+      />
     </div>
   );
 }

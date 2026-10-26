@@ -23,3 +23,12 @@ export {
   startOfWeek,
   weekdayIndex,
 } from "./time";
+export {
+  MAX_LIST_DEPTH,
+  formattedTextToPlain,
+  parseFormattedText,
+  parseInline,
+  type BlockNode,
+  type InlineNode,
+  type ListItemNode,
+} from "./formattedText";

@@ -11,6 +11,8 @@ import yaml
 from fastapi import FastAPI
 
 CONTRACT = Path(__file__).resolve().parents[3] / "handbook" / "api" / "openapi-v1.yaml"
+# Contract additions (Phase 4 part 4, D-035): where a library item is used.
+ADDED_OPERATIONS = {("get", "/api/v1/admin/media/{id}/usage"): ("media_usage", "media.upload")}
 
 
 def _media_operations(spec: dict[str, Any]) -> dict[tuple[str, str], tuple[str, str | None]]:
@@ -25,7 +27,10 @@ def _media_operations(spec: dict[str, Any]) -> dict[tuple[str, str], tuple[str, 
 def test_media_operations_match_the_design_contract(app: FastAPI) -> None:
     design = _media_operations(yaml.safe_load(CONTRACT.read_text()))
     assert len(design) == 10
-    assert _media_operations(app.openapi()) == design
+    live = _media_operations(app.openapi())
+    assert {key: value for key, value in live.items() if key not in ADDED_OPERATIONS} == design
+    for key, value in ADDED_OPERATIONS.items():
+        assert live[key] == value
 
 
 def test_media_schemas_keep_every_contract_field(app: FastAPI) -> None:

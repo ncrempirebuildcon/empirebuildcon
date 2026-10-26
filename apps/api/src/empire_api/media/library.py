@@ -2,17 +2,21 @@
 alt text and honest label, and delete an unused item.
 
 Collaborators: links.py (attached counts), events.py, rules.py (labels), projects/media_owners.py
-(projects using a file, the SEO share image), store.py (the file itself is destroyed later by
-handlers.py); routes.py (HTTP).
+(projects using a file, the SEO share image), content/media_uses.py and content/media_changes.py
+(content using a file), store.py (the file itself is destroyed later by handlers.py); routes.py.
 Implements: ARCHITECTURE §9 (media.updated / media.removed), §11 (audit), §12; the honest
 labels (AGENTS.md "Honest content").
 
 Rules:
-  - Delete only when nothing uses the file: no link (409 "Remove it from … first") and no
-    project's SEO share image. The row goes at once; `media.removed` makes the outbox handler
-    destroy the file at the store, with the normal retries.
+  - Delete only when nothing uses the file (usage.py: links of projects, pages and posts, share
+    images, offer images, testimonial photos); otherwise 409 naming the places. The row goes at
+    once; `media.removed` makes the outbox handler destroy the file at the store, with the
+    normal retries. Offers and testimonials also hold RESTRICT foreign keys as a backstop.
   - A progress photo always has a month; only actual and progress photos carry one; documents
     have no label (also CHECK constraints in 0003_media). The month is stored as its first day.
+  - COMPLIANCE: a photo shown where a label is needed (gallery, hero, page block, post cover,
+    offer image) keeps its label (409 on removing it). A rename or relabel revalidates every
+    live project, page, post, offer and shown testimonial that uses the file (review L2).
 """
 
 from __future__ import annotations
@@ -24,9 +28,9 @@ from typing import Final
 from sqlalchemy import Select, String, cast, exists, func, or_, select
 from sqlalchemy.orm import Session
 
+from empire_api.content import media_changes, media_uses
 from empire_api.errors import ApiProblem
-from empire_api.media import events
-from empire_api.media.links import links_count
+from empire_api.media import events, usage
 from empire_api.media.models import Media, MediaLink
 from empire_api.media.rules import LABEL_FIRST, Owner, check_label, needs_label, normalise_month
 from empire_api.media.schemas import MediaUpdate, label_problem
@@ -35,7 +39,6 @@ from empire_api.projects.common import Actor, commit, conflict, like_pattern, re
 from empire_api.projects.media_owners import (
     owner_project_id,
     projects_by_ids,
-    projects_using_share_image,
     share_image_ids,
 )
 
@@ -67,10 +70,12 @@ def _filtered(filters: MediaFilters) -> Select[Media]:
         owned = select(MediaLink.media_id).where(filters.attached_to.matches())
         stmt = stmt.where(Media.id.in_(owned))
     if filters.unattached:
-        # A project's SEO share image is in use too, even without a link (delete would 409).
+        # A share image, offer image or testimonial photo is in use too, even without a link
+        # (delete would 409).
         stmt = stmt.where(
             ~exists().where(MediaLink.media_id == Media.id),
             cast(Media.id, String).not_in(share_image_ids()),
+            cast(Media.id, String).not_in(media_uses.used_media_ids()),
         )
     return stmt
 
@@ -129,43 +134,50 @@ def update_media(db: Session, actor: Actor, media_id: uuid.UUID, body: MediaUpda
             after=after,
         )
         events.media_event(db, actor, "media.updated", media, "details")
-        _notify_live_projects(db, actor, media)
+        _notify_live_owners(db, actor, media)
     commit(db)
     return media
 
 
 def _shown_where_label_needed(db: Session, media: Media) -> bool:
-    """COMPLIANCE: whether the file is visible in a photo list that needs a label."""
+    """COMPLIANCE: whether the file is visible where a label is needed: a photo list, a page
+    block or a post cover (vocab.LABEL_REQUIRED_ROLES), or an offer image (review L11)."""
     links = db.scalars(
         select(MediaLink).where(MediaLink.media_id == media.id, MediaLink.is_visible.is_(True))
     )
     unlabelled = Media(kind=media.kind, label=None, is_sample=media.is_sample)
-    return any(needs_label(unlabelled, link.role) for link in links)
+    if any(needs_label(unlabelled, link.role) for link in links):
+        return True
+    photo = media.kind == "image" and not media.is_sample
+    return photo and media_uses.is_offer_image(db, media.id)
 
 
-def _notify_live_projects(db: Session, actor: Actor, media: Media) -> None:
-    """A renamed or relabelled file changes the pages of every published project using it."""
+def _notify_live_owners(db: Session, actor: Actor, media: Media) -> None:
+    """A renamed or relabelled file changes every live page that shows it: published projects
+    (here) and live content (content/media_changes.py, review L2)."""
     links = db.scalars(select(MediaLink).where(MediaLink.media_id == media.id)).all()
     seen: dict[uuid.UUID, tuple[Owner, str]] = {}
+    content: dict[str, list[uuid.UUID]] = {"page": [], "post": []}
     for link in links:
         owner = Owner.of(link)
+        if owner.is_content:
+            content[owner.type].append(owner.id)
+            continue
         project_id = owner_project_id(db, owner.type, owner.id)
         if project_id is not None:
             seen.setdefault(project_id, (owner, link.role))
     for project in projects_by_ids(db, set(seen)):
         owner, role = seen[project.id]
         events.owner_changed(db, actor, project, owner, role, "details")
+    media_changes.media_details_changed(db, actor, media.id, content["page"], content["post"])
 
 
 def delete_media(db: Session, actor: Actor, media_id: uuid.UUID) -> None:
     """Delete an unused file from the library; the store copy goes through the outbox."""
     media = get_locked(db, media_id)
-    used = links_count(db, media.id)
-    if used:
-        places = "1 place" if used == 1 else f"{used} places"
-        raise conflict(f"This file is used in {places}. Remove it from there first.")
-    if projects_using_share_image(db, media.id):
-        raise conflict("This image is a project's share image (SEO). Choose another one first.")
+    found = usage.usage(db, media.id)
+    if found:
+        raise conflict(usage.in_use_message(found))
     record(
         db,
         actor,

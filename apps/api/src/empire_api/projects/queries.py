@@ -1,5 +1,6 @@
 """Read-only service functions other modules call about projects: the leads module (public
-project by slug, names for lead rows, configuration checks) and the dashboard (counts, drafts
+project by slug, names for lead rows, configuration checks), the content module (project and
+city ids named by page blocks, FAQs, offers and testimonials) and the dashboard (counts, drafts
 blocked from publishing, sample data still present).
 
 Collaborators: leads/intake.py, leads/present.py, leads/service.py, leads/report.py,
@@ -18,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from empire_api.config import get_settings
 from empire_api.projects.blockers import Blocker, publish_blockers
-from empire_api.projects.models import Configuration, Project
+from empire_api.projects.models import City, Configuration, Project
 
 
 @dataclass(frozen=True)
@@ -51,13 +52,39 @@ def project_ref(db: Session, project_id: uuid.UUID) -> ProjectRef | None:
 
 
 def project_refs(
-    db: Session, project_ids: Iterable[uuid.UUID | None]
+    db: Session, project_ids: Iterable[uuid.UUID | None], *, for_share: bool = False
 ) -> dict[uuid.UUID, ProjectRef]:
+    """Projects by id. `for_share`: lock the rows FOR SHARE until commit, so a project can't
+    be deleted between a page-block check and its save (content/block_refs.py, review L12)."""
     ids = {project_id for project_id in project_ids if project_id is not None}
     if not ids:
         return {}
-    rows = db.execute(select(Project.id, Project.slug, Project.name).where(Project.id.in_(ids)))
-    return {row[0]: ProjectRef(*row) for row in rows}
+    stmt = select(Project.id, Project.slug, Project.name).where(Project.id.in_(ids))
+    if for_share:
+        stmt = stmt.with_for_update(read=True)
+    return {row[0]: ProjectRef(*row) for row in db.execute(stmt)}
+
+
+def published_project_name(db: Session, slug: str) -> str | None:
+    """The name of the published project at /projects/<slug>, if any (a manual redirect from a
+    live address would hide it: seo/redirects.py)."""
+    return db.scalar(
+        select(Project.name).where(Project.slug == slug, Project.publish_state == "published")
+    )
+
+
+def existing_city_ids(
+    db: Session, city_ids: Iterable[uuid.UUID], *, for_share: bool = False
+) -> set[uuid.UUID]:
+    """The ids that are cities (page blocks filter project cards by city). `for_share` as in
+    `project_refs`."""
+    ids = set(city_ids)
+    if not ids:
+        return set()
+    stmt = select(City.id).where(City.id.in_(ids))
+    if for_share:
+        stmt = stmt.with_for_update(read=True)
+    return set(db.scalars(stmt))
 
 
 def configuration_names(

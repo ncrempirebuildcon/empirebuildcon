@@ -12,6 +12,7 @@ from empire_api.leads import models as lead_models
 from empire_api.media import models as media_models
 from empire_api.platform import models as platform_models
 from empire_api.projects import models as project_models
+from empire_api.seo import models as seo_models
 from empire_api.site_settings import models as settings_models
 from empire_api.users import models as user_models
 
@@ -22,6 +23,7 @@ __all__ = [
     "media_models",
     "platform_models",
     "project_models",
+    "seo_models",
     "settings_models",
     "user_models",
 ]

@@ -109,6 +109,23 @@ def _icon_key(value: str) -> str:
     return value
 
 
+# A tag (<b>, </p>, <img …>), a comment (<!--) or a declaration (<!doctype). Case-insensitive.
+_HTML: Final = re.compile(r"<\s*/?\s*[a-z][^>]*>|<!--|<!\s*[a-z]|<\?", re.IGNORECASE)
+NO_HTML_MESSAGE: Final = (
+    "Use plain text: HTML isn't accepted. For bold write *bold*, for italics _italics_, "
+    "and start bullet lines with -."
+)
+
+
+def no_html(value: str) -> str:
+    """SECURITY (SECURITY.md §5): refuse raw HTML. Our renderer shows text as text, so HTML
+    would never run; refusing it on input means nobody pastes markup expecting it to work, and
+    no stored text becomes dangerous if a future renderer is careless (content/fields.py)."""
+    if _HTML.search(value):
+        raise PydanticCustomError("no_html", NO_HTML_MESSAGE)
+    return value
+
+
 def _web_url(value: str) -> str:
     parts = urlsplit(value)
     if parts.scheme not in ("http", "https") or not parts.hostname or " " in value:
@@ -116,8 +133,24 @@ def _web_url(value: str) -> str:
     return value
 
 
+def is_site_path(value: str) -> bool:
+    """A path on our own site: starts with one `/`, no backslash, whitespace or control
+    characters.
+
+    SECURITY (review M5): browsers drop tabs and newlines from URLs, so `/<tab>/evil.example`
+    becomes `//evil.example`, another host; a backslash counts as a slash. One check for every
+    site path (SEO canonical paths, links, redirect targets), so they can't drift apart.
+    """
+    return (
+        value.startswith("/")
+        and not value.startswith("//")
+        and "\\" not in value
+        and not any(ch.isspace() or unicodedata.category(ch) == "Cc" for ch in value)
+    )
+
+
 def _site_path(value: str) -> str:
-    if not value.startswith("/") or value.startswith("//") or "\\" in value or " " in value:
+    if not is_site_path(value):
         raise PydanticCustomError(
             "site_path", "Enter a path on empirebuildcon.com, starting with /, like /projects/x."
         )
@@ -125,9 +158,15 @@ def _site_path(value: str) -> str:
 
 
 BlankIsNone = BeforeValidator(blank_to_none)
+NoHtml = AfterValidator(no_html)
 
 
 # WHY spelled out one by one: mypy needs real type aliases, not function calls.
+Line20 = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=20),
+    AfterValidator(_single_line),
+]
 Line40 = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=40),
@@ -168,6 +207,11 @@ Line170 = Annotated[
     StringConstraints(strip_whitespace=True, min_length=1, max_length=170),
     AfterValidator(_single_line),
 ]
+Line200 = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
+    AfterValidator(_single_line),
+]
 Line250 = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=250),
@@ -183,9 +227,19 @@ Text500 = Annotated[
     StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
     AfterValidator(_multi_line),
 ]
+Text1500 = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=1500),
+    AfterValidator(_multi_line),
+]
 Text2000 = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=2000),
+    AfterValidator(_multi_line),
+]
+Text4000 = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=4000),
     AfterValidator(_multi_line),
 ]
 Text5000 = Annotated[
@@ -196,6 +250,11 @@ Text5000 = Annotated[
 Text20000 = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=20000),
+    AfterValidator(_multi_line),
+]
+Text50000 = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=50000),
     AfterValidator(_multi_line),
 ]
 Slug = Annotated[

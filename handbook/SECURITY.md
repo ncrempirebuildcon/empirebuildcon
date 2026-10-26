@@ -55,7 +55,10 @@ Tested by a Playwright check and a header assertion in API tests.
 - Pydantic models with strict types and length limits on every request body; unknown fields rejected on staff routes.
 - SQL only through SQLAlchemy with bound parameters; no string-built SQL.
 - Formatted text is parsed by our own renderer into React elements; `dangerouslySetInnerHTML` is banned by lint rules (on DOM elements, components and `createElement`) in the web app and the UI package, except for JSON-LD, which is serialised with escaping.
-- Slugs, redirects: `to_path` must be a site path or an allow-listed host; no open redirects.
+- **No HTML in content.** Every content text field refuses HTML (a tag, `<!--`, `<!doctype`) with a plain-text message; `a < b` is fine. Page blocks are typed per block type, so no free-form data is stored.
+- **Links in content** (block buttons, offer buttons and terms links): a site path starting with one `/`, or `https://` with a host. Refused: `javascript:`, `data:`, `vbscript:`, `http:`, `mailto:`, protocol-relative `//host`, spaces and `user@host` tricks. Videos are YouTube/Vimeo links from a host allowlist, stored as provider and id, so the page only ever embeds that provider's player.
+- **Redirects:** `from_path` is a site path (not `/`, and never under `/admin`, `/api`, `/_next` or `/_internal`, in any letter case). `to_path` is a site path or `https://` on one of our own domains, stored as its path, so there are no open redirects. The stored path never starts with `//` and never holds a backslash (`https://empirebuildcon.com//evil.example` is refused), and a database CHECK backs that up. Loops are refused and chains collapse to one hop.
+- **Site paths** (`seo.canonical_path`, CTA links, redirect targets) refuse every whitespace and control character: browsers drop tabs and newlines, which would turn `/<tab>/evil.example` into another host.
 - **SSRF:** the maps resolver (`apps/api/src/empire_api/projects/maps.py`) follows short links only:
   - Hosts: an explicit list (google.com, www.google.com, maps.google.com, google.co.in, www.google.co.in, maps.google.co.in, goo.gl, maps.app.goo.gl). There are no wildcards.
   - Paths: the `www.` and `goo.gl` hosts must also be on a `/maps` path, which keeps Google's open redirect out.

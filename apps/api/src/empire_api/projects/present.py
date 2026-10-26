@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Final
 
+from empire_api.content.schemas_marketing import Faq
 from empire_api.media.queries import ProjectMedia
 from empire_api.media.schemas import LinkedMedia, Media
 from empire_api.projects import display, models
@@ -337,7 +338,9 @@ class AdminMedia:
     share_image: Media | None
 
 
-def project_admin(project: Project, blockers: list[Blocker], media: AdminMedia) -> ProjectAdmin:
+def project_admin(
+    project: Project, blockers: list[Blocker], media: AdminMedia, faqs: list[Faq]
+) -> ProjectAdmin:
     """The full CMS view of a project with its children, each in its saved order."""
     summary = project_summary(project, media.project.cover, media.project.rera_qr).model_dump(
         exclude={"publish_state", "published_at"}
@@ -368,7 +371,7 @@ def project_admin(project: Project, blockers: list[Blocker], media: AdminMedia) 
         documents=media.project.documents,
         brochure=media.project.brochure,
         brochure_gated=project.brochure_gated,
-        faqs=[],  # TODO(phase-4): part 4 (content) lists the project's FAQs.
+        faqs=faqs,
         seo=Seo.model_validate(project.seo),
         translations=Translations(project.translations),
         publish_state=project.publish_state,

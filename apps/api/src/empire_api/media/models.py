@@ -35,9 +35,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from empire_api.db import Base, created_at_column, uuid_pk
 from empire_api.media.vocab import (
+    LINK_ROLES,
     MEDIA_KINDS,
     MEDIA_LABELS,
-    MEDIA_ROLES,
     RESOURCE_TYPES,
     ROLES_BY_OWNER,
     SINGLE_ROLES,
@@ -45,10 +45,9 @@ from empire_api.media.vocab import (
 )
 from empire_api.projects.vocab import check_in
 
-# One column per owner type in the exclusive arc (ARCHITECTURE §6).
-# TODO(phase-4): part 4 (content) adds `page_id` and `post_id` here, to the CHECK below and to
-# the per-owner indexes, in its own migration.
-OWNER_COLUMNS = ("project_id", "configuration_id", "construction_update_id")
+# One column per owner type in the exclusive arc (ARCHITECTURE §6). Phase 4 part 4 added
+# `page_id` and `post_id` (migrations/versions/0005_content.py).
+OWNER_COLUMNS = ("project_id", "configuration_id", "construction_update_id", "page_id", "post_id")
 
 
 def _per_owner_indexes() -> list[Index]:
@@ -177,6 +176,8 @@ class MediaLink(Base):
     construction_update_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("construction_update.id", ondelete="CASCADE")
     )
+    page_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("page.id", ondelete="CASCADE"))
+    post_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("post.id", ondelete="CASCADE"))
     role: Mapped[str] = mapped_column(String(12))
     sort_order: Mapped[int] = mapped_column(server_default=sql("0"))
     is_cover: Mapped[bool] = mapped_column(server_default=sql("false"))
@@ -189,15 +190,18 @@ class MediaLink(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "num_nonnulls(project_id, configuration_id, construction_update_id) = 1",
+            "num_nonnulls(project_id, configuration_id, construction_update_id, page_id, "
+            "post_id) = 1",
             name="one_owner",
         ),
-        CheckConstraint(check_in("role", MEDIA_ROLES), name="role_valid"),
+        CheckConstraint(check_in("role", LINK_ROLES), name="role_valid"),
         # INVARIANT: hidden items can't be the cover (links.update_link unpins on hide).
         CheckConstraint("is_visible OR NOT is_cover", name="cover_is_visible"),
         # The same file once per owner and role. Each also indexes its owner's foreign key.
         UniqueConstraint("project_id", "role", "media_id"),
         UniqueConstraint("configuration_id", "role", "media_id"),
         UniqueConstraint("construction_update_id", "role", "media_id"),
+        UniqueConstraint("page_id", "role", "media_id"),
+        UniqueConstraint("post_id", "role", "media_id"),
         *_per_owner_indexes(),
     )

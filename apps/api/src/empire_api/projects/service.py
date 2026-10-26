@@ -10,10 +10,14 @@ Rules (the Phase 4 spec):
   - New projects are drafts. Publish needs `projects.publish` and an empty blocker list.
   - Delete only drafts that were never published and have no leads; otherwise 409 "Archive it
     instead". Leads keep their project when it is archived (leads/queries.project_has_leads).
+    Nor while a page block or an offer names it (content/queries.project_uses, review L12):
+    409 naming where, so nothing on a page points at a project that is gone.
   - Archive = PATCH publish_state "archived"; unpublish (or PATCH "draft") = back to draft.
     Taking a *published* project off the site either way needs `projects.publish`, and so
     does moving its sales_status to or from off_market (hidden from the site, ARCHITECTURE §7).
   - project.updated is emitted only while the project is published.
+  - A slug change on a published project leaves a 308 redirect from the old address
+    (seo/redirects.py, Phase 4 part 4); publishing removes a redirect from its own address.
 
 INVARIANT: every function commits once, after its audit row and events (common.py header).
 """
@@ -28,6 +32,7 @@ from typing import Any, Final
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from empire_api.content import queries as content_queries
 from empire_api.errors import ApiProblem
 from empire_api.leads import queries as lead_queries
 from empire_api.pagination import PageParams
@@ -48,6 +53,8 @@ from empire_api.projects.common import (
 )
 from empire_api.projects.models import Project, ProjectAmenity
 from empire_api.projects.schemas import ProjectInput, ProjectUpdate
+from empire_api.seo import redirects
+from empire_api.seo.paths import project_path
 from empire_api.timeutil import utcnow
 
 SLUG_CONFLICTS: Final = {"uq_project_slug": ("slug", project_input.SLUG_TAKEN)}
@@ -62,6 +69,7 @@ WAS_PUBLISHED: Final = (
 )
 NOT_A_DRAFT: Final = "Only drafts can be deleted. Restore it to draft first, or keep it archived."
 HAS_LEADS: Final = "This project has leads, so it can't be deleted. Archive it instead."
+SHOWN_IN_MESSAGE: Final = 5
 _AUDIT_SKIP: Final = ("updated_by",)
 
 # Everything a project row loads for the full CMS view (ProjectAdmin).
@@ -281,7 +289,11 @@ def _emit_after_update(
         if visibility_changed:
             # Consumers drop the project from (or add it back to) lists and the sitemap.
             extra["visibility_changed"] = True
-        # TODO(phase-4): part 4 (redirects) adds a redirect from the old path on a slug change.
+        if "slug" in diff and was_published:
+            # ARCHITECTURE §16: the old address keeps working (308, chains collapsed).
+            redirects.slug_changed(
+                db, actor, "project", project_path(before["slug"]), project_path(project.slug)
+            )
         emit(db, actor, project, "project.updated", changed=sorted(diff), **extra)
 
 
@@ -302,6 +314,9 @@ def delete_project(db: Session, project_id: uuid.UUID, actor: Actor) -> None:
         raise conflict(NOT_A_DRAFT)
     if lead_queries.project_has_leads(db, project.id):
         raise conflict(HAS_LEADS)
+    uses = content_queries.project_uses(db, project.id)
+    if uses:
+        raise conflict(_named_by_content(uses))
     record(
         db,
         actor,
@@ -312,6 +327,16 @@ def delete_project(db: Session, project_id: uuid.UUID, actor: Actor) -> None:
     )
     db.delete(project)
     commit(db)
+
+
+def _named_by_content(uses: list[str]) -> str:
+    """'Content still names this project: page “X” (a map block), offer “Y”. …'"""
+    named = ", ".join(uses[:SHOWN_IN_MESSAGE])
+    more = f" and {len(uses) - SHOWN_IN_MESSAGE} more" if len(uses) > SHOWN_IN_MESSAGE else ""
+    return (
+        f"Content still names this project: {named}{more}. Change or remove "
+        f"{'that' if len(uses) == 1 else 'those'} first, then delete the project."
+    )
 
 
 def publish_project(db: Session, project_id: uuid.UUID, actor: Actor) -> None:
@@ -335,6 +360,8 @@ def publish_project(db: Session, project_id: uuid.UUID, actor: Actor) -> None:
     project.published_at = utcnow()
     project.updated_by = actor.user_id
     db.flush()
+    # A redirect from this project's address would hide it now that it is live (redirects.py).
+    redirects.claim_path(db, actor, project_path(project.slug))
     record(
         db,
         actor,

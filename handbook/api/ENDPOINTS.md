@@ -66,7 +66,7 @@ Generated from [openapi-v1.yaml](openapi-v1.yaml). Permission keys are explained
 | POST | `/api/v1/admin/projects` | projects.write | Create project |
 | GET | `/api/v1/admin/projects/{id}` | projects.read | Get project |
 | PATCH | `/api/v1/admin/projects/{id}` | projects.write | Update project |
-| DELETE | `/api/v1/admin/projects/{id}` | projects.delete | Delete project |
+| DELETE | `/api/v1/admin/projects/{id}` | projects.delete | Delete project (a never-published draft without leads that no page block or offer names) |
 | POST | `/api/v1/admin/projects/{id}/publish` | projects.publish | Publish (blocked until RERA number and QR are present) |
 | POST | `/api/v1/admin/projects/{id}/unpublish` | projects.publish | Unpublish (back to draft) |
 | POST | `/api/v1/admin/projects/{id}/duplicate` | projects.write | Copy as a new draft |
@@ -129,7 +129,8 @@ Generated from [openapi-v1.yaml](openapi-v1.yaml). Permission keys are explained
 | POST | `/api/v1/admin/media/upload-signature` | media.upload | Signed parameters for a direct video/document upload to Cloudinary |
 | POST | `/api/v1/admin/media/confirm` | media.upload | Save a direct upload after verifying Cloudinary's signed reply |
 | PATCH | `/api/v1/admin/media/{id}` | media.upload | Rename / alt text |
-| DELETE | `/api/v1/admin/media/{id}` | media.manage | Delete from library and Cloudinary (refused while attached) |
+| DELETE | `/api/v1/admin/media/{id}` | media.manage | Delete from library and Cloudinary (refused while attached or used by content) |
+| GET | `/api/v1/admin/media/{id}/usage` | media.upload | Where a library item is used (projects, pages, posts, offers, testimonials) |
 | POST | `/api/v1/admin/media-links` | media.upload | Attach media to a project, configuration, update, page or post |
 | PATCH | `/api/v1/admin/media-links/{id}` | media.upload | Show/hide on website, make cover |
 | DELETE | `/api/v1/admin/media-links/{id}` | media.upload | Detach (media stays in the library) |
@@ -162,25 +163,26 @@ Generated from [openapi-v1.yaml](openapi-v1.yaml). Permission keys are explained
 | GET | `/api/v1/admin/pages` | content.read | List pages |
 | POST | `/api/v1/admin/pages` | content.write | Create page |
 | GET | `/api/v1/admin/pages/{id}` | content.read | Get page |
-| PATCH | `/api/v1/admin/pages/{id}` | content.write | Update page |
-| DELETE | `/api/v1/admin/pages/{id}` | content.write | Delete page |
-| PUT | `/api/v1/admin/pages/{id}/blocks` | content.write | Save the page's blocks (full ordered list) |
+| PATCH | `/api/v1/admin/pages/{id}` | content.write | Update page (scheduling and archiving a live page need content.publish; `seo` needs seo.manage; a live or scheduled legal page needs legal.publish; 409 when stale against `expected_updated_at`) |
+| DELETE | `/api/v1/admin/pages/{id}` | content.write | Delete a never-published page (required pages never) |
+| PUT | `/api/v1/admin/pages/{id}/blocks` | content.write | Save the page's blocks (full ordered list; 409 when stale against `expected_updated_at`) |
 | POST | `/api/v1/admin/pages/{id}/publish` | content.publish | Publish (legal pages need legal.publish) |
 | POST | `/api/v1/admin/pages/{id}/unpublish` | content.publish | Unpublish |
 | GET | `/api/v1/admin/posts` | content.read | List posts |
 | POST | `/api/v1/admin/posts` | content.write | Create post |
 | GET | `/api/v1/admin/posts/{id}` | content.read | Get post |
 | PATCH | `/api/v1/admin/posts/{id}` | content.write | Update post |
-| DELETE | `/api/v1/admin/posts/{id}` | content.write | Delete post |
+| DELETE | `/api/v1/admin/posts/{id}` | content.write | Delete a never-published post |
 | POST | `/api/v1/admin/posts/{id}/publish` | content.publish | Publish |
 | POST | `/api/v1/admin/posts/{id}/unpublish` | content.publish | Unpublish |
 | GET | `/api/v1/admin/faqs` | content.read | List faqs |
-| POST | `/api/v1/admin/faqs` | content.write | Create faq |
+| POST | `/api/v1/admin/faqs` | content.write | Create faq (showing it needs content.publish) |
+| PUT | `/api/v1/admin/faqs/order` | content.write | Set the order of one FAQ list (site-wide, or one project's) |
 | PATCH | `/api/v1/admin/faqs/{id}` | content.write | Update faq |
 | DELETE | `/api/v1/admin/faqs/{id}` | content.write | Delete faq |
 | GET | `/api/v1/admin/testimonials` | content.read | List testimonials |
 | POST | `/api/v1/admin/testimonials` | content.publish | Create testimonial |
-| PATCH | `/api/v1/admin/testimonials/{id}` | content.publish | Update testimonial |
+| PATCH | `/api/v1/admin/testimonials/{id}` | content.publish | Update testimonial (showing it needs a source and consent date) |
 | DELETE | `/api/v1/admin/testimonials/{id}` | content.publish | Delete testimonial |
 
 ## Marketing
@@ -190,14 +192,14 @@ Generated from [openapi-v1.yaml](openapi-v1.yaml). Permission keys are explained
 | GET | `/api/v1/admin/offers` | offers.manage | List offers |
 | POST | `/api/v1/admin/offers` | offers.manage | Create offer |
 | PATCH | `/api/v1/admin/offers/{id}` | offers.manage | Update offer |
-| DELETE | `/api/v1/admin/offers/{id}` | offers.manage | Delete offer |
+| DELETE | `/api/v1/admin/offers/{id}` | offers.manage | Delete an offer that was never live and no page shows |
 
 ## SEO
 
 | Method | Path | Needs | What it does |
 |---|---|---|---|
 | GET | `/api/v1/admin/redirects` | seo.manage | List redirects |
-| POST | `/api/v1/admin/redirects` | seo.manage | Create redirect |
+| POST | `/api/v1/admin/redirects` | seo.manage | Create redirect (loops and live addresses refused; chains collapsed to one hop) |
 | PATCH | `/api/v1/admin/redirects/{id}` | seo.manage | Update redirect |
 | DELETE | `/api/v1/admin/redirects/{id}` | seo.manage | Delete redirect |
 

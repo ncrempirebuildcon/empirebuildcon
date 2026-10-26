@@ -24,7 +24,7 @@ from starlette.concurrency import run_in_threadpool
 from empire_api.db import get_db
 from empire_api.errors import ApiProblem, problem_responses
 from empire_api.integrations.outbox_drain import drain_soon
-from empire_api.media import library, links, present, uploads
+from empire_api.media import library, links, present, uploads, usage
 from empire_api.media.models import Media as MediaRow
 from empire_api.media.models import MediaLink
 from empire_api.media.multipart import read_capped_form
@@ -37,6 +37,7 @@ from empire_api.media.schemas import (
     MediaLinkUpdate,
     MediaList,
     MediaUpdate,
+    MediaUse,
     UploadConfirm,
     UploadSignature,
     UploadSignatureRequest,
@@ -152,6 +153,20 @@ def update_media(
     """Title, alt text and the honest label (label_month: any day of the month)."""
     row = library.update_media(db, actor_of(actor, request), media_id, body)
     return _media(db, row.id)
+
+
+@router.get(
+    "/media/{id}/usage",
+    response_model=list[MediaUse],
+    operation_id="media_usage",
+    summary="Where a library item is used",
+    **staff("media.upload"),
+)
+def media_usage(media_id: MediaId, actor: Uploader, db: Db) -> list[MediaUse]:
+    """Projects, configurations, updates, pages, posts, offers and testimonials using it (an
+    addition in Phase 4 part 4). Delete needs this list to be empty."""
+    _media(db, media_id)  # 404 for an unknown id
+    return usage.usage(db, media_id)
 
 
 @router.delete(

@@ -12,6 +12,7 @@ same JSON schema in both directions, or FastAPI would split them into `Area-Inpu
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from typing import Annotated, Any, Final, Self
 
 from pydantic import (
@@ -37,6 +38,7 @@ from empire_api.projects.fields import (
     Line160,
     Line170,
     Line300,
+    NoHtml,
     OutModel,
     Pincode,
     SchemaExtra,
@@ -44,11 +46,15 @@ from empire_api.projects.fields import (
     SquareMetres,
     StrictModel,
     no_duplicates,
+    no_html,
 )
 from empire_api.projects.maps import is_google_maps_url
 from empire_api.projects.vocab import DEFAULT_STATE, AreaBasis, AreaUnit, PinSource
 
 MAX_LOCALES: Final = 5
+# The longest English field that can be translated (a post body, 50,000 characters); each field's
+# own limit is checked by `check_translation_fields` (review L1).
+MAX_TRANSLATION: Final = 50_000
 READ_ONLY: Final = SchemaExtra({"readOnly": True})
 
 
@@ -81,16 +87,19 @@ class Price(StrictModel):
     )
 
 
+# SECURITY (SECURITY.md §5): the title and description refuse HTML, like every other text
+# (review L1); the canonical path is a site path (fields.is_site_path, review M5). A comment, not
+# a docstring, so it stays out of the published contract.
 class Seo(StrictModel):
-    title: Annotated[Line70 | None, BlankIsNone] = None
-    description: Annotated[Line170 | None, BlankIsNone] = None
+    title: Annotated[Annotated[Line70, NoHtml] | None, BlankIsNone] = None
+    description: Annotated[Annotated[Line170, NoHtml] | None, BlankIsNone] = None
     # Must be an image in the media library (project_input.validate; 422 otherwise).
     og_image_id: uuid.UUID | None = None
     noindex: bool = False
     canonical_path: Annotated[SitePath | None, BlankIsNone] = None
 
 
-TranslationText = Annotated[str, StringConstraints(max_length=20000)]
+TranslationText = Annotated[str, StringConstraints(max_length=MAX_TRANSLATION)]
 LocaleKey = Annotated[str, StringConstraints(pattern=r"^[a-z]{2}$")]
 FieldKey = Annotated[str, StringConstraints(pattern=r"^[a-z_]{1,40}$")]
 
@@ -116,16 +125,32 @@ class Translations(RootModel[dict[LocaleKey, dict[FieldKey, TranslationText]]]):
         return self
 
 
-def check_translation_fields(value: Translations, allowed: frozenset[str]) -> Translations:
-    """Only fields that have an English column may be translated (e.g. name, tagline)."""
+def check_translation_fields(
+    value: Translations, limits: Mapping[str, int], *, plain_text: bool = False
+) -> Translations:
+    """Only fields that have an English column may be translated (e.g. name, tagline), each
+    within the English field's length (`limits`: field → maximum characters).
+
+    `plain_text`: also refuse HTML, as the English fields of pages, posts and FAQs do
+    (SECURITY.md §5, review L1).
+    """
     for fields in value.root.values():
-        unknown = sorted(set(fields) - allowed)
+        unknown = sorted(set(fields) - set(limits))
         if unknown:
             raise PydanticCustomError(
                 "translation_field",
                 "These fields can't be translated: {fields}. Allowed: {allowed}.",
-                {"fields": ", ".join(unknown), "allowed": ", ".join(sorted(allowed))},
+                {"fields": ", ".join(unknown), "allowed": ", ".join(sorted(limits))},
             )
+        for key, text in fields.items():
+            if len(text) > limits[key]:
+                raise PydanticCustomError(
+                    "translation_length",
+                    "The {field} translation can be at most {limit} characters.",
+                    {"field": key, "limit": f"{limits[key]:,}"},
+                )
+            if plain_text:
+                no_html(text)
     return value
 
 

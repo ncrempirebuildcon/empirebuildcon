@@ -19,10 +19,16 @@ MediaKind = Literal["image", "video", "document"]
 StoreName = Literal["cloudinary", "fake"]
 ResourceType = Literal["image", "video", "raw"]
 DirectKind = Literal["video", "document"]
-OwnerType = Literal["project", "configuration", "construction_update"]
+OwnerType = Literal["project", "configuration", "construction_update", "page", "post"]
 MediaRole = Literal[
     "gallery", "floor_plan", "brochure", "rera_qr", "video", "document", "hero", "og_image"
 ]
+# Phase 4 part 4: pages and posts hold library items too (the exclusive arc's `page_id` and
+# `post_id`). Their links mirror the page's blocks (`block`) and the post's cover (`cover`);
+# only media/content_links.py writes them, and the media-links endpoints refuse them, so these
+# roles never appear in the API's MediaRole.
+ContentRole = Literal["block", "cover"]
+CONTENT_OWNER_TYPES: Final = frozenset({"page", "post"})
 # COMPLIANCE: honest labels (AGENTS.md "Honest content"): an artist's impression must never pass
 # for a photo of the real building, and a progress photo always says which month it shows.
 MediaLabel = Literal["artist_impression", "actual_photo", "progress_photo"]
@@ -32,6 +38,7 @@ STORE_NAMES: Final = get_args(StoreName)
 RESOURCE_TYPES: Final = get_args(ResourceType)
 OWNER_TYPES: Final = get_args(OwnerType)
 MEDIA_ROLES: Final = get_args(MediaRole)
+LINK_ROLES: Final = (*MEDIA_ROLES, *get_args(ContentRole))
 MEDIA_LABELS: Final = get_args(MediaLabel)
 # Labels that may carry a month (an impression isn't of any particular month).
 DATED_LABELS: Final = frozenset({"actual_photo", "progress_photo"})
@@ -97,15 +104,20 @@ ROLES_BY_OWNER: Final[dict[str, dict[str, Accepts]]] = {
     },
     "configuration": {"floor_plan": _IMAGE | _PDF},
     "construction_update": {"gallery": _IMAGE},
+    "page": {"block": _IMAGE | frozenset({("video", None)})},
+    "post": {"cover": _IMAGE},
 }
 # INVARIANT: an owner holds at most one link in each of these roles (a partial unique index in
 # 0003_media enforces it). Attaching a new item replaces the old link; the file stays in the
 # library.
-SINGLE_ROLES: Final = frozenset({"brochure", "rera_qr", "hero", "og_image", "floor_plan"})
+SINGLE_ROLES: Final = frozenset({"brochure", "rera_qr", "hero", "og_image", "floor_plan", "cover"})
 # Only photo lists have a cover (the star on the board).
 COVER_ROLES: Final = frozenset({"gallery"})
 # COMPLIANCE: photos in these roles need an honest label before they can be shown (rules.py).
-LABEL_REQUIRED_ROLES: Final = frozenset({"gallery", "hero"})
+# `block`: every photo a page block shows is a hero, image or gallery photo (content/block_refs.py
+# refuses an unlabelled one), so its label can't be removed while a page uses it. `cover`: a
+# post cover often shows a render (content/posts.py refuses an unlabelled one, review L11).
+LABEL_REQUIRED_ROLES: Final = frozenset({"gallery", "hero", "block", "cover"})
 
 # Uploads and signatures per user per window (SECURITY.md §6; generous for a busy gallery day).
 UPLOAD_LIMIT: Final = 120

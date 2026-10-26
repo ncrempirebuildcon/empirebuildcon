@@ -66,6 +66,7 @@ pnpm format:check
 pnpm -r lint
 pnpm -r typecheck
 pnpm --filter @empire/ui test
+pnpm --filter @empire/web test
 pnpm --filter @empire/web build
 
 # API (from apps/api; uses the empire_test database and wipes it)

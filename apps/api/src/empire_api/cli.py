@@ -3,11 +3,13 @@
 Commands:
   create-superadmin  One-time: create the owner's account and print a setup link (D-009).
   create-user        Development/test only: a staff account with a password from stdin.
-  seed               Feature flags, default settings and the amenity catalogue (idempotent);
+  seed               Feature flags, default settings, the amenity catalogue, and the system and
+                     legal pages as drafts (legal text: the D-017 placeholder) (idempotent);
                      in development and test also the draft consent texts (D-017).
                      --sample also adds sample projects (development and demos; D-015),
-                     with the fake media store SAMPLE placeholder tiles in their photos, and
-                     twelve sample leads with a few site visits.
+                     with the fake media store SAMPLE placeholder tiles in their photos,
+                     twelve sample leads with a few site visits, and a sample post, offer and
+                     FAQs (no testimonials, ever).
   openapi            Write the OpenAPI spec for the typed web client (D-020).
   gen-secrets        Print fresh random values for your own local .env.
 
@@ -30,6 +32,11 @@ from sqlalchemy import select
 
 from empire_api.config import Settings, get_settings
 from empire_api.content.consent import seed_consent_texts
+from empire_api.content.seed import (
+    SampleContentRefusedError,
+    seed_pages,
+    seed_sample_content,
+)
 from empire_api.db import get_sessionmaker
 from empire_api.leads.seed import SampleLeadsRefusedError, seed_sample_leads
 from empire_api.media.seed import seed_sample_media
@@ -113,9 +120,13 @@ def seed(
     (D-017). Staging and production get none: the owner publishes approved wording, and until
     then public intake answers 503.
 
-    `--sample` adds "Sample City" and "Sample — Project A/B" for development and demos, and
-    twelve "Sample Lead N" leads with site visits. They are marked is_sample, the projects stay
-    drafts, and all of it is refused when APP_ENV is production (D-015).
+    It also adds the system pages (home, projects, about, contact) and the legal pages (privacy,
+    terms, disclaimer) as drafts; the legal pages hold only the D-017 placeholder.
+
+    `--sample` adds "Sample City" and "Sample — Project A/B" for development and demos, twelve
+    "Sample Lead N" leads with site visits, and a SAMPLE post, offer and FAQs. They are marked
+    is_sample, stay drafts (or switched off), and all of it is refused when APP_ENV is
+    production (D-015). It never adds a testimonial.
     """
     if sample and get_settings().app_env == "production":
         _fail("Sample data is never added in production (D-015).")
@@ -124,10 +135,12 @@ def seed(
         settings_added = seed_settings(db)
         amenities_added = seed_amenities(db)
         texts_added = seed_consent_texts(db)
+        pages_added = seed_pages(db)
         db.commit()
     _out(
         f"Seeded: {flags_added} new flags, {settings_added} new settings groups, "
-        f"{amenities_added} new amenities, {texts_added} draft consent texts."
+        f"{amenities_added} new amenities, {texts_added} draft consent texts, "
+        f"{pages_added} system and legal pages (drafts)."
     )
     if sample:
         with get_sessionmaker()() as db:
@@ -143,6 +156,21 @@ def seed(
         )
         _seed_sample_media()
         _seed_sample_leads()
+        _seed_sample_content()
+
+
+def _seed_sample_content() -> None:
+    with get_sessionmaker()() as db:
+        try:
+            content = seed_sample_content(db)
+        except SampleContentRefusedError as exc:
+            _fail(str(exc))
+            return
+        db.commit()
+    _out(
+        f"Sample content: {content.posts} post, {content.offers} offer and {content.faqs} FAQs "
+        "added (all marked is_sample; no testimonials)."
+    )
 
 
 def _seed_sample_leads() -> None:
