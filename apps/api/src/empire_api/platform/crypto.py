@@ -1,8 +1,9 @@
 """Small crypto and network helpers: client IP, IP hashing/masking, token hashing, HMAC tokens.
 
 Collaborators: users/ (login rate limits, CSRF, reset tokens), platform/audit.py (masked IPs).
-Implements: SECURITY.md §1 (hashed reset tokens), §8 (IPs stored only as a salted hash on
-leads; audit rows keep a masked network, enough to investigate abuse).
+Implements: SECURITY.md §1 (hashed reset tokens; limits per network, an IPv6 /64 counting as one),
+§8 (IPs stored only as a salted hash on leads; audit rows keep a masked network, enough to
+investigate abuse).
 """
 
 from __future__ import annotations
@@ -39,6 +40,29 @@ def client_ip(request: Request) -> str:
     except ValueError:
         return peer
     return candidate
+
+
+IPV6_NETWORK_PREFIX = 64
+
+
+def network_key(ip: str) -> str:
+    """The network an address stands for, for rate limits and lockouts.
+
+    SECURITY: one IPv6 customer usually gets a whole /64 (2^64 addresses), so limiting single
+    IPv6 addresses would let anyone dodge every limit by changing the last bits. IPv4 stays as is;
+    IPv6 becomes its /64 prefix; an IPv4-mapped IPv6 address becomes its IPv4 address. Anything
+    unparseable is returned unchanged (it still gets its own counter).
+    """
+    try:
+        address = ipaddress.ip_address(ip)
+    except ValueError:
+        return ip
+    if isinstance(address, ipaddress.IPv6Address):
+        if address.ipv4_mapped is not None:
+            return str(address.ipv4_mapped)
+        prefix = f"{address}/{IPV6_NETWORK_PREFIX}"
+        return str(ipaddress.ip_network(prefix, strict=False))
+    return str(address)
 
 
 def hash_ip(ip: str) -> str:

@@ -6,7 +6,9 @@ migration creates the new tables.
 
 from __future__ import annotations
 
+from empire_api.content import models as content_models
 from empire_api.db import Base
+from empire_api.leads import models as lead_models
 from empire_api.media import models as media_models
 from empire_api.platform import models as platform_models
 from empire_api.projects import models as project_models
@@ -15,6 +17,8 @@ from empire_api.users import models as user_models
 
 __all__ = [
     "Base",
+    "content_models",
+    "lead_models",
     "media_models",
     "platform_models",
     "project_models",

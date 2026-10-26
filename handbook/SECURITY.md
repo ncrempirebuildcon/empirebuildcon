@@ -14,7 +14,7 @@ Applies from Phase 3. Each item lists where it is enforced and how it is tested.
 | Cookie | `__Host-empire_session`; `HttpOnly; Secure; SameSite=Lax; Path=/`; no `Domain`. Nothing in localStorage or sessionStorage. | Playwright checks cookie flags |
 | Lifetime | 8 hours idle, 7 days absolute; rotated (new `sid`) at login and on privilege change. | API tests |
 | Lockout | Every sign-in attempt is counted per **account and network (IP)** before the password is checked; the 6th attempt in a 15-minute window gets 429 until the window ends. A stranger can't lock the owner out from another network, parallel requests can't get past 5 guesses, and unknown emails behave exactly like real ones (same 401, same 429). Super-admin unlock clears every network's counter. Same error message for unknown email and wrong password. (D-027) | API tests incl. parallel guesses |
-| Rate limits | Login: 10 per 15 min per IP; password-reset requests: 3 per hour per email and 10 per hour per IP. Counters in PostgreSQL (`rate_limit_bucket`), shared by every API instance. | API tests incl. two app instances |
+| Rate limits | Login: 10 per 15 min per network; password-reset requests: 3 per hour per email and 10 per hour per network. A "network" is the IPv4 address, or the /64 for IPv6 (IPv4-mapped addresses count as their IPv4), so rotating addresses inside one IPv6 allocation doesn't help. Counters in PostgreSQL (`rate_limit_bucket`), shared by every API instance. | API tests incl. two app instances and IPv6 /64 |
 | Client IP and edge key | Only our web proxy may call the API: it adds `X-Empire-Edge-Key` (`EDGE_PROXY_KEY`, required in staging and production) and the visitor's IP as seen by the host in `X-Empire-Client-IP`, after removing any `X-Empire-*` header the visitor sent. The API refuses calls without the key (403), except health checks and the scheduler's internal calls, and never reads `X-Forwarded-For`. `/api/v1/internal/*` is not reachable through the website. (D-027) | API tests, Playwright |
 | Password reset | Single-use random token (32 bytes), stored hashed, valid 30 minutes, claimed with one conditional update so two requests can't both use it; a reset or password change burns every other open link and revokes all sessions. | API tests |
 | Super-admin bootstrap | First super-admin is created by a one-time CLI command (`empire-api create-superadmin --email admin@empirebuildcon.com`) that prints a one-time setup link, never a password. No default credentials exist. | Manual check at deploy |
@@ -23,7 +23,7 @@ Applies from Phase 3. Each item lists where it is enforced and how it is tested.
 ## 2. Authorisation
 
 - Every staff route declares its permission (`x-permission` in the OpenAPI spec). A test walks all routes and fails if one has no permission or public marker.
-- Object-level checks: sales users without `leads.read_all` only see their own leads, in lists, detail, exports and reports.
+- Object-level checks: sales users without `leads.read_all` only see their own leads, in lists, detail, notes, activity, site visits, exports, reports and the dashboard. Requests for someone else's lead answer 404, so lead ids can't be probed (`leads/access.py`).
 - The CMS hides controls a role cannot use, but the API is the only gate.
 - A route's permission marker and its check come from one helper (`staff()`), so a route can't advertise a permission it doesn't enforce.
 - There is always at least one active super-admin who can sign in; demoting or deactivating the last one is refused (rows locked against races).
@@ -113,10 +113,12 @@ India's Digital Personal Data Protection Act applies to lead data. The design su
 
 - Collect only what the form needs: name, phone, optional email and message.
 - Consent recorded per lead with the exact text version; marketing use (ad platforms) needs its own consent.
-- IP addresses stored only as a salted hash (for abuse checks).
+- IP addresses are stored only as a salted hash, for abuse checks. IPv6 addresses are keyed by their /64 network for rate limits and lockout. Rate-limit keys use a keyed hash of the phone.
+- Visitor enquiries write no audit row: the lead's timeline covers them, and an audit row would copy the visitor's network into another table.
+- Page URLs must be http(s) or site paths, and referrers http(s), so a `javascript:` link can't reach a staff browser.
 - Access limited by role; CSV export only for admin and super-admin, and every export is audited.
-- Erasure on request: `leads.erase` replaces personal fields with a stub and keeps the audit trail.
-- Retention: leads inactive for 3 years are anonymised by the daily clean-up job (default; owner can change in Settings).
+- Erasure on request: `leads.erase` replaces personal fields with a stub and keeps the audit trail. That includes free text, notes and event payloads. Audit rows never receive personal free text in the first place, so they need no scrubbing. It covers the lead's duplicate group and, on request, every lead with the same phone (D-034).
+- Retention: leads inactive for 3 years are anonymised by the daily clean-up job (setting `privacy.lead_retention_years`; the owner can change it in Settings). Reads and exports don't count as activity.
 - Logs and audit diffs mask phone numbers and never contain form bodies.
 - Error reports (Sentry) never include local variables, request bodies or cookies, so a crash during sign-in can't send a password; password fields are hidden from `repr`.
 

@@ -22,7 +22,7 @@ from empire_api.config import get_settings
 from empire_api.errors import ApiProblem
 from empire_api.logs import mask_phone
 from empire_api.platform import audit, outbox, rate_limit
-from empire_api.platform.crypto import hash_ip, hash_token, new_token
+from empire_api.platform.crypto import hash_ip, hash_token, network_key, new_token
 from empire_api.timeutil import utcnow
 from empire_api.users import passwords
 from empire_api.users.models import PasswordResetToken, User, UserSession
@@ -78,7 +78,8 @@ def login(db: Session, email: str, password: str, meta: RequestMeta) -> tuple[Us
       - Unknown emails go through exactly the same steps and answers (401, then 429 with the
         same Retry-After rule), so the responses can't reveal which emails have accounts.
     """
-    ip_key = hash_ip(meta.ip)
+    # SECURITY: limits and lockouts count per network: an IPv6 /64 is one network (network_key).
+    ip_key = hash_ip(network_key(meta.ip))
     rate_limit.enforce(
         f"login:ip:{ip_key}",
         limit=10,
@@ -249,7 +250,7 @@ def reset_link(token: str) -> str:
 def forgot_password(db: Session, email: str, meta: RequestMeta) -> None:
     """Queue a reset email if the account exists. Same answer either way (no enumeration)."""
     rate_limit.enforce(
-        f"reset:ip:{hash_ip(meta.ip)}",
+        f"reset:ip:{hash_ip(network_key(meta.ip))}",
         limit=10,
         window_seconds=3600,
         message="Too many reset requests from this network. Try again in an hour.",

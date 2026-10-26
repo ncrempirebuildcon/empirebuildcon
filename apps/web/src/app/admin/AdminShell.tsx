@@ -9,19 +9,34 @@
  *
  * The menu only shows items the user's role can use (ARCHITECTURE.md §11). This is a convenience:
  * SECURITY: the API checks permissions on every call; hiding an item is never the protection.
+ *
+ * The shell also loads the dashboard once per page (`GET /admin/dashboard`): the Leads item shows
+ * the unread count from it as a badge, and the dashboard screen reads the same answer, so the
+ * home page doesn't ask twice (`useAdminSession().dashboard`).
  */
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Chip, ConfirmDialog } from "@empire/ui";
-import { api, setCsrfToken, type SessionUser } from "@/lib/api";
+import { api, call, setCsrfToken, type SessionUser } from "@/lib/api";
 import { ROLE_LABELS } from "@/lib/labels";
-import { CATALOGUE_PATH, MEDIA_PATH, PROJECTS_PATH, SIGN_IN_PATH } from "@/lib/routes";
-import { AdminSessionContext, type AdminSession } from "./session-context";
+import { unreadLeadCount } from "@/lib/leads/dashboard";
+import {
+  CATALOGUE_PATH,
+  LEADS_PATH,
+  MEDIA_PATH,
+  PROJECTS_PATH,
+  SIGN_IN_PATH,
+  SITE_VISITS_PATH,
+  UTM_REPORT_PATH,
+} from "@/lib/routes";
+import { useLoad } from "@/components/admin/useLoad";
+import { AdminSessionContext, type AdminSession, type DashboardState } from "./session-context";
 import { NavIcon, type NavIconName } from "./NavIcon";
 
-export type AdminSection = "dashboard" | "projects" | "catalogue" | "media";
+export type AdminSection =
+  "dashboard" | "leads" | "site_visits" | "reports" | "projects" | "catalogue" | "media";
 
 interface MenuItem {
   label: string;
@@ -32,11 +47,13 @@ interface MenuItem {
   section?: AdminSection;
   /** Draw a divider above this item (board: before "Users & roles"). */
   divider?: boolean;
+  /** Show the unread-leads badge from the dashboard counts. */
+  badge?: "unread_leads";
 }
 
 // Menu items from the CMS boards with the permission each one needs (ARCHITECTURE.md §11).
-// TODO(phase-4): link Leads, Site visits, Pages, Offers & blog, Users, Settings and Audit log as
-// their screens arrive in the later parts of Phase 4.
+// TODO(phase-4): link Pages, Offers & blog, Users, Settings and Audit log as their screens arrive
+// in parts 4 and 5 of Phase 4.
 const MENU: MenuItem[] = [
   {
     label: "Dashboard",
@@ -45,8 +62,28 @@ const MENU: MenuItem[] = [
     href: "/admin",
     section: "dashboard",
   },
-  { label: "Leads", permission: "leads.read", icon: "leads" },
-  { label: "Site visits", permission: "site_visits.manage", icon: "visits" },
+  {
+    label: "Leads",
+    permission: "leads.read",
+    icon: "leads",
+    href: LEADS_PATH,
+    section: "leads",
+    badge: "unread_leads",
+  },
+  {
+    label: "Site visits",
+    permission: "site_visits.manage",
+    icon: "visits",
+    href: SITE_VISITS_PATH,
+    section: "site_visits",
+  },
+  {
+    label: "Reports",
+    permission: "leads.report",
+    icon: "reports",
+    href: UTM_REPORT_PATH,
+    section: "reports",
+  },
   {
     label: "Projects",
     permission: "projects.read",
@@ -97,11 +134,48 @@ export function AdminShell({ me, section, heading, breadcrumb, children }: Admin
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const roleLabel = ROLE_LABELS[me.role] ?? me.role;
 
-  const session = useMemo<AdminSession>(() => {
-    const permissions = new Set(me.permissions ?? []);
-    return { me, can: (p) => permissions.has(p), setHeading: setTitle, setUnsaved };
-  }, [me]);
+  const permissions = useMemo(() => new Set(me.permissions ?? []), [me]);
+  const hasDashboard = permissions.has("dashboard.view");
+  const load = useLoad(`dashboard:${me.id}`, () =>
+    hasDashboard ? call(api.GET("/api/v1/admin/dashboard")) : Promise.resolve(undefined),
+  );
+  const { data: dashboardData, error: dashboardError, loading: dashboardLoading } = load;
+  const { reload: reloadDashboard, refresh: refreshDashboard } = load;
+  const dashboard = useMemo<DashboardState | null>(
+    () =>
+      hasDashboard
+        ? {
+            data: dashboardData,
+            error: dashboardError,
+            loading: dashboardLoading,
+            reload: reloadDashboard,
+            refresh: async () => {
+              await refreshDashboard();
+            },
+          }
+        : null,
+    [
+      hasDashboard,
+      dashboardData,
+      dashboardError,
+      dashboardLoading,
+      reloadDashboard,
+      refreshDashboard,
+    ],
+  );
+
+  const session = useMemo<AdminSession>(
+    () => ({
+      me,
+      can: (p) => permissions.has(p),
+      setHeading: setTitle,
+      setUnsaved,
+      dashboard,
+    }),
+    [me, permissions, dashboard],
+  );
   const visible = MENU.filter((item) => session.can(item.permission));
+  const unread = dashboard?.data ? unreadLeadCount(dashboard.data) : null;
 
   useEffect(() => {
     // WHY: writes need the CSRF token bound to this session (SECURITY.md §3); keep it in memory only.
@@ -169,7 +243,11 @@ export function AdminShell({ me, section, heading, breadcrumb, children }: Admin
                     {item.divider ? (
                       <span aria-hidden="true" className="my-2 block h-px bg-line" />
                     ) : null}
-                    <MenuEntry item={item} current={item.section === section} />
+                    <MenuEntry
+                      item={item}
+                      current={item.section === section}
+                      badge={item.badge === "unread_leads" ? unread : null}
+                    />
                   </li>
                 ))}
               </ul>
@@ -231,7 +309,16 @@ export function AdminShell({ me, section, heading, breadcrumb, children }: Admin
   );
 }
 
-function MenuEntry({ item, current }: { item: MenuItem; current: boolean }) {
+function MenuEntry({
+  item,
+  current,
+  badge,
+}: {
+  item: MenuItem;
+  current: boolean;
+  /** A count to show after the label (unread leads); nothing when null or zero. */
+  badge: number | null;
+}) {
   const base = "flex min-h-11 items-center gap-2.5 rounded-tile px-3 text-small font-semibold";
   if (item.href) {
     return (
@@ -246,6 +333,14 @@ function MenuEntry({ item, current }: { item: MenuItem; current: boolean }) {
       >
         <NavIcon name={item.icon} />
         {item.label}
+        {badge ? (
+          // WHY the words in the link: "Leads 12 unread" is the link's name for screen readers,
+          // and the visible number starts with the visible label (WCAG 2.5.3 Label in Name).
+          <span className="ml-auto rounded-pill bg-gold-500 px-2 text-xs font-extrabold text-noir-900 tabular-nums">
+            {badge > 99 ? "99+" : badge}
+            <span className="sr-only"> unread</span>
+          </span>
+        ) : null}
       </Link>
     );
   }

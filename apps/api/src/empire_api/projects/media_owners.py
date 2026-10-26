@@ -9,6 +9,7 @@ Implements: ARCHITECTURE §2 (modules call each other's service functions, never
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from typing import Final
 
 from sqlalchemy import Select, func, select
@@ -95,3 +96,16 @@ def sample_project_ids(db: Session) -> list[uuid.UUID]:
         select(Project.id).where(Project.slug.in_(SAMPLE_SLUGS), Project.is_sample.is_(True))
     )
     return list(rows)
+
+
+def update_projects(db: Session, update_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, uuid.UUID]:
+    """construction update id → its project's id (for media counts per project)."""
+    ids = set(update_ids)
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(ConstructionUpdate.id, ConstructionUpdate.project_id).where(
+            ConstructionUpdate.id.in_(ids)
+        )
+    )
+    return dict(rows.all())

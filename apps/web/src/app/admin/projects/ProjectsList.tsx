@@ -2,8 +2,9 @@
 /**
  * Projects list (board NoirCmsLeads for the filter bar, table and pager; NoirCmsProject for the
  * status chips). Search and filters live in the URL
- * (`?q=&status=&publish_state=&sales_status=&city=&page=`), so a filtered list can be shared and
- * the dashboard can link to it (ARCHITECTURE.md §8 "filters in the URL").
+ * (`?q=&status=&publish_state=&sales_status=&city=&blocked=true&page=`), so a filtered list can be
+ * shared and the dashboard can link to it (ARCHITECTURE.md §8 "filters in the URL"). `blocked`
+ * comes from the dashboard's "Drafts blocked from publishing" count and shows as a removable chip.
  *
  * "New project" needs `projects.write`; the API checks it again (SECURITY: hiding is not the guard).
  */
@@ -52,6 +53,8 @@ interface Filters {
   publish_state: PublishState | "";
   sales_status: SalesStatus | "";
   city: string;
+  /** "true": can't be published yet (any publish blocker); "false": ready; "": all. */
+  blocked: "" | "true" | "false";
   page: number;
 }
 
@@ -72,6 +75,8 @@ function readFilters(params: URLSearchParams): Filters {
     publish_state: pick(PUBLISH_STATE, "publish_state"),
     sales_status: pick(SALES_STATUS, "sales_status"),
     city: params.get("city") ?? "",
+    blocked:
+      params.get("blocked") === "true" ? "true" : params.get("blocked") === "false" ? "false" : "",
     page: Number.isFinite(page) && page > 0 ? page : 1,
   };
 }
@@ -103,7 +108,12 @@ export function ProjectsList() {
     window.history.replaceState(null, "", url);
   }, []);
   const hasFilters = Boolean(
-    filters.q || filters.status || filters.publish_state || filters.sales_status || filters.city,
+    filters.q ||
+    filters.status ||
+    filters.publish_state ||
+    filters.sales_status ||
+    filters.city ||
+    filters.blocked,
   );
 
   const list = useLoad(listHref(filters), () =>
@@ -118,6 +128,7 @@ export function ProjectsList() {
             publish_state: filters.publish_state || undefined,
             sales_status: filters.sales_status || undefined,
             city: filters.city || undefined,
+            blocked: filters.blocked ? filters.blocked === "true" : undefined,
           },
         },
       }),
@@ -350,6 +361,17 @@ function FilterBar({
         onChange={(event) => onApply({ city: event.target.value })}
         className="flex-[1_1_160px]"
       />
+      {filters.blocked ? (
+        <button
+          type="button"
+          onClick={() => onApply({ blocked: "" })}
+          className="min-h-11 rounded-pill border border-gold-500 bg-gold-tint px-4 text-caption font-bold text-gold-300"
+        >
+          {filters.blocked === "true" ? "Blocked from publishing" : "Ready to publish"}{" "}
+          <span aria-hidden="true">×</span>
+          <span className="sr-only"> (remove this filter)</span>
+        </button>
+      ) : null}
       {clearHref ? (
         <Link
           href={clearHref}

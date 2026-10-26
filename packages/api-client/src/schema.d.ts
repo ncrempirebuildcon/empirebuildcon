@@ -145,6 +145,68 @@ export interface paths {
         patch: operations["update_city"];
         trace?: never;
     };
+    "/api/v1/admin/consent-texts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * All versions
+         * @description Every version of every kind (or of one `kind`), newest version first.
+         */
+        get: operations["list_consent_texts"];
+        put?: never;
+        /**
+         * New draft version
+         * @description A new, unpublished version. It takes effect only when published.
+         */
+        post: operations["create_consent_text"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/consent-texts/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make this version current
+         * @description Forms must send this version's id from now on; older versions get 409 "reload".
+         *     In production a text still marked as a draft is refused (409).
+         */
+        post: operations["publish_consent_text"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Counts that link to filtered lists, latest leads, upcoming visits, tasks */
+        get: operations["dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/flags": {
         parameters: {
             query?: never;
@@ -180,6 +242,173 @@ export interface paths {
          * @description Switch a feature on or off. Locked features (not built yet) answer 409.
          */
         patch: operations["set_flag"];
+        trace?: never;
+    };
+    "/api/v1/admin/lead-owners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * People a lead can be assigned to
+         * @description Active accounts whose role can open leads. Contract addition (Phase 4 part 3).
+         */
+        get: operations["list_lead_owners"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lead inbox, newest first
+         * @description Sales users without leads.read_all see only leads assigned to them.
+         */
+        get: operations["list_leads"];
+        put?: never;
+        /**
+         * Add a lead by hand (walk-in, phone call)
+         * @description `consent_note` is required. Leaving `owner_user_id` out makes you the owner.
+         */
+        post: operations["create_lead_manually"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/leads/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * CSV export of the filtered list (logged in the audit log)
+         * @description Same filters and access rule as the inbox. At most 50,000 rows (more → 422, narrow the filters). Every export is in the audit log with its filters and row count (a search is recorded only by its length), and on each exported lead's timeline. The file contains personal data. Although it is a GET, it needs the X-CSRF-Token header (403 without it), and a Sec-Fetch-Site header other than same-origin is refused (403): download it with fetch and save the blob, never with a plain link. Columns: reference, created_at, name, phone, email, project, configuration, source, status, lost_reason, lost_reason_note, owner, assigned_at, read_at, last_activity_at, message, page_url, referrer, utm_source, utm_medium, utm_campaign, utm_term, utm_content, gclid, gbraid, wbraid, fbclid, msclkid, preferred_bhk, budget_max_inr, preferred_contact_time, language, consent_text_version, consented_at, consent_note, marketing_consent, duplicate_of, is_spam, is_sample, erased_at.
+         */
+        get: operations["export_leads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/leads/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lead detail
+         * @description Reading doesn't mark it read; the CMS calls …/read when the lead is opened.
+         */
+        get: operations["get_lead"];
+        put?: never;
+        post?: never;
+        /**
+         * Erase a lead's personal data on request (keeps an anonymised stub)
+         * @description Erases this lead and its whole duplicate group (the lead it repeats and every lead that repeats it); `scope=person` also erases every other lead with the same phone number (`same_phone_count` on the lead says how many). Name and phone become '[erased]'; email, message, page URL, referrer, click ids, preferred contact time and the UTM term and content are removed; note texts, the lost-reason note and visit notes are replaced or removed, in the timeline and stored events too. The reference, stage, reason code, source, UTM source/medium/campaign, project, timestamps and the consent record's version and time stay. Audited with the scope and count; can't be undone. Leads already erased are skipped (204 again).
+         */
+        delete: operations["erase_lead"];
+        options?: never;
+        head?: never;
+        /**
+         * Change status, owner, details
+         * @description Changing owner needs leads.assign. `lost` needs a `lost_reason` code; `other` also needs `lost_reason_note`.
+         */
+        patch: operations["update_lead"];
+        trace?: never;
+    };
+    "/api/v1/admin/leads/{id}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Timeline
+         * @description Newest first. `data` holds ids, stages and times only.
+         */
+        get: operations["lead_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/leads/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Notes
+         * @description Newest first.
+         */
+        get: operations["list_lead_notes"];
+        put?: never;
+        /** Add note */
+        post: operations["add_lead_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/leads/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark read */
+        post: operations["mark_lead_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/leads/{id}/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark unread */
+        post: operations["mark_lead_unread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/localities": {
@@ -416,7 +645,8 @@ export interface paths {
         };
         /**
          * List Projects
-         * @description Projects, most recently edited first, with the CMS list's filters.
+         * @description Projects, most recently edited first, with the CMS list's filters. `blocked` is the
+         *     dashboard's "drafts blocked from publishing" link (addition, Phase 4 part 3).
          */
         get: operations["list_projects"];
         put?: never;
@@ -871,6 +1101,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/reports/utm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Leads by source, campaign and project
+         * @description Counts only, never personal data. `group_by` source, medium, campaign or project; left out, rows group by all four. Spam never counts. Sales see their own leads' counts.
+         */
+        get: operations["utm_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/roles": {
         parameters: {
             query?: never;
@@ -889,6 +1139,46 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/site-visits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Site-visit calendar
+         * @description Calendar order. A visit's day is its confirmed time (IST) once confirmed, else the day the buyer asked for. At most 500 visits; use from/to for a week or a month.
+         */
+        get: operations["list_site_visits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/site-visits/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Confirm, reschedule, complete
+         * @description Confirm: status `confirmed` with `confirmed_for` (also moves a new or contacted lead to `site_visit`). Reschedule: a new `confirmed_for`. Also `completed`, `no_show`, `cancelled`, `handled_by_user_id` and `notes`. Every change is on the lead's timeline and in the audit log.
+         */
+        patch: operations["update_site_visit"];
         trace?: never;
     };
     "/api/v1/admin/users": {
@@ -1164,6 +1454,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/brochure-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get the brochure link (lead form first when gated)
+         * @description `consent` must name the CURRENT lead-form consent text (id and version): an older one answers 409 "reload the page"; with no published text the answer is 503. `marketing_consent` is optional and, when sent, must name the current marketing text. The phone is normalised to E.164 (+91…); anything else is 422 on `phone`. The same phone and project within 24 hours is saved as a duplicate of the earlier lead and doesn't alert sales again. Only for a published project whose brochure is shown on the website (else 404). Honest note: this collects a lead before showing the link, but it is not access control; the PDF's address is public and doesn't expire, so `expires_at` is always null.
+         */
+        post: operations["request_brochure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit an enquiry (general or for a project)
+         * @description `consent` must name the CURRENT lead-form consent text (id and version): an older one answers 409 "reload the page"; with no published text the answer is 503. `marketing_consent` is optional and, when sent, must name the current marketing text. The phone is normalised to E.164 (+91…); anything else is 422 on `phone`. The same phone and project within 24 hours is saved as a duplicate of the earlier lead and doesn't alert sales again.
+         */
+        post: operations["submit_lead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/site-visits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a site visit (creates a lead and a visit request)
+         * @description `consent` must name the CURRENT lead-form consent text (id and version): an older one answers 409 "reload the page"; with no published text the answer is 503. `marketing_consent` is optional and, when sent, must name the current marketing text. The phone is normalised to E.164 (+91…); anything else is 422 on `phone`. The same phone and project within 24 hours is saved as a duplicate of the earlier lead and doesn't alert sales again. The day must be today or within 120 days (IST); sales confirm the time by phone.
+         */
+        post: operations["request_site_visit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1265,6 +1615,77 @@ export interface components {
             items: components["schemas"]["AuditEntry"][];
             meta: components["schemas"]["PageMeta"];
         };
+        /** BrochureLink */
+        BrochureLink: {
+            /**
+             * Expires At
+             * @description Always null: the address doesn't expire (gating collects a lead, it isn't access control).
+             */
+            expires_at: string | null;
+            /**
+             * Reference
+             * @example EMP-7K3Q9
+             */
+            reference: string;
+            /**
+             * Url
+             * @description The brochure PDF. Public: anyone with the address can open it.
+             */
+            url: string;
+        };
+        /**
+         * BrochureRequest
+         * @description A lead for one project; the answer is the brochure's address.
+         */
+        BrochureRequest: {
+            /** Budget Max Inr */
+            budget_max_inr?: number | null;
+            click_ids?: components["schemas"]["ClickIdsInput"];
+            /** Configuration Id */
+            configuration_id?: string | null;
+            consent: components["schemas"]["ConsentGiven"];
+            /** Email */
+            email?: string | null;
+            /**
+             * Language
+             * @default en
+             * @enum {string}
+             */
+            language: "en" | "hi";
+            /** @description Optional box for news and offers. Send it only when the visitor ticked it; it must name the CURRENT marketing text. */
+            marketing_consent?: components["schemas"]["ConsentGiven"] | null;
+            /** Message */
+            message?: string | null;
+            /** Name */
+            name: string;
+            /** Page Url */
+            page_url: string;
+            /**
+             * Phone
+             * @description Any Indian format; stored as +91XXXXXXXXXX (leads/phone.py)
+             */
+            phone: string;
+            /** Preferred Bhk */
+            preferred_bhk?: number | null;
+            /** Preferred Contact Time */
+            preferred_contact_time?: string | null;
+            /** Project Slug */
+            project_slug: string;
+            /** Referrer */
+            referrer?: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "project_form" | "contact_form" | "brochure" | "site_visit" | "campaign" | "chat" | "whatsapp";
+            utm?: components["schemas"]["UtmInput"];
+            /**
+             * Website
+             * @description Honeypot. Leave empty; people never see this field.
+             * @default
+             */
+            website: string;
+        };
         /** City */
         City: {
             /**
@@ -1315,6 +1736,32 @@ export interface components {
             slug: string;
             /** State */
             state: string;
+        };
+        /** ClickIds */
+        ClickIds: {
+            /** Fbclid */
+            fbclid: string | null;
+            /** Gbraid */
+            gbraid: string | null;
+            /** Gclid */
+            gclid: string | null;
+            /** Msclkid */
+            msclkid: string | null;
+            /** Wbraid */
+            wbraid: string | null;
+        };
+        /** ClickIdsInput */
+        ClickIdsInput: {
+            /** Fbclid */
+            fbclid?: string | null;
+            /** Gbraid */
+            gbraid?: string | null;
+            /** Gclid */
+            gclid?: string | null;
+            /** Msclkid */
+            msclkid?: string | null;
+            /** Wbraid */
+            wbraid?: string | null;
         };
         /**
          * Configuration
@@ -1398,6 +1845,73 @@ export interface components {
             tower_id?: string | null;
             translations?: components["schemas"]["Translations"];
         };
+        /**
+         * ConsentGiven
+         * @description The visitor ticked the box next to this exact text version.
+         */
+        ConsentGiven: {
+            /**
+             * Accepted
+             * @constant
+             */
+            accepted: true;
+            /**
+             * Consent Text Id
+             * Format: uuid
+             */
+            consent_text_id: string;
+            /** Version */
+            version: number;
+        };
+        /** ConsentText */
+        ConsentText: {
+            /** Body */
+            body: string;
+            /** Checkbox Label */
+            checkbox_label: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["UserRef"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Current */
+            is_current: boolean;
+            /**
+             * Is Draft
+             * @description The wording still says it awaits the owner's approval (D-017). Production refuses to publish such a text.
+             */
+            is_draft: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "lead_form" | "marketing" | "brochure" | "cookies" | "chat";
+            /** Published At */
+            published_at: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ConsentTextInput
+         * @description A new draft version. Published texts are never edited: send a new version instead.
+         */
+        ConsentTextInput: {
+            /** Body */
+            body: string;
+            /** Checkbox Label */
+            checkbox_label: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "lead_form" | "marketing" | "brochure" | "cookies" | "chat";
+        };
         /** ConstructionUpdate */
         ConstructionUpdate: {
             /**
@@ -1457,6 +1971,65 @@ export interface components {
              * Format: date
              */
             update_date: string;
+        };
+        /** Dashboard */
+        Dashboard: {
+            /**
+             * Counts
+             * @description Only the counts your role can open
+             */
+            counts: components["schemas"]["DashboardCount"][];
+            /**
+             * Latest Leads
+             * @description Your newest 5 (all leads with leads.read_all)
+             */
+            latest_leads: components["schemas"]["Lead"][];
+            /**
+             * Leads By Source
+             * @description Last 30 days (IST), spam left out, counts only
+             */
+            leads_by_source: components["schemas"]["SourceCount"][];
+            /**
+             * Tasks
+             * @description E.g. projects missing the RERA QR, photos hidden until labelled, consent texts still awaiting the owner's approval
+             */
+            tasks: components["schemas"]["DashboardTask"][];
+            /** Upcoming Visits */
+            upcoming_visits: components["schemas"]["SiteVisit"][];
+        };
+        /** DashboardCount */
+        DashboardCount: {
+            /** Count */
+            count: number;
+            /**
+             * Key
+             * @example leads.new
+             */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Link
+             * @description CMS path with filters, e.g. /admin/leads?status=new
+             */
+            link: string;
+        };
+        /** DashboardTask */
+        DashboardTask: {
+            /** Detail */
+            detail: string | null;
+            /**
+             * Key
+             * @example project.rera_qr_missing
+             */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Link
+             * @description CMS path where the task is done
+             */
+            link: string;
         };
         /** DrainResult */
         DrainResult: {
@@ -1550,6 +2123,378 @@ export interface components {
             /** @enum {string} */
             role?: "gallery" | "floor_plan" | "brochure" | "rera_qr" | "video" | "document" | "hero" | "og_image";
             title?: string;
+        };
+        /** Lead */
+        Lead: {
+            /** Assigned At */
+            assigned_at: string | null;
+            /** Budget Max Inr */
+            budget_max_inr: number | null;
+            click_ids: components["schemas"]["ClickIds"];
+            configuration: components["schemas"]["LeadConfigurationRef"] | null;
+            consent: components["schemas"]["LeadConsentRecord"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Duplicate Of
+             * @description The earlier lead this one repeats (24 h rule), when you may see it; else null
+             */
+            duplicate_of: string | null;
+            /** Duplicate Of Reference */
+            duplicate_of_reference: string | null;
+            /**
+             * Duplicates
+             * @description Later leads linked to this one that you may see (24 h rule)
+             */
+            duplicates: components["schemas"]["LeadRef"][];
+            /** Email */
+            email: string | null;
+            /** Erased At */
+            erased_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Sample */
+            is_sample: boolean;
+            /** Is Spam */
+            is_spam: boolean;
+            /** Language */
+            language: string;
+            /**
+             * Last Activity At
+             * Format: date-time
+             */
+            last_activity_at: string;
+            /**
+             * Lost Reason
+             * @description Why the lead was lost (a code; the CMS shows its label). Null unless lost.
+             */
+            lost_reason: ("bought_elsewhere" | "budget" | "location" | "not_reachable" | "not_looking" | "duplicate" | "other") | null;
+            /**
+             * Lost Reason Note
+             * @description Staff's own words; required for `other`
+             */
+            lost_reason_note: string | null;
+            /** @description Null: the optional marketing box was not ticked. Don't add to marketing lists. */
+            marketing_consent: components["schemas"]["LeadConsentRecord"] | null;
+            /** Message */
+            message: string | null;
+            /** Name */
+            name: string;
+            next_visit: components["schemas"]["SiteVisit"] | null;
+            owner: components["schemas"]["UserRef"] | null;
+            /** Page Url */
+            page_url: string | null;
+            /** Phone E164 */
+            phone_e164: string;
+            /** Preferred Bhk */
+            preferred_bhk: number | null;
+            /** Preferred Contact Time */
+            preferred_contact_time: string | null;
+            project: components["schemas"]["LeadProjectRef"] | null;
+            /** Read At */
+            read_at: string | null;
+            /** Reference */
+            reference: string;
+            /** Referrer */
+            referrer: string | null;
+            /**
+             * Same Phone Count
+             * @description Leads with this phone number, this one included. Only for leads.erase (the erase dialog's 'all leads from this person'); null otherwise and once erased.
+             */
+            same_phone_count: number | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "project_form" | "contact_form" | "brochure" | "site_visit" | "campaign" | "chat" | "whatsapp" | "phone" | "manual";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "new" | "contacted" | "site_visit" | "negotiation" | "booked" | "lost";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            utm: components["schemas"]["Utm"];
+        };
+        /** LeadAccepted */
+        LeadAccepted: {
+            /** Message */
+            message: string;
+            /**
+             * Reference
+             * @example EMP-7K3Q9
+             */
+            reference: string;
+        };
+        /** LeadActivity */
+        LeadActivity: {
+            actor: components["schemas"]["UserRef"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Data
+             * @description Ids, stages and times only; never personal data
+             */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "created" | "status_changed" | "assigned" | "note_added" | "visit_requested" | "visit_updated" | "alert_sent" | "webhook_sent" | "exported" | "read" | "unread" | "details_changed" | "spam_marked" | "duplicate_linked" | "erased";
+        };
+        /** LeadConfigurationRef */
+        LeadConfigurationRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * LeadConsentRecord
+         * @description What the person agreed to. Public forms: the text version and label shown. Manual leads:
+         *     staff's note on how consent was given (no text version).
+         */
+        LeadConsentRecord: {
+            /** Checkbox Label */
+            checkbox_label: string | null;
+            /** Consent Note */
+            consent_note: string | null;
+            /** Consent Text Id */
+            consent_text_id: string | null;
+            /**
+             * Consented At
+             * Format: date-time
+             */
+            consented_at: string;
+            /** Page Url */
+            page_url: string | null;
+            /** Text Version */
+            text_version: number | null;
+        };
+        /**
+         * LeadCreate
+         * @description An enquiry from a public form. `consent` must name the CURRENT lead-form text.
+         */
+        LeadCreate: {
+            /** Budget Max Inr */
+            budget_max_inr?: number | null;
+            click_ids?: components["schemas"]["ClickIdsInput"];
+            /** Configuration Id */
+            configuration_id?: string | null;
+            consent: components["schemas"]["ConsentGiven"];
+            /** Email */
+            email?: string | null;
+            /**
+             * Language
+             * @default en
+             * @enum {string}
+             */
+            language: "en" | "hi";
+            /** @description Optional box for news and offers. Send it only when the visitor ticked it; it must name the CURRENT marketing text. */
+            marketing_consent?: components["schemas"]["ConsentGiven"] | null;
+            /** Message */
+            message?: string | null;
+            /** Name */
+            name: string;
+            /** Page Url */
+            page_url: string;
+            /**
+             * Phone
+             * @description Any Indian format; stored as +91XXXXXXXXXX (leads/phone.py)
+             */
+            phone: string;
+            /** Preferred Bhk */
+            preferred_bhk?: number | null;
+            /** Preferred Contact Time */
+            preferred_contact_time?: string | null;
+            /** Project Slug */
+            project_slug?: string | null;
+            /** Referrer */
+            referrer?: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "project_form" | "contact_form" | "brochure" | "site_visit" | "campaign" | "chat" | "whatsapp";
+            utm?: components["schemas"]["UtmInput"];
+            /**
+             * Website
+             * @description Honeypot. Leave empty; people never see this field.
+             * @default
+             */
+            website: string;
+        };
+        /** LeadList */
+        LeadList: {
+            /** Items */
+            items: components["schemas"]["Lead"][];
+            meta: components["schemas"]["PageMeta"];
+            /** @description Leads per stage under the same filters, ignoring `status` (board columns) */
+            status_counts: components["schemas"]["LeadStatusCounts"];
+        };
+        /**
+         * LeadManualCreate
+         * @description A walk-in or phone enquiry typed in by staff. `consent_note` says how consent was given.
+         */
+        LeadManualCreate: {
+            /**
+             * Consent Note
+             * @description How consent was obtained, e.g. 'Verbal on phone call'
+             */
+            consent_note: string;
+            /** Email */
+            email?: string | null;
+            /** Message */
+            message?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Owner User Id
+             * @description Left out: you. Someone else, or null for the sales inbox, needs leads.assign.
+             */
+            owner_user_id?: string | null;
+            /**
+             * Phone
+             * @description Any Indian format; stored as +91XXXXXXXXXX (leads/phone.py)
+             */
+            phone: string;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "project_form" | "contact_form" | "brochure" | "site_visit" | "campaign" | "chat" | "whatsapp" | "phone" | "manual";
+        };
+        /** LeadNote */
+        LeadNote: {
+            author: components["schemas"]["UserRef"];
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /** LeadNoteInput */
+        LeadNoteInput: {
+            /** Body */
+            body: string;
+        };
+        /** LeadOwner */
+        LeadOwner: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "super_admin" | "admin" | "sales" | "marketing" | "content_editor";
+        };
+        /** LeadProjectRef */
+        LeadProjectRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+        };
+        /** LeadRef */
+        LeadRef: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reference */
+            reference: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "project_form" | "contact_form" | "brochure" | "site_visit" | "campaign" | "chat" | "whatsapp" | "phone" | "manual";
+        };
+        /** LeadStatusCounts */
+        LeadStatusCounts: {
+            /** Booked */
+            booked: number;
+            /** Contacted */
+            contacted: number;
+            /** Lost */
+            lost: number;
+            /** Negotiation */
+            negotiation: number;
+            /** New */
+            new: number;
+            /** Site Visit */
+            site_visit: number;
+        };
+        /**
+         * LeadUpdate
+         * @description PATCH body: send only what changes. `owner_user_id` needs leads.assign; `lost` needs a
+         *     `lost_reason` code, and the code `other` needs a `lost_reason_note`.
+         */
+        LeadUpdate: {
+            /** Budget Max Inr */
+            budget_max_inr?: number | null;
+            /** Email */
+            email?: string | null;
+            /** Is Spam */
+            is_spam?: boolean | null;
+            /** Lost Reason */
+            lost_reason?: ("bought_elsewhere" | "budget" | "location" | "not_reachable" | "not_looking" | "duplicate" | "other") | null;
+            /** Lost Reason Note */
+            lost_reason_note?: string | null;
+            /** Owner User Id */
+            owner_user_id?: string | null;
+            /** Preferred Bhk */
+            preferred_bhk?: number | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Status */
+            status?: ("new" | "contacted" | "site_visit" | "negotiation" | "booked" | "lost") | null;
         };
         /**
          * LinkedMedia
@@ -2523,6 +3468,164 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** SiteVisit */
+        SiteVisit: {
+            /** Confirmed For */
+            confirmed_for: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            handled_by: components["schemas"]["UserRef"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Sample */
+            is_sample: boolean;
+            /**
+             * Lead Id
+             * Format: uuid
+             */
+            lead_id: string;
+            /** Lead Name */
+            lead_name: string;
+            lead_owner: components["schemas"]["UserRef"] | null;
+            /** Lead Phone E164 */
+            lead_phone_e164: string;
+            /** Lead Reference */
+            lead_reference: string;
+            /**
+             * Lead Status
+             * @enum {string}
+             */
+            lead_status: "new" | "contacted" | "site_visit" | "negotiation" | "booked" | "lost";
+            /** Notes */
+            notes: string | null;
+            /**
+             * Preferred Date
+             * Format: date
+             */
+            preferred_date: string;
+            /**
+             * Preferred Slot
+             * @enum {string}
+             */
+            preferred_slot: "morning" | "afternoon" | "evening";
+            project: components["schemas"]["SiteVisitProject"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "requested" | "confirmed" | "completed" | "no_show" | "cancelled";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** SiteVisitProject */
+        SiteVisitProject: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+        };
+        /**
+         * SiteVisitRequest
+         * @description A lead plus a visit request for one project (preferred day and time of day).
+         */
+        SiteVisitRequest: {
+            /** Budget Max Inr */
+            budget_max_inr?: number | null;
+            click_ids?: components["schemas"]["ClickIdsInput"];
+            /** Configuration Id */
+            configuration_id?: string | null;
+            consent: components["schemas"]["ConsentGiven"];
+            /** Email */
+            email?: string | null;
+            /**
+             * Language
+             * @default en
+             * @enum {string}
+             */
+            language: "en" | "hi";
+            /** @description Optional box for news and offers. Send it only when the visitor ticked it; it must name the CURRENT marketing text. */
+            marketing_consent?: components["schemas"]["ConsentGiven"] | null;
+            /** Message */
+            message?: string | null;
+            /** Name */
+            name: string;
+            /** Page Url */
+            page_url: string;
+            /**
+             * Phone
+             * @description Any Indian format; stored as +91XXXXXXXXXX (leads/phone.py)
+             */
+            phone: string;
+            /** Preferred Bhk */
+            preferred_bhk?: number | null;
+            /** Preferred Contact Time */
+            preferred_contact_time?: string | null;
+            /**
+             * Preferred Date
+             * Format: date
+             */
+            preferred_date: string;
+            /**
+             * Preferred Slot
+             * @enum {string}
+             */
+            preferred_slot: "morning" | "afternoon" | "evening";
+            /** Project Slug */
+            project_slug: string;
+            /** Referrer */
+            referrer?: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "project_form" | "contact_form" | "brochure" | "site_visit" | "campaign" | "chat" | "whatsapp";
+            utm?: components["schemas"]["UtmInput"];
+            /**
+             * Website
+             * @description Honeypot. Leave empty; people never see this field.
+             * @default
+             */
+            website: string;
+        };
+        /**
+         * SiteVisitUpdate
+         * @description Confirm (status `confirmed` + `confirmed_for`), reschedule (a new `confirmed_for`),
+         *     complete, no-show or cancel; plus who handles it and notes.
+         */
+        SiteVisitUpdate: {
+            /** Confirmed For */
+            confirmed_for?: string | null;
+            /** Handled By User Id */
+            handled_by_user_id?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Status */
+            status?: ("requested" | "confirmed" | "completed" | "no_show" | "cancelled") | null;
+        };
+        /** SourceCount */
+        SourceCount: {
+            /** Count */
+            count: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "project_form" | "contact_form" | "brochure" | "site_visit" | "campaign" | "chat" | "whatsapp" | "phone" | "manual";
+        };
         /** Specification */
         Specification: {
             /**
@@ -2786,6 +3889,54 @@ export interface components {
             phone?: string | null;
             /** Role */
             role?: ("super_admin" | "admin" | "sales" | "marketing" | "content_editor") | null;
+        };
+        /** Utm */
+        Utm: {
+            /** Campaign */
+            campaign: string | null;
+            /** Content */
+            content: string | null;
+            /** Medium */
+            medium: string | null;
+            /** Source */
+            source: string | null;
+            /** Term */
+            term: string | null;
+        };
+        /** UtmInput */
+        UtmInput: {
+            /** Campaign */
+            campaign?: string | null;
+            /** Content */
+            content?: string | null;
+            /** Medium */
+            medium?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Term */
+            term?: string | null;
+        };
+        /** UtmReportRow */
+        UtmReportRow: {
+            /** Booked */
+            booked: number;
+            /** Campaign */
+            campaign: string | null;
+            /** Leads */
+            leads: number;
+            /** Medium */
+            medium: string | null;
+            /** Project */
+            project: string | null;
+            /** Project Id */
+            project_id: string | null;
+            /**
+             * Site Visits
+             * @description Leads in this row with at least one visit request
+             */
+            site_visits: number;
+            /** Source */
+            source: string | null;
         };
     };
     responses: never;
@@ -3447,6 +4598,256 @@ export interface operations {
             };
         };
     };
+    list_consent_texts: {
+        parameters: {
+            query?: {
+                kind?: ("lead_form" | "marketing" | "brochure" | "cookies" | "chat") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentText"][];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_consent_text: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentTextInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentText"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    publish_consent_text: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentText"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_flags: {
         parameters: {
             query?: never;
@@ -3565,6 +4966,779 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_lead_owners: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadOwner"][];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_leads: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+                /** @description Name, reference, or the phone's last digits */
+                q?: string | null;
+                status?: ("new" | "contacted" | "site_visit" | "negotiation" | "booked" | "lost") | null;
+                /** @description A project's id, or 'none' (general) */
+                project_id?: string | null;
+                /** @description An id, 'me' or 'unassigned' */
+                owner_id?: string | null;
+                /** @description false = unread only */
+                read?: boolean | null;
+                source?: ("project_form" | "contact_form" | "brochure" | "site_visit" | "campaign" | "chat" | "whatsapp" | "phone" | "manual") | null;
+                /** @description Exact tag; empty = no tag */
+                utm_source?: string | null;
+                /** @description Exact tag; empty = no tag */
+                utm_medium?: string | null;
+                /** @description Exact tag; empty = no tag */
+                utm_campaign?: string | null;
+                /** @description IST day, included */
+                from?: string | null;
+                /** @description IST day, included */
+                to?: string | null;
+                include_spam?: boolean;
+                /** @description true = spam only; false = no spam (wins over include_spam) */
+                is_spam?: boolean | null;
+                /** @description Seeded sample leads (D-015) */
+                include_sample?: boolean;
+                /** @description true = still being worked (not booked, lost or erased); false = the rest */
+                open?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadList"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_lead_manually: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadManualCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Lead"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    export_leads: {
+        parameters: {
+            query?: {
+                /** @description Name, reference, or the phone's last digits */
+                q?: string | null;
+                status?: ("new" | "contacted" | "site_visit" | "negotiation" | "booked" | "lost") | null;
+                /** @description A project's id, or 'none' (general) */
+                project_id?: string | null;
+                /** @description An id, 'me' or 'unassigned' */
+                owner_id?: string | null;
+                /** @description false = unread only */
+                read?: boolean | null;
+                source?: ("project_form" | "contact_form" | "brochure" | "site_visit" | "campaign" | "chat" | "whatsapp" | "phone" | "manual") | null;
+                /** @description Exact tag; empty = no tag */
+                utm_source?: string | null;
+                /** @description Exact tag; empty = no tag */
+                utm_medium?: string | null;
+                /** @description Exact tag; empty = no tag */
+                utm_campaign?: string | null;
+                /** @description IST day, included */
+                from?: string | null;
+                /** @description IST day, included */
+                to?: string | null;
+                include_spam?: boolean;
+                /** @description true = spam only; false = no spam (wins over include_spam) */
+                is_spam?: boolean | null;
+                /** @description Seeded sample leads (D-015) */
+                include_sample?: boolean;
+                /** @description true = still being worked (not booked, lost or erased); false = the rest */
+                open?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_lead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Lead"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    erase_lead: {
+        parameters: {
+            query?: {
+                /** @description group (default): the duplicate group; person: every lead with the phone */
+                scope?: "group" | "person";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_lead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Lead"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    lead_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadActivity"][];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_lead_notes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadNote"][];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    add_lead_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadNoteInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadNote"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    mark_lead_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    mark_lead_unread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4637,6 +6811,8 @@ export interface operations {
                 publish_state?: ("draft" | "published" | "archived") | null;
                 sales_status?: ("available" | "sold_out" | "off_market") | null;
                 city?: string | null;
+                /** @description true = can't be published yet (any publish blocker); false = ready */
+                blocked?: boolean | null;
                 page?: number;
                 per_page?: number;
             };
@@ -7163,6 +9339,70 @@ export interface operations {
             };
         };
     };
+    utm_report: {
+        parameters: {
+            query?: {
+                /** @description IST day, included */
+                from?: string | null;
+                /** @description IST day, included */
+                to?: string | null;
+                group_by?: ("source" | "medium" | "campaign" | "project") | null;
+                /** @description Seeded sample leads (D-015) */
+                include_sample?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UtmReportRow"][];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_roles: {
         parameters: {
             query?: never;
@@ -7179,6 +9419,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Role"][];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_site_visits: {
+        parameters: {
+            query?: {
+                /** @description IST day, included */
+                from?: string | null;
+                /** @description IST day, included */
+                to?: string | null;
+                status?: ("requested" | "confirmed" | "completed" | "no_show" | "cancelled") | null;
+                project_id?: string | null;
+                /** @description One lead's visits */
+                lead_id?: string | null;
+                /** @description true = requested or confirmed; false = the rest */
+                open?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteVisit"][];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_site_visit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteVisitUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteVisit"];
                 };
             };
             /** @description Not signed in */
@@ -8145,6 +10523,222 @@ export interface operations {
             };
             /** @description Too many requests */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    request_brochure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrochureRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrochureLink"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    submit_lead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadAccepted"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    request_site_visit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteVisitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadAccepted"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

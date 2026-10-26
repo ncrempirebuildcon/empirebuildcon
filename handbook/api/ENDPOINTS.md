@@ -143,13 +143,14 @@ Generated from [openapi-v1.yaml](openapi-v1.yaml). Permission keys are explained
 | POST | `/api/v1/admin/leads` | leads.update | Add a lead by hand (walk-in, phone call) |
 | GET | `/api/v1/admin/leads/{id}` | leads.read | Lead detail |
 | PATCH | `/api/v1/admin/leads/{id}` | leads.update | Change status, owner, details |
-| DELETE | `/api/v1/admin/leads/{id}` | leads.erase | Erase a lead's personal data on request (keeps an anonymised stub) |
+| DELETE | `/api/v1/admin/leads/{id}` | leads.erase | Erase personal data on request for the lead and its duplicate group; `?scope=person` also erases every lead with the same phone. Keeps anonymised stubs |
 | POST | `/api/v1/admin/leads/{id}/read` | leads.read | Mark read |
 | POST | `/api/v1/admin/leads/{id}/unread` | leads.read | Mark unread |
 | GET | `/api/v1/admin/leads/{id}/notes` | leads.read | Notes |
 | POST | `/api/v1/admin/leads/{id}/notes` | leads.update | Add note |
 | GET | `/api/v1/admin/leads/{id}/activity` | leads.read | Timeline |
-| GET | `/api/v1/admin/leads/export.csv` | leads.export | CSV export of the filtered list (logged in the audit log) |
+| GET | `/api/v1/admin/leads/export.csv` | leads.export | CSV export of the filtered list (logged in the audit log). Needs the `X-CSRF-Token` header, like a write |
+| GET | `/api/v1/admin/lead-owners` | leads.read | People a lead can be assigned to |
 | GET | `/api/v1/admin/reports/utm` | leads.report | Leads by source, campaign and project |
 | GET | `/api/v1/admin/site-visits` | site_visits.manage | Site-visit calendar |
 | PATCH | `/api/v1/admin/site-visits/{id}` | site_visits.manage | Confirm, reschedule, complete |

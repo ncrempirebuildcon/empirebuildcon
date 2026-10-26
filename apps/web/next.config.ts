@@ -30,6 +30,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // WHY: `next dev` otherwise writes its own apps/web/AGENTS.md when it detects an AI agent.
+  // The repo-root AGENTS.md is the one place for AI rules (handbook/CONTRIBUTING.md §11).
+  agentRules: false,
   skipTrailingSlashRedirect: true,
   experimental: {
     // WHY: with a proxy (src/proxy.ts) Next.js buffers request bodies and silently cuts them at

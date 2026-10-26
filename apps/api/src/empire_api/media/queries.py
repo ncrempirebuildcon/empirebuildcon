@@ -1,8 +1,10 @@
 """Read-only service functions the projects module calls to fill its media fields: a project's
 gallery, videos, documents, brochure, cover and RERA QR; configurations' floor plans; updates'
-progress photos; and the checks behind the publish blocker and the SEO share image.
+progress photos; and the checks behind the publish blocker and the SEO share image. Also the
+public brochure address (leads/intake.py) and the dashboard's "photos hidden until labelled".
 
-Collaborators: projects/present.py, routes.py, child_kinds.py, blockers.py, project_input.py.
+Collaborators: projects/present.py, routes.py, child_kinds.py, blockers.py, project_input.py,
+leads/intake.py, dashboard/service.py.
 Implements: ARCHITECTURE §2 (other modules call these, never the media tables), the cover rule
 (pinned, else the first visible photo in order) and D-002 (RERA QR before publishing).
 """
@@ -14,11 +16,12 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
-from sqlalchemy import Select, exists, select
+from sqlalchemy import Select, exists, func, select
 from sqlalchemy.orm import Session
 
 from empire_api.media import present, schemas
 from empire_api.media.models import Media, MediaLink
+from empire_api.projects.media_owners import update_projects
 
 
 @dataclass
@@ -169,3 +172,48 @@ def library_item(db: Session, media_id: uuid.UUID | None) -> schemas.Media | Non
     if row is None:
         return None
     return present.media_out(row, present.attached_counts(db, [row.id]).get(row.id, 0))
+
+
+def visible_brochure_url(db: Session, project_id: uuid.UUID) -> str | None:
+    """The address of the project's brochure PDF when it is shown on the website, else None.
+
+    Used by public brochure requests (leads/intake.py). The address is public: gating collects a
+    lead, it doesn't protect the file.
+    """
+    link = db.scalar(
+        select(MediaLink).where(
+            MediaLink.project_id == project_id,
+            MediaLink.role == "brochure",
+            MediaLink.is_visible.is_(True),
+        )
+    )
+    if link is None:
+        return None
+    return present.media_out(link.media, 0).url
+
+
+def hidden_unlabelled_photos(db: Session) -> dict[uuid.UUID, int]:
+    """project id → photos (its own gallery and its progress photos) that stay hidden until
+    they get an honest label (rules.LABEL_FIRST). Sample tiles are left out: they are never
+    public, so they don't need a label (D-033)."""
+    rows = db.execute(
+        select(MediaLink.project_id, MediaLink.construction_update_id, func.count())
+        .join(Media, Media.id == MediaLink.media_id)
+        .where(
+            MediaLink.role == "gallery",
+            MediaLink.is_visible.is_(False),
+            Media.label.is_(None),
+            Media.is_sample.is_(False),
+        )
+        .group_by(MediaLink.project_id, MediaLink.construction_update_id)
+    )
+    by_project: dict[uuid.UUID, int] = defaultdict(int)
+    by_update: dict[uuid.UUID, int] = {}
+    for project_id, update_id, count in rows:
+        if project_id is not None:
+            by_project[project_id] += int(count)
+        elif update_id is not None:
+            by_update[update_id] = int(count)
+    for update_id, project_id in update_projects(db, by_update).items():
+        by_project[project_id] += by_update[update_id]
+    return dict(by_project)

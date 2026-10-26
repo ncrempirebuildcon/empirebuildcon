@@ -251,6 +251,224 @@
         "title": "AuditList",
         "type": "object"
       },
+      "BrochureLink": {
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Always null: the address doesn't expire (gating collects a lead, it isn't access control).",
+            "title": "Expires At"
+          },
+          "reference": {
+            "examples": [
+              "EMP-7K3Q9"
+            ],
+            "title": "Reference",
+            "type": "string"
+          },
+          "url": {
+            "description": "The brochure PDF. Public: anyone with the address can open it.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "reference"
+        ],
+        "title": "BrochureLink",
+        "type": "object"
+      },
+      "BrochureRequest": {
+        "description": "A lead for one project; the answer is the brochure's address.",
+        "properties": {
+          "budget_max_inr": {
+            "anyOf": [
+              {
+                "description": "Whole rupees",
+                "maximum": 1000000000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Max Inr"
+          },
+          "click_ids": {
+            "$ref": "#/components/schemas/ClickIdsInput"
+          },
+          "configuration_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Id"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/ConsentGiven"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "language": {
+            "default": "en",
+            "enum": [
+              "en",
+              "hi"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "marketing_consent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsentGiven"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional box for news and offers. Send it only when the visitor ticked it; it must name the CURRENT marketing text."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Name",
+            "type": "string"
+          },
+          "page_url": {
+            "maxLength": 1000,
+            "title": "Page Url",
+            "type": "string"
+          },
+          "phone": {
+            "description": "Any Indian format; stored as +91XXXXXXXXXX (leads/phone.py)",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Phone",
+            "type": "string"
+          },
+          "preferred_bhk": {
+            "anyOf": [
+              {
+                "description": "Bedrooms in whole or half steps, 0.5 to 20; 1.5 for 1.5 BHK",
+                "maximum": 20.0,
+                "minimum": 0.5,
+                "multipleOf": 0.5,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Bhk"
+          },
+          "preferred_contact_time": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Contact Time"
+          },
+          "project_slug": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "title": "Project Slug",
+            "type": "string"
+          },
+          "referrer": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referrer"
+          },
+          "source": {
+            "enum": [
+              "project_form",
+              "contact_form",
+              "brochure",
+              "site_visit",
+              "campaign",
+              "chat",
+              "whatsapp"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "utm": {
+            "$ref": "#/components/schemas/UtmInput"
+          },
+          "website": {
+            "default": "",
+            "description": "Honeypot. Leave empty; people never see this field.",
+            "maxLength": 200,
+            "title": "Website",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "project_slug",
+          "source",
+          "page_url",
+          "consent"
+        ],
+        "title": "BrochureRequest",
+        "type": "object"
+      },
       "City": {
         "properties": {
           "id": {
@@ -373,6 +591,140 @@
           "state"
         ],
         "title": "CityRef",
+        "type": "object"
+      },
+      "ClickIds": {
+        "properties": {
+          "fbclid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fbclid"
+          },
+          "gbraid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gbraid"
+          },
+          "gclid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gclid"
+          },
+          "msclkid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Msclkid"
+          },
+          "wbraid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wbraid"
+          }
+        },
+        "required": [
+          "gclid",
+          "gbraid",
+          "wbraid",
+          "fbclid",
+          "msclkid"
+        ],
+        "title": "ClickIds",
+        "type": "object"
+      },
+      "ClickIdsInput": {
+        "properties": {
+          "fbclid": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fbclid"
+          },
+          "gbraid": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gbraid"
+          },
+          "gclid": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gclid"
+          },
+          "msclkid": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Msclkid"
+          },
+          "wbraid": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wbraid"
+          }
+        },
+        "title": "ClickIdsInput",
         "type": "object"
       },
       "Configuration": {
@@ -635,6 +987,151 @@
         "title": "ConfigurationInput",
         "type": "object"
       },
+      "ConsentGiven": {
+        "description": "The visitor ticked the box next to this exact text version.",
+        "properties": {
+          "accepted": {
+            "const": true,
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "consent_text_id": {
+            "format": "uuid",
+            "title": "Consent Text Id",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted",
+          "consent_text_id",
+          "version"
+        ],
+        "title": "ConsentGiven",
+        "type": "object"
+      },
+      "ConsentText": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "checkbox_label": {
+            "title": "Checkbox Label",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_current": {
+            "title": "Is Current",
+            "type": "boolean"
+          },
+          "is_draft": {
+            "description": "The wording still says it awaits the owner's approval (D-017). Production refuses to publish such a text.",
+            "title": "Is Draft",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "lead_form",
+              "marketing",
+              "brochure",
+              "cookies",
+              "chat"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "version",
+          "body",
+          "checkbox_label",
+          "published_at",
+          "is_current",
+          "is_draft",
+          "created_at",
+          "created_by"
+        ],
+        "title": "ConsentText",
+        "type": "object"
+      },
+      "ConsentTextInput": {
+        "additionalProperties": false,
+        "description": "A new draft version. Published texts are never edited: send a new version instead.",
+        "properties": {
+          "body": {
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "checkbox_label": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Checkbox Label",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "lead_form",
+              "marketing",
+              "brochure",
+              "cookies",
+              "chat"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "body",
+          "checkbox_label"
+        ],
+        "title": "ConsentTextInput",
+        "type": "object"
+      },
       "ConstructionUpdate": {
         "properties": {
           "body": {
@@ -805,6 +1302,129 @@
           "update_date"
         ],
         "title": "ConstructionUpdateInput",
+        "type": "object"
+      },
+      "Dashboard": {
+        "properties": {
+          "counts": {
+            "description": "Only the counts your role can open",
+            "items": {
+              "$ref": "#/components/schemas/DashboardCount"
+            },
+            "title": "Counts",
+            "type": "array"
+          },
+          "latest_leads": {
+            "description": "Your newest 5 (all leads with leads.read_all)",
+            "items": {
+              "$ref": "#/components/schemas/Lead"
+            },
+            "title": "Latest Leads",
+            "type": "array"
+          },
+          "leads_by_source": {
+            "description": "Last 30 days (IST), spam left out, counts only",
+            "items": {
+              "$ref": "#/components/schemas/SourceCount"
+            },
+            "title": "Leads By Source",
+            "type": "array"
+          },
+          "tasks": {
+            "description": "E.g. projects missing the RERA QR, photos hidden until labelled, consent texts still awaiting the owner's approval",
+            "items": {
+              "$ref": "#/components/schemas/DashboardTask"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "upcoming_visits": {
+            "items": {
+              "$ref": "#/components/schemas/SiteVisit"
+            },
+            "title": "Upcoming Visits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "counts",
+          "latest_leads",
+          "upcoming_visits",
+          "tasks",
+          "leads_by_source"
+        ],
+        "title": "Dashboard",
+        "type": "object"
+      },
+      "DashboardCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "key": {
+            "examples": [
+              "leads.new"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "link": {
+            "description": "CMS path with filters, e.g. /admin/leads?status=new",
+            "title": "Link",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "count",
+          "link"
+        ],
+        "title": "DashboardCount",
+        "type": "object"
+      },
+      "DashboardTask": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "key": {
+            "examples": [
+              "project.rera_qr_missing"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "link": {
+            "description": "CMS path where the task is done",
+            "title": "Link",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "detail",
+          "link"
+        ],
+        "title": "DashboardTask",
         "type": "object"
       },
       "DrainResult": {
@@ -1040,6 +1660,1176 @@
         "required": [
           "file"
         ],
+        "type": "object"
+      },
+      "Lead": {
+        "properties": {
+          "assigned_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned At"
+          },
+          "budget_max_inr": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Max Inr"
+          },
+          "click_ids": {
+            "$ref": "#/components/schemas/ClickIds"
+          },
+          "configuration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeadConfigurationRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "consent": {
+            "$ref": "#/components/schemas/LeadConsentRecord"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "duplicate_of": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The earlier lead this one repeats (24 h rule), when you may see it; else null",
+            "title": "Duplicate Of"
+          },
+          "duplicate_of_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Of Reference"
+          },
+          "duplicates": {
+            "description": "Later leads linked to this one that you may see (24 h rule)",
+            "items": {
+              "$ref": "#/components/schemas/LeadRef"
+            },
+            "title": "Duplicates",
+            "type": "array"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "erased_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Erased At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_sample": {
+            "title": "Is Sample",
+            "type": "boolean"
+          },
+          "is_spam": {
+            "title": "Is Spam",
+            "type": "boolean"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "last_activity_at": {
+            "format": "date-time",
+            "title": "Last Activity At",
+            "type": "string"
+          },
+          "lost_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "bought_elsewhere",
+                  "budget",
+                  "location",
+                  "not_reachable",
+                  "not_looking",
+                  "duplicate",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the lead was lost (a code; the CMS shows its label). Null unless lost.",
+            "title": "Lost Reason"
+          },
+          "lost_reason_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Staff's own words; required for `other`",
+            "title": "Lost Reason Note"
+          },
+          "marketing_consent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeadConsentRecord"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null: the optional marketing box was not ticked. Don't add to marketing lists."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_visit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SiteVisit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "page_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Url"
+          },
+          "phone_e164": {
+            "title": "Phone E164",
+            "type": "string"
+          },
+          "preferred_bhk": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Bhk"
+          },
+          "preferred_contact_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Contact Time"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeadProjectRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "reference": {
+            "title": "Reference",
+            "type": "string"
+          },
+          "referrer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referrer"
+          },
+          "same_phone_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Leads with this phone number, this one included. Only for leads.erase (the erase dialog's 'all leads from this person'); null otherwise and once erased.",
+            "title": "Same Phone Count"
+          },
+          "source": {
+            "enum": [
+              "project_form",
+              "contact_form",
+              "brochure",
+              "site_visit",
+              "campaign",
+              "chat",
+              "whatsapp",
+              "phone",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "new",
+              "contacted",
+              "site_visit",
+              "negotiation",
+              "booked",
+              "lost"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "utm": {
+            "$ref": "#/components/schemas/Utm"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "created_at",
+          "updated_at",
+          "last_activity_at",
+          "name",
+          "phone_e164",
+          "email",
+          "message",
+          "project",
+          "configuration",
+          "source",
+          "status",
+          "lost_reason",
+          "lost_reason_note",
+          "owner",
+          "assigned_at",
+          "read_at",
+          "page_url",
+          "referrer",
+          "utm",
+          "click_ids",
+          "preferred_bhk",
+          "budget_max_inr",
+          "preferred_contact_time",
+          "language",
+          "consent",
+          "marketing_consent",
+          "is_spam",
+          "is_sample",
+          "erased_at",
+          "duplicate_of",
+          "duplicate_of_reference",
+          "duplicates",
+          "same_phone_count",
+          "next_visit"
+        ],
+        "title": "Lead",
+        "type": "object"
+      },
+      "LeadAccepted": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "reference": {
+            "examples": [
+              "EMP-7K3Q9"
+            ],
+            "title": "Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reference",
+          "message"
+        ],
+        "title": "LeadAccepted",
+        "type": "object"
+      },
+      "LeadActivity": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": true,
+            "description": "Ids, stages and times only; never personal data",
+            "title": "Data",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "created",
+              "status_changed",
+              "assigned",
+              "note_added",
+              "visit_requested",
+              "visit_updated",
+              "alert_sent",
+              "webhook_sent",
+              "exported",
+              "read",
+              "unread",
+              "details_changed",
+              "spam_marked",
+              "duplicate_linked",
+              "erased"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "data",
+          "created_at"
+        ],
+        "title": "LeadActivity",
+        "type": "object"
+      },
+      "LeadConfigurationRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "LeadConfigurationRef",
+        "type": "object"
+      },
+      "LeadConsentRecord": {
+        "description": "What the person agreed to. Public forms: the text version and label shown. Manual leads:\nstaff's note on how consent was given (no text version).",
+        "properties": {
+          "checkbox_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkbox Label"
+          },
+          "consent_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Note"
+          },
+          "consent_text_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Text Id"
+          },
+          "consented_at": {
+            "format": "date-time",
+            "title": "Consented At",
+            "type": "string"
+          },
+          "page_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Url"
+          },
+          "text_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Version"
+          }
+        },
+        "required": [
+          "consent_text_id",
+          "text_version",
+          "consented_at",
+          "page_url",
+          "checkbox_label",
+          "consent_note"
+        ],
+        "title": "LeadConsentRecord",
+        "type": "object"
+      },
+      "LeadCreate": {
+        "description": "An enquiry from a public form. `consent` must name the CURRENT lead-form text.",
+        "properties": {
+          "budget_max_inr": {
+            "anyOf": [
+              {
+                "description": "Whole rupees",
+                "maximum": 1000000000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Max Inr"
+          },
+          "click_ids": {
+            "$ref": "#/components/schemas/ClickIdsInput"
+          },
+          "configuration_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Id"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/ConsentGiven"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "language": {
+            "default": "en",
+            "enum": [
+              "en",
+              "hi"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "marketing_consent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsentGiven"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional box for news and offers. Send it only when the visitor ticked it; it must name the CURRENT marketing text."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Name",
+            "type": "string"
+          },
+          "page_url": {
+            "maxLength": 1000,
+            "title": "Page Url",
+            "type": "string"
+          },
+          "phone": {
+            "description": "Any Indian format; stored as +91XXXXXXXXXX (leads/phone.py)",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Phone",
+            "type": "string"
+          },
+          "preferred_bhk": {
+            "anyOf": [
+              {
+                "description": "Bedrooms in whole or half steps, 0.5 to 20; 1.5 for 1.5 BHK",
+                "maximum": 20.0,
+                "minimum": 0.5,
+                "multipleOf": 0.5,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Bhk"
+          },
+          "preferred_contact_time": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Contact Time"
+          },
+          "project_slug": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Slug"
+          },
+          "referrer": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referrer"
+          },
+          "source": {
+            "enum": [
+              "project_form",
+              "contact_form",
+              "brochure",
+              "site_visit",
+              "campaign",
+              "chat",
+              "whatsapp"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "utm": {
+            "$ref": "#/components/schemas/UtmInput"
+          },
+          "website": {
+            "default": "",
+            "description": "Honeypot. Leave empty; people never see this field.",
+            "maxLength": 200,
+            "title": "Website",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "source",
+          "page_url",
+          "consent"
+        ],
+        "title": "LeadCreate",
+        "type": "object"
+      },
+      "LeadList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Lead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          },
+          "status_counts": {
+            "$ref": "#/components/schemas/LeadStatusCounts",
+            "description": "Leads per stage under the same filters, ignoring `status` (board columns)"
+          }
+        },
+        "required": [
+          "items",
+          "meta",
+          "status_counts"
+        ],
+        "title": "LeadList",
+        "type": "object"
+      },
+      "LeadManualCreate": {
+        "additionalProperties": false,
+        "description": "A walk-in or phone enquiry typed in by staff. `consent_note` says how consent was given.",
+        "properties": {
+          "consent_note": {
+            "description": "How consent was obtained, e.g. 'Verbal on phone call'",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Consent Note",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Name",
+            "type": "string"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Left out: you. Someone else, or null for the sales inbox, needs leads.assign.",
+            "title": "Owner User Id"
+          },
+          "phone": {
+            "description": "Any Indian format; stored as +91XXXXXXXXXX (leads/phone.py)",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Phone",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "source": {
+            "enum": [
+              "project_form",
+              "contact_form",
+              "brochure",
+              "site_visit",
+              "campaign",
+              "chat",
+              "whatsapp",
+              "phone",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "source",
+          "consent_note"
+        ],
+        "title": "LeadManualCreate",
+        "type": "object"
+      },
+      "LeadNote": {
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "body",
+          "created_at"
+        ],
+        "title": "LeadNote",
+        "type": "object"
+      },
+      "LeadNoteInput": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "LeadNoteInput",
+        "type": "object"
+      },
+      "LeadOwner": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "super_admin",
+              "admin",
+              "sales",
+              "marketing",
+              "content_editor"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role"
+        ],
+        "title": "LeadOwner",
+        "type": "object"
+      },
+      "LeadProjectRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name"
+        ],
+        "title": "LeadProjectRef",
+        "type": "object"
+      },
+      "LeadRef": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reference": {
+            "title": "Reference",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "project_form",
+              "contact_form",
+              "brochure",
+              "site_visit",
+              "campaign",
+              "chat",
+              "whatsapp",
+              "phone",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "source",
+          "created_at"
+        ],
+        "title": "LeadRef",
+        "type": "object"
+      },
+      "LeadStatusCounts": {
+        "properties": {
+          "booked": {
+            "title": "Booked",
+            "type": "integer"
+          },
+          "contacted": {
+            "title": "Contacted",
+            "type": "integer"
+          },
+          "lost": {
+            "title": "Lost",
+            "type": "integer"
+          },
+          "negotiation": {
+            "title": "Negotiation",
+            "type": "integer"
+          },
+          "new": {
+            "title": "New",
+            "type": "integer"
+          },
+          "site_visit": {
+            "title": "Site Visit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "new",
+          "contacted",
+          "site_visit",
+          "negotiation",
+          "booked",
+          "lost"
+        ],
+        "title": "LeadStatusCounts",
+        "type": "object"
+      },
+      "LeadUpdate": {
+        "additionalProperties": false,
+        "description": "PATCH body: send only what changes. `owner_user_id` needs leads.assign; `lost` needs a\n`lost_reason` code, and the code `other` needs a `lost_reason_note`.",
+        "properties": {
+          "budget_max_inr": {
+            "anyOf": [
+              {
+                "description": "Whole rupees",
+                "maximum": 1000000000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Max Inr"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "is_spam": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Spam"
+          },
+          "lost_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "bought_elsewhere",
+                  "budget",
+                  "location",
+                  "not_reachable",
+                  "not_looking",
+                  "duplicate",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lost Reason"
+          },
+          "lost_reason_note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lost Reason Note"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "preferred_bhk": {
+            "anyOf": [
+              {
+                "description": "Bedrooms in whole or half steps, 0.5 to 20; 1.5 for 1.5 BHK",
+                "maximum": 20.0,
+                "minimum": 0.5,
+                "multipleOf": 0.5,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Bhk"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "new",
+                  "contacted",
+                  "site_visit",
+                  "negotiation",
+                  "booked",
+                  "lost"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "LeadUpdate",
         "type": "object"
       },
       "LinkedMedia": {
@@ -4074,6 +5864,464 @@
         "title": "Seo",
         "type": "object"
       },
+      "SiteVisit": {
+        "properties": {
+          "confirmed_for": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed For"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "handled_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_sample": {
+            "title": "Is Sample",
+            "type": "boolean"
+          },
+          "lead_id": {
+            "format": "uuid",
+            "title": "Lead Id",
+            "type": "string"
+          },
+          "lead_name": {
+            "title": "Lead Name",
+            "type": "string"
+          },
+          "lead_owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lead_phone_e164": {
+            "title": "Lead Phone E164",
+            "type": "string"
+          },
+          "lead_reference": {
+            "title": "Lead Reference",
+            "type": "string"
+          },
+          "lead_status": {
+            "enum": [
+              "new",
+              "contacted",
+              "site_visit",
+              "negotiation",
+              "booked",
+              "lost"
+            ],
+            "title": "Lead Status",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "preferred_date": {
+            "format": "date",
+            "title": "Preferred Date",
+            "type": "string"
+          },
+          "preferred_slot": {
+            "enum": [
+              "morning",
+              "afternoon",
+              "evening"
+            ],
+            "title": "Preferred Slot",
+            "type": "string"
+          },
+          "project": {
+            "$ref": "#/components/schemas/SiteVisitProject"
+          },
+          "status": {
+            "enum": [
+              "requested",
+              "confirmed",
+              "completed",
+              "no_show",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "lead_id",
+          "lead_reference",
+          "lead_name",
+          "lead_phone_e164",
+          "lead_status",
+          "lead_owner",
+          "project",
+          "preferred_date",
+          "preferred_slot",
+          "confirmed_for",
+          "status",
+          "handled_by",
+          "notes",
+          "is_sample",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SiteVisit",
+        "type": "object"
+      },
+      "SiteVisitProject": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name"
+        ],
+        "title": "SiteVisitProject",
+        "type": "object"
+      },
+      "SiteVisitRequest": {
+        "description": "A lead plus a visit request for one project (preferred day and time of day).",
+        "properties": {
+          "budget_max_inr": {
+            "anyOf": [
+              {
+                "description": "Whole rupees",
+                "maximum": 1000000000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Max Inr"
+          },
+          "click_ids": {
+            "$ref": "#/components/schemas/ClickIdsInput"
+          },
+          "configuration_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Id"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/ConsentGiven"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "language": {
+            "default": "en",
+            "enum": [
+              "en",
+              "hi"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "marketing_consent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsentGiven"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional box for news and offers. Send it only when the visitor ticked it; it must name the CURRENT marketing text."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Name",
+            "type": "string"
+          },
+          "page_url": {
+            "maxLength": 1000,
+            "title": "Page Url",
+            "type": "string"
+          },
+          "phone": {
+            "description": "Any Indian format; stored as +91XXXXXXXXXX (leads/phone.py)",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Phone",
+            "type": "string"
+          },
+          "preferred_bhk": {
+            "anyOf": [
+              {
+                "description": "Bedrooms in whole or half steps, 0.5 to 20; 1.5 for 1.5 BHK",
+                "maximum": 20.0,
+                "minimum": 0.5,
+                "multipleOf": 0.5,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Bhk"
+          },
+          "preferred_contact_time": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Contact Time"
+          },
+          "preferred_date": {
+            "format": "date",
+            "title": "Preferred Date",
+            "type": "string"
+          },
+          "preferred_slot": {
+            "enum": [
+              "morning",
+              "afternoon",
+              "evening"
+            ],
+            "title": "Preferred Slot",
+            "type": "string"
+          },
+          "project_slug": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "title": "Project Slug",
+            "type": "string"
+          },
+          "referrer": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referrer"
+          },
+          "source": {
+            "enum": [
+              "project_form",
+              "contact_form",
+              "brochure",
+              "site_visit",
+              "campaign",
+              "chat",
+              "whatsapp"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "utm": {
+            "$ref": "#/components/schemas/UtmInput"
+          },
+          "website": {
+            "default": "",
+            "description": "Honeypot. Leave empty; people never see this field.",
+            "maxLength": 200,
+            "title": "Website",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "project_slug",
+          "source",
+          "page_url",
+          "consent",
+          "preferred_date",
+          "preferred_slot"
+        ],
+        "title": "SiteVisitRequest",
+        "type": "object"
+      },
+      "SiteVisitUpdate": {
+        "additionalProperties": false,
+        "description": "Confirm (status `confirmed` + `confirmed_for`), reschedule (a new `confirmed_for`),\ncomplete, no-show or cancel; plus who handles it and notes.",
+        "properties": {
+          "confirmed_for": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed For"
+          },
+          "handled_by_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handled By User Id"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "requested",
+                  "confirmed",
+                  "completed",
+                  "no_show",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "SiteVisitUpdate",
+        "type": "object"
+      },
+      "SourceCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "project_form",
+              "contact_form",
+              "brochure",
+              "site_visit",
+              "campaign",
+              "chat",
+              "whatsapp",
+              "phone",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "count"
+        ],
+        "title": "SourceCount",
+        "type": "object"
+      },
       "Specification": {
         "properties": {
           "category": {
@@ -4788,6 +7036,225 @@
           }
         },
         "title": "UserUpdate",
+        "type": "object"
+      },
+      "Utm": {
+        "properties": {
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "medium": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medium"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term"
+          }
+        },
+        "required": [
+          "source",
+          "medium",
+          "campaign",
+          "term",
+          "content"
+        ],
+        "title": "Utm",
+        "type": "object"
+      },
+      "UtmInput": {
+        "properties": {
+          "campaign": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "medium": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medium"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "term": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term"
+          }
+        },
+        "title": "UtmInput",
+        "type": "object"
+      },
+      "UtmReportRow": {
+        "properties": {
+          "booked": {
+            "title": "Booked",
+            "type": "integer"
+          },
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          },
+          "leads": {
+            "title": "Leads",
+            "type": "integer"
+          },
+          "medium": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Medium"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "site_visits": {
+            "description": "Leads in this row with at least one visit request",
+            "title": "Site Visits",
+            "type": "integer"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "source",
+          "medium",
+          "campaign",
+          "project",
+          "project_id",
+          "leads",
+          "site_visits",
+          "booked"
+        ],
+        "title": "UtmReportRow",
         "type": "object"
       }
     },
@@ -5801,6 +8268,348 @@
         "x-permission": "projects.write"
       }
     },
+    "/api/v1/admin/consent-texts": {
+      "get": {
+        "description": "Every version of every kind (or of one `kind`), newest version first.",
+        "operationId": "list_consent_texts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "lead_form",
+                    "marketing",
+                    "brochure",
+                    "cookies",
+                    "chat"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConsentText"
+                  },
+                  "title": "Response List Consent Texts",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "All versions",
+        "tags": [
+          "Settings"
+        ],
+        "x-permission": "settings.read"
+      },
+      "post": {
+        "description": "A new, unpublished version. It takes effect only when published.",
+        "operationId": "create_consent_text",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentTextInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentText"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "New draft version",
+        "tags": [
+          "Settings"
+        ],
+        "x-permission": "legal.publish"
+      }
+    },
+    "/api/v1/admin/consent-texts/{id}/publish": {
+      "post": {
+        "description": "Forms must send this version's id from now on; older versions get 409 \"reload\".\nIn production a text still marked as a draft is refused (409).",
+        "operationId": "publish_consent_text",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentText"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Make this version current",
+        "tags": [
+          "Settings"
+        ],
+        "x-permission": "legal.publish"
+      }
+    },
+    "/api/v1/admin/dashboard": {
+      "get": {
+        "operationId": "dashboard",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Counts that link to filtered lists, latest leads, upcoming visits, tasks",
+        "tags": [
+          "Dashboard"
+        ],
+        "x-permission": "dashboard.view"
+      }
+    },
     "/api/v1/admin/flags": {
       "get": {
         "operationId": "list_flags",
@@ -5980,6 +8789,1556 @@
           "Settings"
         ],
         "x-permission": "flags.manage"
+      }
+    },
+    "/api/v1/admin/lead-owners": {
+      "get": {
+        "description": "Active accounts whose role can open leads. Contract addition (Phase 4 part 3).",
+        "operationId": "list_lead_owners",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LeadOwner"
+                  },
+                  "title": "Response List Lead Owners",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "People a lead can be assigned to",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.read"
+      }
+    },
+    "/api/v1/admin/leads": {
+      "get": {
+        "description": "Sales users without leads.read_all see only leads assigned to them.",
+        "operationId": "list_leads",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "per_page",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Per Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Name, reference, or the phone's last digits",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Name, reference, or the phone's last digits",
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "new",
+                    "contacted",
+                    "site_visit",
+                    "negotiation",
+                    "booked",
+                    "lost"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "A project's id, or 'none' (general)",
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 36,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A project's id, or 'none' (general)",
+              "title": "Project Id"
+            }
+          },
+          {
+            "description": "An id, 'me' or 'unassigned'",
+            "in": "query",
+            "name": "owner_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 36,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An id, 'me' or 'unassigned'",
+              "title": "Owner Id"
+            }
+          },
+          {
+            "description": "false = unread only",
+            "in": "query",
+            "name": "read",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "false = unread only",
+              "title": "Read"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "project_form",
+                    "contact_form",
+                    "brochure",
+                    "site_visit",
+                    "campaign",
+                    "chat",
+                    "whatsapp",
+                    "phone",
+                    "manual"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "description": "Exact tag; empty = no tag",
+            "in": "query",
+            "name": "utm_source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact tag; empty = no tag",
+              "title": "Utm Source"
+            }
+          },
+          {
+            "description": "Exact tag; empty = no tag",
+            "in": "query",
+            "name": "utm_medium",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact tag; empty = no tag",
+              "title": "Utm Medium"
+            }
+          },
+          {
+            "description": "Exact tag; empty = no tag",
+            "in": "query",
+            "name": "utm_campaign",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact tag; empty = no tag",
+              "title": "Utm Campaign"
+            }
+          },
+          {
+            "description": "IST day, included",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IST day, included",
+              "title": "From"
+            }
+          },
+          {
+            "description": "IST day, included",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IST day, included",
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_spam",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Spam",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "true = spam only; false = no spam (wins over include_spam)",
+            "in": "query",
+            "name": "is_spam",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true = spam only; false = no spam (wins over include_spam)",
+              "title": "Is Spam"
+            }
+          },
+          {
+            "description": "Seeded sample leads (D-015)",
+            "in": "query",
+            "name": "include_sample",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Seeded sample leads (D-015)",
+              "title": "Include Sample",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "true = still being worked (not booked, lost or erased); false = the rest",
+            "in": "query",
+            "name": "open",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true = still being worked (not booked, lost or erased); false = the rest",
+              "title": "Open"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Lead inbox, newest first",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.read"
+      },
+      "post": {
+        "description": "`consent_note` is required. Leaving `owner_user_id` out makes you the owner.",
+        "operationId": "create_lead_manually",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeadManualCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Add a lead by hand (walk-in, phone call)",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.update"
+      }
+    },
+    "/api/v1/admin/leads/export.csv": {
+      "get": {
+        "description": "Same filters and access rule as the inbox. At most 50,000 rows (more → 422, narrow the filters). Every export is in the audit log with its filters and row count (a search is recorded only by its length), and on each exported lead's timeline. The file contains personal data. Although it is a GET, it needs the X-CSRF-Token header (403 without it), and a Sec-Fetch-Site header other than same-origin is refused (403): download it with fetch and save the blob, never with a plain link. Columns: reference, created_at, name, phone, email, project, configuration, source, status, lost_reason, lost_reason_note, owner, assigned_at, read_at, last_activity_at, message, page_url, referrer, utm_source, utm_medium, utm_campaign, utm_term, utm_content, gclid, gbraid, wbraid, fbclid, msclkid, preferred_bhk, budget_max_inr, preferred_contact_time, language, consent_text_version, consented_at, consent_note, marketing_consent, duplicate_of, is_spam, is_sample, erased_at.",
+        "operationId": "export_leads",
+        "parameters": [
+          {
+            "description": "Name, reference, or the phone's last digits",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Name, reference, or the phone's last digits",
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "new",
+                    "contacted",
+                    "site_visit",
+                    "negotiation",
+                    "booked",
+                    "lost"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "A project's id, or 'none' (general)",
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 36,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A project's id, or 'none' (general)",
+              "title": "Project Id"
+            }
+          },
+          {
+            "description": "An id, 'me' or 'unassigned'",
+            "in": "query",
+            "name": "owner_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 36,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An id, 'me' or 'unassigned'",
+              "title": "Owner Id"
+            }
+          },
+          {
+            "description": "false = unread only",
+            "in": "query",
+            "name": "read",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "false = unread only",
+              "title": "Read"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "project_form",
+                    "contact_form",
+                    "brochure",
+                    "site_visit",
+                    "campaign",
+                    "chat",
+                    "whatsapp",
+                    "phone",
+                    "manual"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "description": "Exact tag; empty = no tag",
+            "in": "query",
+            "name": "utm_source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact tag; empty = no tag",
+              "title": "Utm Source"
+            }
+          },
+          {
+            "description": "Exact tag; empty = no tag",
+            "in": "query",
+            "name": "utm_medium",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact tag; empty = no tag",
+              "title": "Utm Medium"
+            }
+          },
+          {
+            "description": "Exact tag; empty = no tag",
+            "in": "query",
+            "name": "utm_campaign",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact tag; empty = no tag",
+              "title": "Utm Campaign"
+            }
+          },
+          {
+            "description": "IST day, included",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IST day, included",
+              "title": "From"
+            }
+          },
+          {
+            "description": "IST day, included",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IST day, included",
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_spam",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Spam",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "true = spam only; false = no spam (wins over include_spam)",
+            "in": "query",
+            "name": "is_spam",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true = spam only; false = no spam (wins over include_spam)",
+              "title": "Is Spam"
+            }
+          },
+          {
+            "description": "Seeded sample leads (D-015)",
+            "in": "query",
+            "name": "include_sample",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Seeded sample leads (D-015)",
+              "title": "Include Sample",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "true = still being worked (not booked, lost or erased); false = the rest",
+            "in": "query",
+            "name": "open",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true = still being worked (not booked, lost or erased); false = the rest",
+              "title": "Open"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "CSV file"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "CSV export of the filtered list (logged in the audit log)",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.export"
+      }
+    },
+    "/api/v1/admin/leads/{id}": {
+      "delete": {
+        "description": "Erases this lead and its whole duplicate group (the lead it repeats and every lead that repeats it); `scope=person` also erases every other lead with the same phone number (`same_phone_count` on the lead says how many). Name and phone become '[erased]'; email, message, page URL, referrer, click ids, preferred contact time and the UTM term and content are removed; note texts, the lost-reason note and visit notes are replaced or removed, in the timeline and stored events too. The reference, stage, reason code, source, UTM source/medium/campaign, project, timestamps and the consent record's version and time stay. Audited with the scope and count; can't be undone. Leads already erased are skipped (204 again).",
+        "operationId": "erase_lead",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "group (default): the duplicate group; person: every lead with the phone",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "group",
+              "description": "group (default): the duplicate group; person: every lead with the phone",
+              "enum": [
+                "group",
+                "person"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Erase a lead's personal data on request (keeps an anonymised stub)",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.erase"
+      },
+      "get": {
+        "description": "Reading doesn't mark it read; the CMS calls …/read when the lead is opened.",
+        "operationId": "get_lead",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Lead detail",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.read"
+      },
+      "patch": {
+        "description": "Changing owner needs leads.assign. `lost` needs a `lost_reason` code; `other` also needs `lost_reason_note`.",
+        "operationId": "update_lead",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeadUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Change status, owner, details",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.update"
+      }
+    },
+    "/api/v1/admin/leads/{id}/activity": {
+      "get": {
+        "description": "Newest first. `data` holds ids, stages and times only.",
+        "operationId": "lead_activity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LeadActivity"
+                  },
+                  "title": "Response Lead Activity",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Timeline",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.read"
+      }
+    },
+    "/api/v1/admin/leads/{id}/notes": {
+      "get": {
+        "description": "Newest first.",
+        "operationId": "list_lead_notes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LeadNote"
+                  },
+                  "title": "Response List Lead Notes",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Notes",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.read"
+      },
+      "post": {
+        "operationId": "add_lead_note",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeadNoteInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadNote"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Add note",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.update"
+      }
+    },
+    "/api/v1/admin/leads/{id}/read": {
+      "post": {
+        "operationId": "mark_lead_read",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Mark read",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.read"
+      }
+    },
+    "/api/v1/admin/leads/{id}/unread": {
+      "post": {
+        "operationId": "mark_lead_unread",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Mark unread",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.read"
       }
     },
     "/api/v1/admin/localities": {
@@ -7435,7 +11794,7 @@
     },
     "/api/v1/admin/projects": {
       "get": {
-        "description": "Projects, most recently edited first, with the CMS list's filters.",
+        "description": "Projects, most recently edited first, with the CMS list's filters. `blocked` is the\ndashboard's \"drafts blocked from publishing\" link (addition, Phase 4 part 3).",
         "operationId": "list_projects",
         "parameters": [
           {
@@ -7535,6 +11894,24 @@
                 }
               ],
               "title": "City"
+            }
+          },
+          {
+            "description": "true = can't be published yet (any publish blocker); false = ready",
+            "in": "query",
+            "name": "blocked",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true = can't be published yet (any publish blocker); false = ready",
+              "title": "Blocked"
             }
           },
           {
@@ -11115,6 +15492,152 @@
         "x-permission": "projects.publish"
       }
     },
+    "/api/v1/admin/reports/utm": {
+      "get": {
+        "description": "Counts only, never personal data. `group_by` source, medium, campaign or project; left out, rows group by all four. Spam never counts. Sales see their own leads' counts.",
+        "operationId": "utm_report",
+        "parameters": [
+          {
+            "description": "IST day, included",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IST day, included",
+              "title": "From"
+            }
+          },
+          {
+            "description": "IST day, included",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IST day, included",
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "group_by",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "source",
+                    "medium",
+                    "campaign",
+                    "project"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group By"
+            }
+          },
+          {
+            "description": "Seeded sample leads (D-015)",
+            "in": "query",
+            "name": "include_sample",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Seeded sample leads (D-015)",
+              "title": "Include Sample",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UtmReportRow"
+                  },
+                  "title": "Response Utm Report",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Leads by source, campaign and project",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "leads.report"
+      }
+    },
     "/api/v1/admin/roles": {
       "get": {
         "description": "The five roles and their permissions (ARCHITECTURE §11).",
@@ -11195,6 +15718,296 @@
           "Users"
         ],
         "x-permission": "users.manage"
+      }
+    },
+    "/api/v1/admin/site-visits": {
+      "get": {
+        "description": "Calendar order. A visit's day is its confirmed time (IST) once confirmed, else the day the buyer asked for. At most 500 visits; use from/to for a week or a month.",
+        "operationId": "list_site_visits",
+        "parameters": [
+          {
+            "description": "IST day, included",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IST day, included",
+              "title": "From"
+            }
+          },
+          {
+            "description": "IST day, included",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IST day, included",
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "requested",
+                    "confirmed",
+                    "completed",
+                    "no_show",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "description": "One lead's visits",
+            "in": "query",
+            "name": "lead_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "One lead's visits",
+              "title": "Lead Id"
+            }
+          },
+          {
+            "description": "true = requested or confirmed; false = the rest",
+            "in": "query",
+            "name": "open",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true = requested or confirmed; false = the rest",
+              "title": "Open"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SiteVisit"
+                  },
+                  "title": "Response List Site Visits",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Site-visit calendar",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "site_visits.manage"
+      }
+    },
+    "/api/v1/admin/site-visits/{id}": {
+      "patch": {
+        "description": "Confirm: status `confirmed` with `confirmed_for` (also moves a new or contacted lead to `site_visit`). Reschedule: a new `confirmed_for`. Also `completed`, `no_show`, `cancelled`, `handled_by_user_id` and `notes`. Every change is on the lead's timeline and in the audit log.",
+        "operationId": "update_site_visit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteVisitUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteVisit"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Confirm, reschedule, complete",
+        "tags": [
+          "Leads"
+        ],
+        "x-permission": "site_visits.manage"
       }
     },
     "/api/v1/admin/users": {
@@ -12410,6 +17223,271 @@
           "Internal"
         ],
         "x-internal": true
+      }
+    },
+    "/api/v1/public/brochure-requests": {
+      "post": {
+        "description": "`consent` must name the CURRENT lead-form consent text (id and version): an older one answers 409 \"reload the page\"; with no published text the answer is 503. `marketing_consent` is optional and, when sent, must name the current marketing text. The phone is normalised to E.164 (+91…); anything else is 422 on `phone`. The same phone and project within 24 hours is saved as a duplicate of the earlier lead and doesn't alert sales again. Only for a published project whose brochure is shown on the website (else 404). Honest note: this collects a lead before showing the link, but it is not access control; the PDF's address is public and doesn't expire, so `expires_at` is always null.",
+        "operationId": "request_brochure",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrochureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrochureLink"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service unavailable"
+          }
+        },
+        "security": [],
+        "summary": "Get the brochure link (lead form first when gated)",
+        "tags": [
+          "Lead intake"
+        ],
+        "x-public": true,
+        "x-rate-limit": "5 per 10 minutes per IP and per phone"
+      }
+    },
+    "/api/v1/public/leads": {
+      "post": {
+        "description": "`consent` must name the CURRENT lead-form consent text (id and version): an older one answers 409 \"reload the page\"; with no published text the answer is 503. `marketing_consent` is optional and, when sent, must name the current marketing text. The phone is normalised to E.164 (+91…); anything else is 422 on `phone`. The same phone and project within 24 hours is saved as a duplicate of the earlier lead and doesn't alert sales again.",
+        "operationId": "submit_lead",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeadCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service unavailable"
+          }
+        },
+        "security": [],
+        "summary": "Submit an enquiry (general or for a project)",
+        "tags": [
+          "Lead intake"
+        ],
+        "x-public": true,
+        "x-rate-limit": "5 per 10 minutes per IP and per phone"
+      }
+    },
+    "/api/v1/public/site-visits": {
+      "post": {
+        "description": "`consent` must name the CURRENT lead-form consent text (id and version): an older one answers 409 \"reload the page\"; with no published text the answer is 503. `marketing_consent` is optional and, when sent, must name the current marketing text. The phone is normalised to E.164 (+91…); anything else is 422 on `phone`. The same phone and project within 24 hours is saved as a duplicate of the earlier lead and doesn't alert sales again. The day must be today or within 120 days (IST); sales confirm the time by phone.",
+        "operationId": "request_site_visit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteVisitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service unavailable"
+          }
+        },
+        "security": [],
+        "summary": "Request a site visit (creates a lead and a visit request)",
+        "tags": [
+          "Lead intake"
+        ],
+        "x-public": true,
+        "x-rate-limit": "5 per 10 minutes per IP and per phone"
       }
     }
   },

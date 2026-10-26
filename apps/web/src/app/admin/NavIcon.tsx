@@ -6,6 +6,7 @@ const PATHS = {
   dashboard: ["M3 3h7v7H3z", "M14 3h7v7h-7z", "M3 14h7v7H3z", "M14 14h7v7h-7z"],
   leads: ["M3 13l3-8h12l3 8v6H3z", "M3 13h5l1 3h6l1-3h5"],
   visits: ["M3 5h18v16H3z", "M3 10h18M8 3v4M16 3v4"],
+  reports: ["M4 20h16", "M7 16v-5M12 16V6M17 16v-8"],
   projects: ["M4 21V9h6v12M14 21V4h6v17M2 21h20"],
   catalogue: ["M4 5h16M4 12h16M4 19h10", "M18 17l2 2 3-4"],
   media: ["M3 4h18v16H3z", "M21 17l-6-6-9 9", "M9 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4"],
