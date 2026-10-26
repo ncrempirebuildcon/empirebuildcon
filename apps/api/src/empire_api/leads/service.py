@@ -45,7 +45,7 @@ from empire_api.users.models import User
 
 ERASED_LEAD: Final = "This lead's personal data was erased, so it can't be changed."
 NEEDS_ASSIGN: Final = "Only admins can change who a lead belongs to."
-OWNER_INVALID: Final = "Choose an active team member who can open leads."
+OWNER_INVALID: Final = routing.OWNER_INVALID
 LOST_NEEDS_REASON: Final = "Pick a reason to mark this lead lost."
 OTHER_NEEDS_NOTE: Final = "Say in a few words why the lead was lost."
 REASON_ONLY_LOST: Final = "A reason is only kept for lost leads."
@@ -105,8 +105,9 @@ def list_activity(db: Session, staff: Staff, lead_id: uuid.UUID) -> list[LeadAct
 
 
 def lead_owners(db: Session) -> list[User]:
-    """Everyone a lead can be assigned to: active accounts that can open leads."""
-    return directory.active_users_with(db, routing.OWNER_PERMISSION)
+    """Everyone a lead can be assigned to: accounts that can sign in (not just invited) and
+    open leads (routing.owner_refusal)."""
+    return directory.ready_users_with(db, routing.OWNER_PERMISSION)
 
 
 # --- Pipeline and details --------------------------------------------------------------------
@@ -125,8 +126,9 @@ def _check_owner(db: Session, staff: Staff, lead: Lead, sent: dict[str, Any]) ->
     if not staff.can("leads.assign"):
         raise ApiProblem(403, NEEDS_ASSIGN)
     new_owner = sent["owner_user_id"]
-    if new_owner is not None and not routing.can_own(db, new_owner):
-        raise _field(422, "owner_user_id", OWNER_INVALID)
+    refusal = routing.owner_refusal(db, new_owner) if new_owner is not None else None
+    if refusal is not None:
+        raise _field(422, "owner_user_id", refusal)
 
 
 def _check_status(lead: Lead, sent: dict[str, Any]) -> None:
@@ -296,8 +298,9 @@ def _manual_owner(db: Session, staff: Staff, sent: dict[str, Any]) -> uuid.UUID 
     if not staff.can("leads.assign"):
         raise ApiProblem(403, NEEDS_ASSIGN)
     owner: uuid.UUID | None = sent["owner_user_id"]
-    if owner is not None and not routing.can_own(db, owner):
-        raise _field(422, "owner_user_id", OWNER_INVALID)
+    refusal = routing.owner_refusal(db, owner) if owner is not None else None
+    if refusal is not None:
+        raise _field(422, "owner_user_id", refusal)
     return owner
 
 

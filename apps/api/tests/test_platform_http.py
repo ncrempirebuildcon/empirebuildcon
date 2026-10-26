@@ -117,6 +117,8 @@ def test_hsts_and_hidden_docs_in_production() -> None:
         data_encryption_key=SecretStr(Fernet.generate_key().decode()),
         edge_proxy_key=SecretStr("e" * 48),
         cloudinary_url=SecretStr("cloudinary://key:not-a-secret@demo"),
+        email_api_key=SecretStr("not-a-real-resend-key"),
+        email_from="alerts@example.com",
     )
     prod = create_app(settings)
     with TestClient(prod, base_url="https://testserver") as c:

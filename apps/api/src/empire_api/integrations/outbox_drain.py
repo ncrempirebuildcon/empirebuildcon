@@ -5,7 +5,8 @@ How it works:
      and a request's drain_soon) never take the same row.
   2. Run each row's handlers inside a savepoint. Success → `delivered`.
   3. Failure → attempts + 1 and retry after 1 min, 5 min, 30 min, 2 h, 6 h, 24 h; after the
-     7th failure the row is `dead` and an error is logged (Sentry picks it up).
+     7th failure the row is `dead` and an error is logged (Sentry picks it up). A
+     `PermanentDeliveryError` (handlers.py) makes the row `dead` at once, with the same alert.
 
 PERF: free hosting calls the drain every 15 minutes from Cloud Scheduler (D-007) so the
 database can sleep in between; `drain_soon` covers time-critical events right after a request.
@@ -25,15 +26,16 @@ from sqlalchemy.orm import Session
 
 from empire_api.content.schedule import schedule_tick
 from empire_api.db import get_engine, get_sessionmaker, rows_affected
-from empire_api.integrations.handlers import handlers_for
+from empire_api.integrations.handlers import PermanentDeliveryError, handlers_for
 from empire_api.leads.erasure import anonymise_inactive
 from empire_api.logs import get_logger
+from empire_api.mail import handlers as mail_handlers
 from empire_api.media import handlers as media_handlers
 from empire_api.media.uploads import discard_stale_intents
 from empire_api.platform.models import OutboxEvent, RateLimitBucket
 from empire_api.site_settings.models import Setting
 from empire_api.timeutil import utcnow
-from empire_api.users.models import PasswordResetToken, UserSession
+from empire_api.users.models import PasswordResetToken, SignInChallenge, UserSession
 
 # DO NOT CHANGE without updating ARCHITECTURE §9: the schedule is documented and relied on by
 # the "dead events" alert wording.
@@ -53,7 +55,7 @@ _CLEANUP_SETTING = "system.cleanup"
 
 log = get_logger(__name__)
 # Modules whose outbox handlers register on import (handlers.on); listed so they always load.
-HANDLER_MODULES = (media_handlers,)
+HANDLER_MODULES = (media_handlers, mail_handlers)
 
 
 @dataclass(frozen=True)
@@ -66,7 +68,16 @@ class DrainResult:
 def _schedule_retry(row: OutboxEvent, exc: BaseException, now: datetime) -> None:
     row.attempts += 1
     row.last_error = f"{type(exc).__name__}: {exc}"[:2000]
-    if row.attempts > len(RETRY_DELAYS):
+    if isinstance(exc, PermanentDeliveryError):
+        row.status = "dead"
+        log.error(
+            "outbox_event_dead",
+            event_type=row.type,
+            event_id=str(row.event_id),
+            reason="permanent",
+            error_type=type(exc).__name__,
+        )
+    elif row.attempts > len(RETRY_DELAYS):
         row.status = "dead"
         log.error("outbox_event_dead", event_type=row.type, event_id=str(row.event_id))
         # TODO(phase-6): email the owner a daily digest of dead events (ARCHITECTURE §9).
@@ -156,7 +167,8 @@ def drain_soon(background: BackgroundTasks, budget_seconds: float = 3.0) -> None
 
 
 def cleanup(now: datetime | None = None) -> dict[str, int]:
-    """Delete expired sessions, used/expired reset tokens and old rate-limit buckets, send
+    """Delete expired sessions, used/expired reset tokens, old rate-limit buckets and sign-in
+    challenges (two-factor second steps), send
     unconfirmed direct uploads to be destroyed (media/uploads.discard_stale_intents), and
     anonymise leads with no activity for the retention period (leads/erasure.py, SECURITY.md §8).
     """
@@ -171,10 +183,14 @@ def cleanup(now: datetime | None = None) -> dict[str, int]:
         PasswordResetToken.expires_at < now - timedelta(days=1)
     )
     old_buckets = delete(RateLimitBucket).where(RateLimitBucket.expires_at < now)
+    old_challenges = delete(SignInChallenge).where(
+        SignInChallenge.expires_at < now - timedelta(days=1)
+    )
     with get_sessionmaker()() as db, db.begin():
         sessions = rows_affected(db.execute(old_sessions))
         tokens = rows_affected(db.execute(old_tokens))
         buckets = rows_affected(db.execute(old_buckets))
+        challenges = rows_affected(db.execute(old_challenges))
         uploads = discard_stale_intents(db, now)
     # WHY its own transaction: a problem anonymising one lead must not undo the session and
     # token clean-up above (it raises after they are committed, and the next run retries).
@@ -184,6 +200,7 @@ def cleanup(now: datetime | None = None) -> dict[str, int]:
         "sessions": sessions,
         "reset_tokens": tokens,
         "rate_limit_buckets": buckets,
+        "sign_in_challenges": challenges,
         "unconfirmed_uploads": uploads,
         "leads_anonymised": anonymised,
     }

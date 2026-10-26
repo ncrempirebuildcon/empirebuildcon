@@ -1,2 +1,4 @@
 # Files written by the fake media store in development and tests (MEDIA_DEV_DIR, D-033).
 .media-dev/
+# Messages kept by the dev email transport (MAIL_DEV_DIR; never sends, holds dev links).
+.mail-dev/

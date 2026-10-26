@@ -23,7 +23,8 @@ class AuditLog(Base):
     """Who did what to which record, with a before/after diff. Append-only.
 
     INVARIANT: rows are never updated or deleted by application code (audit board: "can't be
-    edited or deleted"). Retention clean-up, if ever added, needs owner approval.
+    edited or deleted"), and a row trigger refuses UPDATE and DELETE in the database (migration
+    0006). Retention clean-up, if ever added, needs owner approval and a migration.
     """
 
     __tablename__ = "audit_log"

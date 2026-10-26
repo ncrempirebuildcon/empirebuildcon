@@ -1,7 +1,9 @@
 """Business rules for signing in, passwords and staff accounts.
 
 Collaborators: users/sessions.py (session rows, tokens), users/passwords.py (hashing, policy),
-platform/audit.py, platform/outbox.py, platform/rate_limit.py.
+users/lockout.py (sign-in counters), platform/audit.py, platform/outbox.py,
+platform/rate_limit.py. Signing in itself lives in users/sign_in.py, two-factor in
+users/two_factor.py.
 Implements: D-009 and SECURITY.md §1; ARCHITECTURE §11 (audit on login and permission changes).
 
 INVARIANT: every function that changes data records an audit row in the same transaction and
@@ -13,7 +15,8 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Final
+from urllib.parse import parse_qs, urlsplit
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
@@ -24,18 +27,21 @@ from empire_api.logs import mask_phone
 from empire_api.platform import audit, outbox, rate_limit
 from empire_api.platform.crypto import hash_ip, hash_token, network_key, new_token
 from empire_api.timeutil import utcnow
-from empire_api.users import passwords
+from empire_api.users import lockout, passwords, two_factor
+from empire_api.users.lockout import clear_every_network
 from empire_api.users.models import PasswordResetToken, User, UserSession
-from empire_api.users.sessions import revoke_sessions, start_session
+from empire_api.users.sessions import revoke_sessions
 
 # SECURITY: one message for "no such email" and "wrong password" so the login form can't be
 # used to discover which emails have staff accounts.
 GENERIC_LOGIN_ERROR = "The email or password is incorrect."
-LOCKED_MESSAGE = "Too many attempts. Try again in 15 minutes."
 INVALID_LINK = "This link is invalid or has expired. Ask for a new one."
+CURRENT_PASSWORD_WRONG = "Your current password is not correct."  # noqa: S105 — a message
+# The lockout's limits and message, kept here too for callers that read them from the service.
+LOCKED_MESSAGE = lockout.LOCKED_MESSAGE
+MAX_FAILED_LOGINS = lockout.MAX_FAILED_LOGINS
+LOCK_WINDOW_SECONDS = lockout.LOCK_WINDOW_SECONDS
 
-MAX_FAILED_LOGINS = 5
-LOCK_WINDOW_SECONDS = 15 * 60
 RESET_TOKEN_TTL = timedelta(minutes=30)
 SETUP_TOKEN_TTL = timedelta(hours=24)
 
@@ -56,101 +62,7 @@ def find_user_by_email(db: Session, email: str) -> User | None:
     return db.scalar(select(User).where(func.lower(User.email) == normalise_email(email)))
 
 
-# --- Sign in / out -------------------------------------------------------------------------------
-
-
-def login(db: Session, email: str, password: str, meta: RequestMeta) -> tuple[User, str, uuid.UUID]:
-    """Check credentials and start a session. Returns (user, signed token, session id).
-
-    How it works:
-      1. Per-network limit: 10 sign-in attempts per 15 minutes per IP, across all accounts.
-      2. Per account AND network: every attempt is counted (atomic UPSERT) BEFORE the password
-         is checked; the 6th attempt within the 15-minute window gets 429 until the window ends.
-      3. Wrong password → 401 with one generic message; the 5th failure records a "locked"
-         audit row and shows the account as recently locked in the CMS.
-      4. Success → the account/network counter is cleared, a new session (new sid), audit row.
-
-    SECURITY (why this shape):
-      - Counting before checking means parallel requests can't squeeze in extra guesses.
-        INVARIANT: at most 5 password checks per account, per network, per 15 minutes.
-      - Locking per account AND network means a stranger can't lock the owner out by typing
-        the owner's (public) email five times: only the stranger's network gets blocked.
-      - Unknown emails go through exactly the same steps and answers (401, then 429 with the
-        same Retry-After rule), so the responses can't reveal which emails have accounts.
-    """
-    # SECURITY: limits and lockouts count per network: an IPv6 /64 is one network (network_key).
-    ip_key = hash_ip(network_key(meta.ip))
-    rate_limit.enforce(
-        f"login:ip:{ip_key}",
-        limit=10,
-        window_seconds=LOCK_WINDOW_SECONDS,
-        message="Too many sign-in attempts from this network. Try again in 15 minutes.",
-    )
-    attempt_key = _attempt_key(email, ip_key)
-    attempt = rate_limit.hit(
-        attempt_key, limit=MAX_FAILED_LOGINS, window_seconds=LOCK_WINDOW_SECONDS
-    )
-    if not attempt.allowed:
-        raise ApiProblem(429, LOCKED_MESSAGE, headers={"Retry-After": str(attempt.retry_after)})
-
-    now = utcnow()
-    user = find_user_by_email(db, email)
-    ok = passwords.verify_password(user.password_hash if user else None, password)
-    if user is None or not ok or not user.is_active:
-        if user is not None and attempt.count == MAX_FAILED_LOGINS:
-            _record_lock(db, user, meta, until=now + timedelta(seconds=attempt.retry_after))
-        audit.record(
-            db,
-            action="auth.login_failed",
-            entity_type="user",
-            entity_id=user.id if user else "unknown",
-            actor_id=None,
-            ip=meta.ip,
-        )
-        db.commit()
-        raise ApiProblem(401, GENERIC_LOGIN_ERROR)
-
-    assert user.password_hash is not None  # noqa: S101 — verify_password returned True
-    if passwords.needs_rehash(user.password_hash):
-        user.password_hash = passwords.hash_password(password)
-    rate_limit.clear(attempt_key)
-    user.locked_until = None
-    user.last_login_at = now
-    session_row, token = start_session(db, user, ip_hash=ip_key, user_agent=meta.user_agent)
-    audit.record(
-        db, action="auth.login", entity_type="user", entity_id=user.id, actor_id=user.id, ip=meta.ip
-    )
-    db.commit()
-    return user, token, session_row.id
-
-
-def _attempt_key(email: str, ip_key: str) -> str:
-    return f"login:acct:{hash_token(normalise_email(email))}:{ip_key}"
-
-
-def _record_lock(db: Session, user: User, meta: RequestMeta, *, until: datetime) -> None:
-    """Note a lockout for the CMS and the security email (the 429 itself comes from the counter).
-
-    `locked_until` is informational: "locked from at least one network until …". Unlock in the
-    CMS clears it and every network's counter for this account.
-    """
-    user.locked_until = until
-    audit.record(
-        db,
-        action="user.locked",
-        entity_type="user",
-        entity_id=user.id,
-        actor_id=None,
-        ip=meta.ip,
-        changes={"locked_until": until.isoformat()},
-    )
-    outbox.emit(
-        db,
-        type_="user.locked",
-        aggregate_type="user",
-        aggregate_id=user.id,
-        data={"user_id": str(user.id), "locked_until": until.isoformat()},
-    )
+# --- Sign out ----------------------------------------------------------------------------------
 
 
 def logout(db: Session, user: User, session: UserSession, meta: RequestMeta) -> None:
@@ -182,9 +94,23 @@ def _policy_or_422(password: str, email: str) -> None:
 def change_password(
     db: Session, user: User, session: UserSession, current: str, new: str, meta: RequestMeta
 ) -> None:
-    """Change own password; every other session is signed out (SECURITY.md §1)."""
+    """Change own password; every other session is signed out (SECURITY.md §1).
+
+    SECURITY (part 5 review M2): the current password is counted on the sign-in lockout BEFORE
+    it is checked (users/lockout.py), like My account's checks: otherwise a stolen session
+    could guess it here without limit, then use it to put its own phone on the account. A
+    miss is audited (`auth.password_check_failed`); a completed change clears the counter.
+    """
+    ip_key = lockout.network_hash(meta.ip)
+    attempt = lockout.guard_attempt(user.email, ip_key)
     if not passwords.verify_password(user.password_hash, current):
-        raise ApiProblem(400, "Your current password is not correct.")
+        lockout.note_failure(db, user, attempt, meta.ip, action="auth.password_check_failed")
+        db.commit()
+        raise ApiProblem(
+            400,
+            CURRENT_PASSWORD_WRONG,
+            errors=[{"field": "current_password", "message": CURRENT_PASSWORD_WRONG}],
+        )
     _policy_or_422(new, user.email)
     now = utcnow()
     user.password_hash = passwords.hash_password(new)
@@ -199,19 +125,37 @@ def change_password(
         actor_id=user.id,
         ip=meta.ip,
     )
+    _password_changed_event(db, user, how="changed")
     db.commit()
+    lockout.clear(user.email, ip_key)
+
+
+def _password_changed_event(db: Session, user: User, *, how: str) -> None:
+    """`user.password_changed`: the security email to the account (ids only)."""
+    outbox.emit(
+        db,
+        type_="user.password_changed",
+        aggregate_type="user",
+        aggregate_id=user.id,
+        actor_id=user.id,
+        data={"user_id": str(user.id), "how": how},
+    )
 
 
 def issue_password_token(
     db: Session, user: User, *, purpose: str, actor_id: uuid.UUID | None
 ) -> str:
-    """Create a single-use link token and queue the email event. Returns the raw token.
+    """Create a single-use link token (every older open link of the account stops working) and
+    queue the email event. Returns the raw token.
 
     COMPLIANCE/SECURITY: the link goes into the outbox payload encrypted (Fernet), so the queue
     table never holds a working link in plain text. Caller commits.
     """
     ttl = SETUP_TOKEN_TTL if purpose == "setup" else RESET_TOKEN_TTL
     token = new_token(32)
+    # SECURITY (part 5 review M4): only the newest link works. An earlier one may have gone to a
+    # mistyped address, and the CMS tells the super-admin that older links stop working.
+    _burn_open_tokens(db, user.id, utcnow())
     db.add(
         PasswordResetToken(
             user_id=user.id,
@@ -235,31 +179,83 @@ def issue_password_token(
         },
         contains_personal_data=True,
     )
-    # TODO(phase-4): an outbox handler emails this link through Resend (o-30 in the tracker).
+    # The mail module's handler decrypts and emails the link (mail/handlers.py); it is never
+    # logged there either.
     return token
 
 
+def password_link_open(db: Session, token: str) -> bool:
+    """Whether a setup or reset token can still be used (not used, burned or expired). The mail
+    handler checks this before sending, so a retried event never emails a dead link."""
+    row = db.scalar(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_token(token))
+    )
+    return row is not None and row.used_at is None and row.expires_at > utcnow()
+
+
 def setup_link(token: str) -> str:
-    return f"{get_settings().site_url.rstrip('/')}/admin/setup?token={token}"
+    """`<SITE_URL>/admin/setup#token=…`.
+
+    SECURITY (part 5 review L10): the token is in the fragment, which browsers never send to a
+    server, so it can't land in the web host's request logs (a third party keeps those for the
+    link's whole lifetime). The CMS page reads it from `location.hash` and sends it in the body.
+    """
+    return f"{get_settings().site_url.rstrip('/')}/admin/setup#token={token}"
 
 
 def reset_link(token: str) -> str:
-    return f"{get_settings().site_url.rstrip('/')}/admin/reset?token={token}"
+    """`<SITE_URL>/admin/reset#token=…` (fragment, as setup_link explains)."""
+    return f"{get_settings().site_url.rstrip('/')}/admin/reset#token={token}"
+
+
+def token_of_link(link: str) -> str:
+    """The token in a setup or reset link: the fragment, or (links queued before part 5's
+    review) the query string."""
+    parts = urlsplit(link)
+    for source in (parts.fragment, parts.query):
+        found = parse_qs(source).get("token")
+        if found:
+            return found[0]
+    return ""
+
+
+RESET_PER_HOUR: Final = 3
+RESET_PER_DAY: Final = 5
+DAY_SECONDS: Final = 24 * 3600
 
 
 def forgot_password(db: Session, email: str, meta: RequestMeta) -> None:
-    """Queue a reset email if the account exists. Same answer either way (no enumeration)."""
+    """Queue a reset email if the account exists. Same answer either way (no enumeration).
+
+    Limits, all counted BEFORE the account is looked up, so a real and an unknown email get
+    exactly the same answers (204, then the same 429s):
+      1. 10 per hour per network;
+      2. 3 per hour per email address (keyed hash);
+      3. 5 per UTC day per email address. WHY: the hourly limit alone still lets someone spread
+         72 requests a day over many networks at one address, most of the Resend Free plan's
+         100 emails a day (D-007), and lead alerts would stop for the rest of the day. The
+         window is a fixed day from midnight UTC, when Resend's daily quota resets too. Only
+         requests the hourly limit let through count here, so a burst of refused ones doesn't
+         use up the owner's own resets for the day.
+    """
     rate_limit.enforce(
         f"reset:ip:{hash_ip(network_key(meta.ip))}",
         limit=10,
         window_seconds=3600,
         message="Too many reset requests from this network. Try again in an hour.",
     )
+    email_key = hash_token(normalise_email(email))
     rate_limit.enforce(
-        f"reset:email:{hash_token(normalise_email(email))}",
-        limit=3,
+        f"reset:email:{email_key}",
+        limit=RESET_PER_HOUR,
         window_seconds=3600,
         message="Too many reset requests for this email. Try again in an hour.",
+    )
+    rate_limit.enforce(
+        f"reset:email-day:{email_key}",
+        limit=RESET_PER_DAY,
+        window_seconds=DAY_SECONDS,
+        message="Too many reset requests for this email today. Try again tomorrow.",
     )
     user = find_user_by_email(db, email)
     if user is None or not user.is_active:
@@ -305,7 +301,7 @@ def reset_password(db: Session, token: str, new: str, meta: RequestMeta) -> User
     user.password_hash = passwords.hash_password(new)
     user.password_changed_at = now
     user.locked_until = None
-    rate_limit.clear_prefix(_attempt_key(user.email, ""))
+    clear_every_network(user.email, user.id)
     _burn_open_tokens(db, user.id, now)
     revoke_sessions(db, user.id, now=now)
     audit.record(
@@ -316,6 +312,9 @@ def reset_password(db: Session, token: str, new: str, meta: RequestMeta) -> User
         actor_id=user.id,
         ip=meta.ip,
     )
+    if claimed.purpose == "reset":
+        # The first password of a new account needs no notice; a reset does (security email).
+        _password_changed_event(db, user, how="reset")
     db.commit()
     return user
 
@@ -437,6 +436,10 @@ def update_user(
         # SECURITY: privilege change → new session required (SECURITY.md §1 "rotated on
         # privilege change"). Revoking forces a fresh login, which issues a new sid.
         revoke_sessions(db, user.id)
+    if "email" in delta or "is_active" in delta:
+        # SECURITY (part 5 review M4): a link sent to the old address, or before a deactivation,
+        # must not work afterwards (reactivating would otherwise bring it back).
+        _burn_open_tokens(db, user.id, utcnow())
     action = "user.role_changed" if "role" in delta else "user.updated"
     audit.record(
         db,
@@ -462,7 +465,7 @@ def update_user(
 def unlock_user(db: Session, user: User, actor_id: uuid.UUID, meta: RequestMeta) -> None:
     """Clear the lock note and every network's sign-in counter for this account."""
     user.locked_until = None
-    rate_limit.clear_prefix(_attempt_key(user.email, ""))
+    clear_every_network(user.email, user.id)
     audit.record(
         db,
         action="user.unlocked",
@@ -500,3 +503,48 @@ def admin_send_reset(db: Session, user: User, actor_id: uuid.UUID, meta: Request
         ip=meta.ip,
     )
     db.commit()
+
+
+def admin_reset_two_factor(
+    db: Session, user: User, actor_id: uuid.UUID | None, meta: RequestMeta | None
+) -> None:
+    """Super-admin: remove someone's two-factor (lost phone) and sign them out everywhere.
+
+    They get a security email (`user.two_factor_reset`). With the `admin_2fa` flag on, their
+    next sign-in asks them to set it up again; otherwise they sign in with the password.
+    """
+    two_factor.admin_reset(db, user, actor_id, meta.ip if meta else None)
+    revoke_sessions(db, user.id)
+    db.commit()
+
+
+def sign_out_admins_without_two_factor(db: Session, actor_id: uuid.UUID, ip: str | None) -> int:
+    """`admin_2fa` was just switched on: sign out every admin and super-admin whose account has
+    no two-factor yet (never the person switching, who has it by rule), so their next sign-in
+    meets the forced set-up instead of a 7-day-old password-only session carrying on (part 5
+    review L1). One audit row per account signed out. Returns how many accounts. Caller commits.
+    """
+    accounts = db.scalars(
+        select(User).where(
+            User.is_active.is_(True),
+            User.role.in_(sorted(two_factor.TWO_FACTOR_ROLES)),
+            User.id != actor_id,
+        )
+    ).all()
+    signed_out = 0
+    for user in accounts:
+        if user.two_factor_enabled:
+            continue
+        count = revoke_sessions(db, user.id)
+        if count:
+            signed_out += 1
+            audit.record(
+                db,
+                action="user.sessions_revoked",
+                entity_type="user",
+                entity_id=user.id,
+                actor_id=actor_id,
+                ip=ip,
+                changes={"sessions": [count, 0], "reason": [None, "admin_2fa switched on"]},
+            )
+    return signed_out

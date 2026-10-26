@@ -168,6 +168,45 @@
         "title": "Area",
         "type": "object"
       },
+      "AuditActor": {
+        "description": "`UserRef` plus the role the person has now (null for a removed account).",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "super_admin",
+                  "admin",
+                  "sales",
+                  "marketing",
+                  "content_editor"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role"
+        ],
+        "title": "AuditActor",
+        "type": "object"
+      },
       "AuditEntry": {
         "properties": {
           "action": {
@@ -177,12 +216,13 @@
           "actor": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserRef"
+                "$ref": "#/components/schemas/AuditActor"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Null: done by the system (no person)"
           },
           "changes": {
             "additionalProperties": true,
@@ -215,6 +255,7 @@
                 "type": "null"
               }
             ],
+            "description": "Masked: the first two parts of an IPv4 address (49.36.xxx.xxx) or the /32 of an IPv6 address. The full address is never stored.",
             "title": "Ip"
           }
         },
@@ -1018,6 +1059,103 @@
         "title": "ColumnsData",
         "type": "object"
       },
+      "CompanySettings": {
+        "additionalProperties": false,
+        "properties": {
+          "brand_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The name visitors know",
+            "title": "Brand Name"
+          },
+          "corporate_address": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Shown in the footer and on the Contact page",
+            "title": "Corporate Address"
+          },
+          "gstin": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "15 characters; the last one is a check character",
+            "title": "Gstin"
+          },
+          "legal_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As registered, e.g. on the GST record",
+            "title": "Legal Name"
+          },
+          "registered_address": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registered Address"
+          },
+          "tagline": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tagline"
+          }
+        },
+        "required": [
+          "legal_name",
+          "brand_name",
+          "gstin",
+          "tagline",
+          "registered_address",
+          "corporate_address"
+        ],
+        "title": "CompanySettings",
+        "type": "object"
+      },
       "Configuration": {
         "description": "A floor-plan type; a \"property\" on the public site (D-004).",
         "properties": {
@@ -1305,6 +1443,84 @@
         "title": "ConsentGiven",
         "type": "object"
       },
+      "ConsentKindSummary": {
+        "description": "One purpose (kind) for the consent-text screen: which version is current.",
+        "properties": {
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsentText"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the forms show now; null = none yet"
+          },
+          "current_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Version"
+          },
+          "has_unpublished_newer": {
+            "description": "A version newer than the current one exists but isn't published",
+            "title": "Has Unpublished Newer",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "lead_form",
+              "marketing",
+              "brochure",
+              "cookies",
+              "chat"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "purpose": {
+            "title": "Purpose",
+            "type": "string"
+          },
+          "versions": {
+            "title": "Versions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "purpose",
+          "current",
+          "current_version",
+          "latest_version",
+          "versions",
+          "has_unpublished_newer"
+        ],
+        "title": "ConsentKindSummary",
+        "type": "object"
+      },
       "ConsentText": {
         "properties": {
           "body": {
@@ -1340,8 +1556,13 @@
             "type": "boolean"
           },
           "is_draft": {
-            "description": "The wording still says it awaits the owner's approval (D-017). Production refuses to publish such a text.",
+            "description": "The wording still says it awaits the owner's approval (D-017). Production refuses to publish such a text. Same as is_draft_text (kept for the part 3 CMS).",
             "title": "Is Draft",
+            "type": "boolean"
+          },
+          "is_draft_text": {
+            "description": "The wording still says it awaits the owner's approval (D-017), as on pages.",
+            "title": "Is Draft Text",
             "type": "boolean"
           },
           "kind": {
@@ -1367,6 +1588,17 @@
             ],
             "title": "Published At"
           },
+          "published_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who first published this version (with published_at); null for seeded texts"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -1381,8 +1613,10 @@
           "published_at",
           "is_current",
           "is_draft",
+          "is_draft_text",
           "created_at",
-          "created_by"
+          "created_by",
+          "published_by"
         ],
         "title": "ConsentText",
         "type": "object"
@@ -1593,6 +1827,147 @@
           "update_date"
         ],
         "title": "ConstructionUpdateInput",
+        "type": "object"
+      },
+      "ContactSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_care_email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Care Email"
+          },
+          "customer_care_phone": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Care Phone"
+          },
+          "grievance_officer_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Named in the privacy notice (DPDP Act)",
+            "title": "Grievance Officer Name"
+          },
+          "office_hours": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "E.g. Mon–Sat, 10:00–19:00",
+            "title": "Office Hours"
+          },
+          "privacy_email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where buyers ask to see, correct or erase their data",
+            "title": "Privacy Email"
+          },
+          "sales_email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sales Email"
+          },
+          "sales_phone": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stored as +91XXXXXXXXXX",
+            "title": "Sales Phone"
+          },
+          "whatsapp_message": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The opening message; {page} becomes the page the visitor is on",
+            "title": "Whatsapp Message"
+          },
+          "whatsapp_number": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Every WhatsApp button and the mobile bar",
+            "title": "Whatsapp Number"
+          }
+        },
+        "required": [
+          "sales_phone",
+          "whatsapp_number",
+          "customer_care_phone",
+          "office_hours",
+          "sales_email",
+          "customer_care_email",
+          "grievance_officer_name",
+          "privacy_email",
+          "whatsapp_message"
+        ],
+        "title": "ContactSettings",
         "type": "object"
       },
       "Cta": {
@@ -1864,6 +2239,56 @@
         "title": "DashboardTask",
         "type": "object"
       },
+      "DevMail": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "links": {
+            "description": "Every link in the message, in order",
+            "items": {
+              "type": "string"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "sent_at": {
+            "format": "date-time",
+            "title": "Sent At",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "template": {
+            "description": "e.g. setup_link, reset_link, lead_alert, account_locked",
+            "title": "Template",
+            "type": "string"
+          },
+          "text": {
+            "description": "The plain-text version",
+            "title": "Text",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "to",
+          "subject",
+          "template",
+          "links",
+          "text",
+          "sent_at"
+        ],
+        "title": "DevMail",
+        "type": "object"
+      },
       "DividerBlock": {
         "properties": {
           "data": {
@@ -1962,6 +2387,92 @@
           "remaining"
         ],
         "title": "DrainResult",
+        "type": "object"
+      },
+      "EmailIntegration": {
+        "properties": {
+          "failed_last_7_days": {
+            "title": "Failed Last 7 Days",
+            "type": "integer"
+          },
+          "from_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "EMAIL_FROM; the key itself is never shown",
+            "title": "From Address"
+          },
+          "status": {
+            "description": "connected: the key and sender are set (sending problems show in failed_last_7_days); not_configured: something is missing; dev: development mailbox, nothing is sent",
+            "enum": [
+              "connected",
+              "not_configured",
+              "dev"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "transport": {
+            "enum": [
+              "resend",
+              "dev"
+            ],
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transport",
+          "status",
+          "from_address",
+          "failed_last_7_days"
+        ],
+        "title": "EmailIntegration",
+        "type": "object"
+      },
+      "EmailSettings": {
+        "additionalProperties": false,
+        "description": "The From address itself is the EMAIL_FROM environment variable.",
+        "properties": {
+          "reply_to": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where replies to alerts go",
+            "title": "Reply To"
+          },
+          "sender_name": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Shown as the sender; empty = 'Empire CMS'",
+            "title": "Sender Name"
+          }
+        },
+        "required": [
+          "sender_name",
+          "reply_to"
+        ],
+        "title": "EmailSettings",
         "type": "object"
       },
       "Faq": {
@@ -2313,6 +2824,22 @@
       },
       "FeatureFlag": {
         "properties": {
+          "can_switch": {
+            "description": "Whether you can switch it now",
+            "title": "Can Switch",
+            "type": "boolean"
+          },
+          "cannot_switch_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cannot Switch Reason"
+          },
           "description": {
             "title": "Description",
             "type": "string"
@@ -2331,6 +2858,10 @@
           },
           "key": {
             "title": "Key",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
             "type": "string"
           },
           "updated_at": {
@@ -2354,12 +2885,20 @@
                 "type": "null"
               }
             ]
+          },
+          "who_can_switch": {
+            "title": "Who Can Switch",
+            "type": "string"
           }
         },
         "required": [
           "key",
+          "title",
           "enabled",
           "description",
+          "who_can_switch",
+          "can_switch",
+          "cannot_switch_reason",
           "is_public",
           "is_locked",
           "updated_at",
@@ -2884,6 +3423,30 @@
         "required": [
           "file"
         ],
+        "type": "object"
+      },
+      "IntegrationsStatus": {
+        "properties": {
+          "crm": {
+            "$ref": "#/components/schemas/PlannedIntegration"
+          },
+          "email": {
+            "$ref": "#/components/schemas/EmailIntegration"
+          },
+          "webhooks": {
+            "$ref": "#/components/schemas/PlannedIntegration"
+          },
+          "whatsapp_alerts": {
+            "$ref": "#/components/schemas/PlannedIntegration"
+          }
+        },
+        "required": [
+          "email",
+          "crm",
+          "webhooks",
+          "whatsapp_alerts"
+        ],
+        "title": "IntegrationsStatus",
         "type": "object"
       },
       "Lead": {
@@ -4010,6 +4573,77 @@
         "title": "LeadRef",
         "type": "object"
       },
+      "LeadRoutingSettings": {
+        "additionalProperties": false,
+        "description": "D-016 (leads/routing.py applies it): `single` → the person in `single_owner_user_id`, or\nthe sales inbox when empty; `round_robin` → in turn through `round_robin_user_ids` (empty:\nevery active sales user), skipping anyone in `round_robin_paused_user_ids`; `manual` →\nunassigned until an admin assigns.",
+        "properties": {
+          "inbox_email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Every new lead is emailed here; when empty, to every active super-admin",
+            "title": "Inbox Email"
+          },
+          "mode": {
+            "default": "single",
+            "enum": [
+              "single",
+              "round_robin",
+              "manual"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "round_robin_paused_user_ids": {
+            "description": "In the list but out of rotation for now",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Round Robin Paused User Ids",
+            "type": "array"
+          },
+          "round_robin_user_ids": {
+            "description": "The rotation, in order",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Round Robin User Ids",
+            "type": "array"
+          },
+          "single_owner_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Single Owner User Id"
+          }
+        },
+        "required": [
+          "mode",
+          "inbox_email",
+          "single_owner_user_id",
+          "round_robin_user_ids",
+          "round_robin_paused_user_ids"
+        ],
+        "title": "LeadRoutingSettings",
+        "type": "object"
+      },
       "LeadStatusCounts": {
         "properties": {
           "booked": {
@@ -5121,6 +5755,11 @@
       },
       "Me": {
         "properties": {
+          "can_use_two_factor": {
+            "description": "This role may turn two-factor on (admin and super-admin).",
+            "title": "Can Use Two Factor",
+            "type": "boolean"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -5139,6 +5778,19 @@
             "title": "Id",
             "type": "string"
           },
+          "invite_sent_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the newest setup link was sent (invited accounts only).",
+            "title": "Invite Sent At"
+          },
           "is_active": {
             "title": "Is Active",
             "type": "boolean"
@@ -5153,6 +5805,7 @@
                 "type": "null"
               }
             ],
+            "description": "Last completed sign-in (the board's 'Last sign-in').",
             "title": "Last Login At"
           },
           "locked_until": {
@@ -5189,6 +5842,18 @@
             ],
             "title": "Phone"
           },
+          "recovery_codes_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unused recovery codes; null when two-factor is off.",
+            "title": "Recovery Codes Left"
+          },
           "role": {
             "enum": [
               "super_admin",
@@ -5199,6 +5864,27 @@
             ],
             "title": "Role",
             "type": "string"
+          },
+          "status": {
+            "description": "deactivated (is_active false), invited (no password set yet), locked (locked_until is in the future: locked from at least one network) or active.",
+            "enum": [
+              "active",
+              "invited",
+              "locked",
+              "deactivated"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "two_factor_enabled": {
+            "description": "Two-factor sign-in is set up and confirmed with a code.",
+            "title": "Two Factor Enabled",
+            "type": "boolean"
+          },
+          "two_factor_required": {
+            "description": "The admin_2fa flag is on and this role must use two-factor.",
+            "title": "Two Factor Required",
+            "type": "boolean"
           }
         },
         "required": [
@@ -5208,8 +5894,13 @@
           "role",
           "is_active",
           "created_at",
+          "status",
+          "two_factor_enabled",
           "permissions",
-          "csrf_token"
+          "csrf_token",
+          "can_use_two_factor",
+          "two_factor_required",
+          "recovery_codes_left"
         ],
         "title": "Me",
         "type": "object"
@@ -7015,6 +7706,22 @@
         "title": "PasswordChange",
         "type": "object"
       },
+      "PasswordConfirm": {
+        "additionalProperties": false,
+        "properties": {
+          "current_password": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Current Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password"
+        ],
+        "title": "PasswordConfirm",
+        "type": "object"
+      },
       "PasswordForgot": {
         "additionalProperties": false,
         "properties": {
@@ -7201,6 +7908,67 @@
           "percent"
         ],
         "title": "PaymentPlanStage",
+        "type": "object"
+      },
+      "Permission": {
+        "description": "One row of the role table: a permission, what it allows, and which roles have it.",
+        "properties": {
+          "allows": {
+            "title": "Allows",
+            "type": "string"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "enum": [
+                "super_admin",
+                "admin",
+                "sales",
+                "marketing",
+                "content_editor"
+              ],
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "group",
+          "allows",
+          "roles"
+        ],
+        "title": "Permission",
+        "type": "object"
+      },
+      "PlannedIntegration": {
+        "properties": {
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "none",
+              "phase_6"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "note"
+        ],
+        "title": "PlannedIntegration",
         "type": "object"
       },
       "Post": {
@@ -7852,6 +8620,24 @@
           }
         },
         "title": "Price",
+        "type": "object"
+      },
+      "PrivacySettings": {
+        "additionalProperties": false,
+        "description": "COMPLIANCE (module header): super-admin only, 1–10 years.",
+        "properties": {
+          "lead_retention_years": {
+            "default": 3,
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Lead Retention Years",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lead_retention_years"
+        ],
+        "title": "PrivacySettings",
         "type": "object"
       },
       "Problem": {
@@ -9229,6 +10015,23 @@
         "title": "PropertyGridBlockInput",
         "type": "object"
       },
+      "RecoveryCodes": {
+        "description": "Shown once. SECURITY: never stored in plain text; only keyed hashes are kept.",
+        "properties": {
+          "recovery_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recovery Codes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recovery_codes"
+        ],
+        "title": "RecoveryCodes",
+        "type": "object"
+      },
       "Redirect": {
         "properties": {
           "created_at": {
@@ -9439,6 +10242,85 @@
           }
         },
         "title": "RedirectUpdate",
+        "type": "object"
+      },
+      "RegulatorView": {
+        "description": "The regulator group as the RERA section shows it (names spelled out, fixed fields).",
+        "properties": {
+          "authority": {
+            "const": "UP-RERA",
+            "default": "UP-RERA",
+            "title": "Authority",
+            "type": "string"
+          },
+          "authority_name": {
+            "default": "Uttar Pradesh Real Estate Regulatory Authority",
+            "title": "Authority Name",
+            "type": "string"
+          },
+          "locked_fields": {
+            "default": [
+              "state",
+              "authority",
+              "website",
+              "show_rera_everywhere"
+            ],
+            "description": "Shown locked; a PATCH that changes them is refused (COMPLIANCE)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Locked Fields",
+            "type": "array"
+          },
+          "promoter_registration_number": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only if Empire holds one",
+            "title": "Promoter Registration Number"
+          },
+          "show_rera_everywhere": {
+            "const": true,
+            "default": true,
+            "description": "Always on (UP-RERA's advertising directions); can't be off",
+            "title": "Show Rera Everywhere",
+            "type": "boolean"
+          },
+          "state": {
+            "const": "UP",
+            "default": "UP",
+            "title": "State",
+            "type": "string"
+          },
+          "state_name": {
+            "default": "Uttar Pradesh",
+            "title": "State Name",
+            "type": "string"
+          },
+          "website": {
+            "const": "https://www.up-rera.in",
+            "default": "https://www.up-rera.in",
+            "title": "Website",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "authority",
+          "website",
+          "promoter_registration_number",
+          "show_rera_everywhere",
+          "state_name",
+          "authority_name",
+          "locked_fields"
+        ],
+        "title": "RegulatorView",
         "type": "object"
       },
       "ReorderRequest": {
@@ -9686,14 +10568,85 @@
             },
             "title": "Permissions",
             "type": "array"
+          },
+          "summary": {
+            "description": "What the role is for, in a sentence (the role table)",
+            "title": "Summary",
+            "type": "string"
+          },
+          "user_count": {
+            "description": "Active accounts with this role",
+            "title": "User Count",
+            "type": "integer"
           }
         },
         "required": [
           "key",
           "name",
-          "permissions"
+          "permissions",
+          "summary",
+          "user_count"
         ],
         "title": "Role",
+        "type": "object"
+      },
+      "RotationRow": {
+        "properties": {
+          "can_own": {
+            "description": "Active, own password set, role can open leads",
+            "title": "Can Own",
+            "type": "boolean"
+          },
+          "gets_next": {
+            "title": "Gets Next",
+            "type": "boolean"
+          },
+          "in_rotation": {
+            "description": "False: paused, or can't be given leads now",
+            "title": "In Rotation",
+            "type": "boolean"
+          },
+          "open_leads": {
+            "title": "Open Leads",
+            "type": "integer"
+          },
+          "position": {
+            "description": "1 = first in the rotation",
+            "title": "Position",
+            "type": "integer"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "super_admin",
+                  "admin",
+                  "sales",
+                  "marketing",
+                  "content_editor"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserRef"
+          }
+        },
+        "required": [
+          "position",
+          "user",
+          "role",
+          "open_leads",
+          "in_rotation",
+          "can_own",
+          "gets_next"
+        ],
+        "title": "RotationRow",
         "type": "object"
       },
       "Seo": {
@@ -9758,6 +10711,58 @@
         "title": "Seo",
         "type": "object"
       },
+      "SeoDefaultsSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "default_description": {
+            "anyOf": [
+              {
+                "maxLength": 170,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Description"
+          },
+          "default_title": {
+            "anyOf": [
+              {
+                "maxLength": 70,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Used when a page has no title of its own",
+            "title": "Default Title"
+          },
+          "title_suffix": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Added after every page title, e.g. ' · Empire'",
+            "title": "Title Suffix"
+          }
+        },
+        "required": [
+          "default_title",
+          "title_suffix",
+          "default_description"
+        ],
+        "title": "SeoDefaultsSettings",
+        "type": "object"
+      },
       "SeoWarning": {
         "description": "One line of the SEO checklist. Warnings never block saving or publishing.",
         "properties": {
@@ -9787,6 +10792,141 @@
           "message"
         ],
         "title": "SeoWarning",
+        "type": "object"
+      },
+      "SettingsGroupMeta": {
+        "properties": {
+          "can_edit": {
+            "description": "Whether you can change it",
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "key": {
+            "enum": [
+              "company",
+              "contacts",
+              "social",
+              "tracking",
+              "lead_routing",
+              "seo_defaults",
+              "regulator",
+              "email",
+              "privacy"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "permission": {
+            "description": "What changing this group needs",
+            "title": "Permission",
+            "type": "string"
+          },
+          "super_admin_only": {
+            "title": "Super Admin Only",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "permission",
+          "super_admin_only",
+          "can_edit",
+          "updated_at",
+          "updated_by"
+        ],
+        "title": "SettingsGroupMeta",
+        "type": "object"
+      },
+      "SettingsOverview": {
+        "description": "Every group (typed), plus read-only blocks: per-group meta, the round-robin table and\nthe integrations status. Contract change: the contract's free-form map, typed.",
+        "properties": {
+          "company": {
+            "$ref": "#/components/schemas/CompanySettings"
+          },
+          "contacts": {
+            "$ref": "#/components/schemas/ContactSettings"
+          },
+          "email": {
+            "$ref": "#/components/schemas/EmailSettings"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/SettingsGroupMeta"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "integrations": {
+            "$ref": "#/components/schemas/IntegrationsStatus"
+          },
+          "lead_rotation": {
+            "items": {
+              "$ref": "#/components/schemas/RotationRow"
+            },
+            "title": "Lead Rotation",
+            "type": "array"
+          },
+          "lead_routing": {
+            "$ref": "#/components/schemas/LeadRoutingSettings"
+          },
+          "privacy": {
+            "$ref": "#/components/schemas/PrivacySettings"
+          },
+          "regulator": {
+            "$ref": "#/components/schemas/RegulatorView"
+          },
+          "seo_defaults": {
+            "$ref": "#/components/schemas/SeoDefaultsSettings"
+          },
+          "social": {
+            "$ref": "#/components/schemas/SocialSettings"
+          },
+          "tracking": {
+            "$ref": "#/components/schemas/TrackingSettings"
+          }
+        },
+        "required": [
+          "company",
+          "contacts",
+          "social",
+          "tracking",
+          "lead_routing",
+          "seo_defaults",
+          "regulator",
+          "email",
+          "privacy",
+          "groups",
+          "lead_rotation",
+          "integrations"
+        ],
+        "title": "SettingsOverview",
         "type": "object"
       },
       "SiteVisit": {
@@ -10216,6 +11356,67 @@
           }
         },
         "title": "SiteVisitUpdate",
+        "type": "object"
+      },
+      "SocialSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "facebook": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facebook"
+          },
+          "instagram": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instagram"
+          },
+          "linkedin": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin"
+          },
+          "youtube": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Youtube"
+          }
+        },
+        "required": [
+          "facebook",
+          "instagram",
+          "youtube",
+          "linkedin"
+        ],
+        "title": "SocialSettings",
         "type": "object"
       },
       "SourceCount": {
@@ -11356,6 +12557,72 @@
         "title": "TowerInput",
         "type": "object"
       },
+      "TrackingSettings": {
+        "additionalProperties": false,
+        "description": "Stored only. Nothing loads on the website until the consent banner (Phase 6), and then\neach tag only after the visitor accepts the matching cookie choice.",
+        "properties": {
+          "ga4_id": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "pattern": "^G-[A-Z0-9]{6,12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ga4 Id"
+          },
+          "google_ads_id": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "pattern": "^AW-[0-9]{6,12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Google Ads Id"
+          },
+          "gtm_id": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "pattern": "^GTM-[A-Z0-9]{4,10}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gtm Id"
+          },
+          "meta_pixel_id": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "pattern": "^[0-9]{15,16}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta Pixel Id"
+          }
+        },
+        "required": [
+          "gtm_id",
+          "ga4_id",
+          "meta_pixel_id",
+          "google_ads_id"
+        ],
+        "title": "TrackingSettings",
+        "type": "object"
+      },
       "Translations": {
         "description": "Per-locale overlay of translatable fields, e.g. {\"hi\": {\"name\": \"…\"}}. English lives in\nthe base fields and missing translations fall back to it (D-014).",
         "patternProperties": {
@@ -11370,6 +12637,195 @@
           }
         },
         "title": "Translations",
+        "type": "object"
+      },
+      "TwoFactorChallenge": {
+        "description": "202 from `login`: the password was right, but there is a second step (no session yet).\nThe `__Host-empire_2fa` cookie (HttpOnly, 5 minutes) carries the challenge.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_in_seconds": {
+            "title": "Expires In Seconds",
+            "type": "integer"
+          },
+          "status": {
+            "const": "two_factor_required",
+            "default": "two_factor_required",
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "description": "verify: enter a code (POST /auth/2fa/verify). setup: two-factor must be set up now (POST /auth/2fa/enrol, then /auth/2fa/enrol/confirm).",
+            "enum": [
+              "verify",
+              "setup"
+            ],
+            "title": "Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "step",
+          "email",
+          "expires_in_seconds"
+        ],
+        "title": "TwoFactorChallenge",
+        "type": "object"
+      },
+      "TwoFactorCode": {
+        "additionalProperties": false,
+        "description": "A 6-digit code from the authenticator app.",
+        "properties": {
+          "code": {
+            "maxLength": 12,
+            "minLength": 6,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "TwoFactorCode",
+        "type": "object"
+      },
+      "TwoFactorDisable": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "minLength": 6,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "current_password": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Current Password",
+            "type": "string"
+          },
+          "recovery_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Code"
+          }
+        },
+        "required": [
+          "current_password"
+        ],
+        "title": "TwoFactorDisable",
+        "type": "object"
+      },
+      "TwoFactorEnrolled": {
+        "description": "The forced set-up at sign-in is done: recovery codes (shown once) and the session.",
+        "properties": {
+          "me": {
+            "$ref": "#/components/schemas/Me"
+          },
+          "recovery_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recovery Codes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recovery_codes",
+          "me"
+        ],
+        "title": "TwoFactorEnrolled",
+        "type": "object"
+      },
+      "TwoFactorProof": {
+        "additionalProperties": false,
+        "description": "Exactly one: a code from the app, or one of the recovery codes.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "minLength": 6,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "recovery_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Code"
+          }
+        },
+        "title": "TwoFactorProof",
+        "type": "object"
+      },
+      "TwoFactorSetup": {
+        "description": "Shown once while setting two-factor up. SECURITY: holds the secret; never cached.",
+        "properties": {
+          "digits": {
+            "default": 6,
+            "title": "Digits",
+            "type": "integer"
+          },
+          "otpauth_uri": {
+            "description": "otpauth://totp/… for apps that open links",
+            "title": "Otpauth Uri",
+            "type": "string"
+          },
+          "period_seconds": {
+            "default": 30,
+            "title": "Period Seconds",
+            "type": "integer"
+          },
+          "qr_svg_data_url": {
+            "description": "data:image/svg+xml QR code of otpauth_uri",
+            "title": "Qr Svg Data Url",
+            "type": "string"
+          },
+          "secret": {
+            "description": "The key to type into the app, in groups of four",
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "otpauth_uri",
+          "secret",
+          "qr_svg_data_url",
+          "digits",
+          "period_seconds"
+        ],
+        "title": "TwoFactorSetup",
         "type": "object"
       },
       "UploadConfirm": {
@@ -11547,7 +13003,7 @@
         "type": "object"
       },
       "User": {
-        "description": "`User` in the design contract.",
+        "description": "`User` in the design contract, plus status and two-factor (part 5).",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -11563,6 +13019,19 @@
             "title": "Id",
             "type": "string"
           },
+          "invite_sent_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the newest setup link was sent (invited accounts only).",
+            "title": "Invite Sent At"
+          },
           "is_active": {
             "title": "Is Active",
             "type": "boolean"
@@ -11577,6 +13046,7 @@
                 "type": "null"
               }
             ],
+            "description": "Last completed sign-in (the board's 'Last sign-in').",
             "title": "Last Login At"
           },
           "locked_until": {
@@ -11616,6 +13086,22 @@
             ],
             "title": "Role",
             "type": "string"
+          },
+          "status": {
+            "description": "deactivated (is_active false), invited (no password set yet), locked (locked_until is in the future: locked from at least one network) or active.",
+            "enum": [
+              "active",
+              "invited",
+              "locked",
+              "deactivated"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "two_factor_enabled": {
+            "description": "Two-factor sign-in is set up and confirmed with a code.",
+            "title": "Two Factor Enabled",
+            "type": "boolean"
           }
         },
         "required": [
@@ -11624,7 +13110,9 @@
           "name",
           "role",
           "is_active",
-          "created_at"
+          "created_at",
+          "status",
+          "two_factor_enabled"
         ],
         "title": "User",
         "type": "object"
@@ -12620,10 +14108,11 @@
     },
     "/api/v1/admin/audit-log": {
       "get": {
-        "description": "Audit log, newest first. Dates are whole days in UTC; `to` is inclusive.",
+        "description": "Audit log, newest first. Dates are whole days in India time (IST); `to` is inclusive.\nIP addresses are masked; the actor comes with their name and current role.",
         "operationId": "audit_log",
         "parameters": [
           {
+            "description": "One person",
             "in": "query",
             "name": "actor_id",
             "required": false,
@@ -12637,7 +14126,20 @@
                   "type": "null"
                 }
               ],
+              "description": "One person",
               "title": "Actor Id"
+            }
+          },
+          {
+            "description": "Only entries made by the system (no person)",
+            "in": "query",
+            "name": "system",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only entries made by the system (no person)",
+              "title": "System",
+              "type": "boolean"
             }
           },
           {
@@ -12675,6 +14177,7 @@
             }
           },
           {
+            "description": "Exact action",
             "in": "query",
             "name": "action",
             "required": false,
@@ -12688,10 +14191,31 @@
                   "type": "null"
                 }
               ],
+              "description": "Exact action",
               "title": "Action"
             }
           },
           {
+            "description": "Actions starting with this, e.g. auth. or user.",
+            "in": "query",
+            "name": "action_prefix",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Actions starting with this, e.g. auth. or user.",
+              "title": "Action Prefix"
+            }
+          },
+          {
+            "description": "First IST day",
             "in": "query",
             "name": "from",
             "required": false,
@@ -12705,10 +14229,12 @@
                   "type": "null"
                 }
               ],
+              "description": "First IST day",
               "title": "From"
             }
           },
           {
+            "description": "Last IST day (inclusive)",
             "in": "query",
             "name": "to",
             "required": false,
@@ -12722,6 +14248,7 @@
                   "type": "null"
                 }
               ],
+              "description": "Last IST day (inclusive)",
               "title": "To"
             }
           },
@@ -13358,6 +14885,78 @@
         "x-permission": "legal.publish"
       }
     },
+    "/api/v1/admin/consent-texts/current": {
+      "get": {
+        "description": "Every purpose, even one with no text yet, with the version the forms show now.",
+        "operationId": "consent_text_kinds",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConsentKindSummary"
+                  },
+                  "title": "Response Consent Text Kinds",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "Each purpose with its current version (contract addition, part 5)",
+        "tags": [
+          "Settings"
+        ],
+        "x-permission": "settings.read"
+      }
+    },
     "/api/v1/admin/consent-texts/{id}/publish": {
       "post": {
         "description": "Forms must send this version's id from now on; older versions get 409 \"reload\".\nIn production a text still marked as a draft is refused (409).",
@@ -13972,6 +15571,7 @@
     },
     "/api/v1/admin/flags": {
       "get": {
+        "description": "Every flag with what it does, who may switch it, and whether you can now.",
         "operationId": "list_flags",
         "responses": {
           "200": {
@@ -14053,7 +15653,7 @@
     },
     "/api/v1/admin/flags/{key}": {
       "patch": {
-        "description": "Switch a feature on or off. Locked features (not built yet) answer 409.",
+        "description": "Switch a feature on or off. Locked features (not built yet) answer 409. `admin_2fa`:\nsuper-admins only (403), and switching it on needs your own two-factor on (409); switching\nit on signs out every admin and super-admin without two-factor (audited), so they set it up\nat their next sign-in.",
         "operationId": "set_flag",
         "parameters": [
           {
@@ -14153,7 +15753,7 @@
     },
     "/api/v1/admin/lead-owners": {
       "get": {
-        "description": "Active accounts whose role can open leads. Contract addition (Phase 4 part 3).",
+        "description": "Active accounts that have set their password (not just invited) and whose role can open leads. Contract addition (Phase 4 part 3).",
         "operationId": "list_lead_owners",
         "responses": {
           "200": {
@@ -18429,6 +20029,88 @@
           "Content"
         ],
         "x-permission": "content.publish"
+      }
+    },
+    "/api/v1/admin/permissions": {
+      "get": {
+        "description": "In the order of ARCHITECTURE §11, grouped as on the users and roles board.",
+        "operationId": "list_permissions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Permission"
+                  },
+                  "title": "Response List Permissions",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "The role table: each permission, what it allows and which roles have it",
+        "tags": [
+          "Users"
+        ],
+        "x-permission": "users.manage"
       }
     },
     "/api/v1/admin/posts": {
@@ -23353,7 +25035,7 @@
     },
     "/api/v1/admin/roles": {
       "get": {
-        "description": "The five roles and their permissions (ARCHITECTURE §11).",
+        "description": "The five roles, what each is for, their permissions and how many active accounts have\neach (ARCHITECTURE §11).",
         "operationId": "list_roles",
         "responses": {
           "200": {
@@ -23431,6 +25113,210 @@
           "Users"
         ],
         "x-permission": "users.manage"
+      }
+    },
+    "/api/v1/admin/settings": {
+      "get": {
+        "operationId": "get_settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "summary": "All settings groups, who can change each, the round-robin table and the integrations status (never a key)",
+        "tags": [
+          "Settings"
+        ],
+        "x-permission": "settings.read"
+      }
+    },
+    "/api/v1/admin/settings/{group}": {
+      "patch": {
+        "description": "Each group checks its own permission (module header): 403 without it. Tracking needs\nmarketing.tracking; SEO defaults need seo.manage, and the route itself needs settings.read,\nso content editors (seo.manage without settings.read) can't save them; retention (privacy)\nneeds the super-admin. Every change is audited with before and after, and announced as\n`settings.updated`.",
+        "operationId": "update_settings_group",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group",
+            "required": true,
+            "schema": {
+              "enum": [
+                "company",
+                "contacts",
+                "social",
+                "tracking",
+                "lead_routing",
+                "seo_defaults",
+                "regulator",
+                "email",
+                "privacy"
+              ],
+              "title": "Group",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "description": "Fields of this group's model",
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Settings Group",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Update one group (send only what changes; null clears a field)",
+        "tags": [
+          "Settings"
+        ],
+        "x-permission": "settings.read",
+        "x-permission-by-group": {
+          "company": "settings.write",
+          "contacts": "settings.write",
+          "email": "settings.write",
+          "lead_routing": "settings.write",
+          "privacy": "settings.write + super_admin",
+          "regulator": "settings.write",
+          "seo_defaults": "seo.manage (with settings.read, which the route needs)",
+          "social": "settings.write",
+          "tracking": "marketing.tracking"
+        }
       }
     },
     "/api/v1/admin/site-visits": {
@@ -24090,7 +25976,7 @@
     },
     "/api/v1/admin/users": {
       "get": {
-        "description": "Staff accounts, newest first. `q` matches name or email.",
+        "description": "Staff accounts, newest first. `q` matches name or email; `role` and `status` filter.",
         "operationId": "list_users",
         "parameters": [
           {
@@ -24108,6 +25994,51 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "super_admin",
+                    "admin",
+                    "sales",
+                    "marketing",
+                    "content_editor"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "active",
+                    "invited",
+                    "locked",
+                    "deactivated"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
             }
           },
           {
@@ -24208,7 +26139,7 @@
         "x-permission": "users.manage"
       },
       "post": {
-        "description": "Invite a staff member. They get a one-time setup link to choose their own password.",
+        "description": "Invite a staff member. They get a one-time setup link by email to choose their own\npassword. SECURITY: the link is never in this answer (or any other).",
         "operationId": "create_user",
         "requestBody": {
           "content": {
@@ -24384,7 +26315,7 @@
         "x-permission": "users.manage"
       },
       "patch": {
-        "description": "Edit name, email, phone, role or active state. Role changes sign the person out.",
+        "description": "Edit name, email, phone, role or active state (deactivate: `is_active: false`;\nreactivate: `true`). Role changes and deactivation sign the person out.",
         "operationId": "update_user",
         "parameters": [
           {
@@ -24477,6 +26408,90 @@
           }
         ],
         "summary": "Update User",
+        "tags": [
+          "Users"
+        ],
+        "x-permission": "users.manage"
+      }
+    },
+    "/api/v1/admin/users/{id}/reset-2fa": {
+      "post": {
+        "description": "Audited, and the person gets a security email. With the admin_2fa flag on, their next\nsign-in asks them to set it up again. Not for your own account (409): My account turns it\noff with your password and a code, which this route doesn't ask for.",
+        "operationId": "reset_user_two_factor",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Remove someone's two-factor (lost phone); signs them out everywhere",
         "tags": [
           "Users"
         ],
@@ -24733,9 +26748,674 @@
         "x-permission": "users.manage"
       }
     },
+    "/api/v1/auth/2fa/disable": {
+      "post": {
+        "operationId": "two_factor_disable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoFactorDisable"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Turn two-factor off (password and a code or recovery code)",
+        "tags": [
+          "Auth"
+        ],
+        "x-auth": "signed_in"
+      }
+    },
+    "/api/v1/auth/2fa/enrol": {
+      "post": {
+        "description": "For `login`'s 202 with `step: setup` (the admin_2fa flag is on and this admin has no\ntwo-factor yet). Each call makes a new key; only the newest one can be confirmed.",
+        "operationId": "two_factor_enrol_start",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorSetup"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "security": [],
+        "summary": "Forced set-up at sign-in, part 1: the key and QR code",
+        "tags": [
+          "Auth"
+        ],
+        "x-cookie": "__Host-empire_2fa",
+        "x-public": true,
+        "x-rate-limit": "Counts toward the sign-in lockout: 5 passwords or codes per account and network per 15 minutes (429 after), and 20 codes per account per hour across networks."
+      }
+    },
+    "/api/v1/auth/2fa/enrol/confirm": {
+      "post": {
+        "description": "A right code turns two-factor on, starts the session (cookie) and returns the ten\nrecovery codes, shown only this once.",
+        "operationId": "two_factor_enrol_confirm",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoFactorCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorEnrolled"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "security": [],
+        "summary": "Forced set-up at sign-in, part 2: confirm a code, get recovery codes, sign in",
+        "tags": [
+          "Auth"
+        ],
+        "x-cookie": "__Host-empire_2fa",
+        "x-public": true,
+        "x-rate-limit": "Counts toward the sign-in lockout: 5 passwords or codes per account and network per 15 minutes (429 after), and 20 codes per account per hour across networks."
+      }
+    },
+    "/api/v1/auth/2fa/recovery-codes": {
+      "post": {
+        "operationId": "two_factor_recovery_codes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoFactorProof"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "New recovery codes (a code or recovery code); the old ones stop working",
+        "tags": [
+          "Auth"
+        ],
+        "x-auth": "signed_in"
+      }
+    },
+    "/api/v1/auth/2fa/setup": {
+      "post": {
+        "description": "Admins and super-admins only (403 otherwise); 409 when it is already on.",
+        "operationId": "two_factor_setup_start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorSetup"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Turn two-factor on, part 1 (needs your password)",
+        "tags": [
+          "Auth"
+        ],
+        "x-auth": "signed_in"
+      }
+    },
+    "/api/v1/auth/2fa/setup/confirm": {
+      "post": {
+        "description": "Other sessions of this account are signed out. The codes are shown only this once.",
+        "operationId": "two_factor_setup_confirm",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoFactorCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "summary": "Turn two-factor on, part 2: confirm a code, get recovery codes",
+        "tags": [
+          "Auth"
+        ],
+        "x-auth": "signed_in"
+      }
+    },
+    "/api/v1/auth/2fa/verify": {
+      "post": {
+        "description": "Completes the sign-in started by `login`'s 202 (`step: verify`): sets the session cookie\nand clears the challenge cookie. A wrong code answers 401 and counts toward the lockout.",
+        "operationId": "two_factor_verify",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoFactorProof"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "security": [],
+        "summary": "Sign-in step 2: a code from the app, or a recovery code",
+        "tags": [
+          "Auth"
+        ],
+        "x-cookie": "__Host-empire_2fa",
+        "x-public": true,
+        "x-rate-limit": "Counts toward the sign-in lockout: 5 passwords or codes per account and network per 15 minutes (429 after), and 20 codes per account per hour across networks."
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
-        "description": "Sign in. Sets the session cookie; 5 failed attempts lock the account for 15 minutes.",
+        "description": "Sign in. 5 failed attempts (passwords or codes) lock the account for 15 minutes on that\nnetwork. With two-factor, a right password answers 202 and the session starts only after\nthe code (POST /auth/2fa/verify) or the forced set-up (/auth/2fa/enrol…).",
         "operationId": "login",
         "requestBody": {
           "content": {
@@ -24757,6 +27437,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorChallenge"
+                }
+              }
+            },
+            "description": "Password right; a two-factor step comes next (no session yet). Sets the __Host-empire_2fa cookie (HttpOnly, SameSite=Strict, 5 minutes)."
           },
           "401": {
             "content": {
@@ -24871,7 +27561,7 @@
     },
     "/api/v1/auth/me": {
       "get": {
-        "description": "Current user, permissions and CSRF token.",
+        "description": "Current user, permissions, two-factor state and CSRF token.",
         "operationId": "me",
         "responses": {
           "200": {
@@ -25139,6 +27829,79 @@
         "summary": "Password Reset",
         "tags": [
           "Auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/dev-mail/latest": {
+      "get": {
+        "operationId": "dev_mail_latest",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "maxLength": 254,
+              "minLength": 3,
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "template",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Template"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevMail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          }
+        },
+        "security": [],
+        "summary": "The newest message to an address (dev transport only; development and test)",
+        "tags": [
+          "Dev mail"
         ],
         "x-public": true
       }

@@ -56,6 +56,8 @@ class ConsentText(Base):
     is_current: Mapped[bool] = mapped_column(server_default=sql("false"))
     # WHY no foreign key: like project.created_by, authorship outlives any staff account row.
     created_by: Mapped[uuid.UUID | None] = mapped_column()
+    # Who first published this version (with `published_at`); NULL for seeded texts (part 5).
+    published_by: Mapped[uuid.UUID | None] = mapped_column()
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 

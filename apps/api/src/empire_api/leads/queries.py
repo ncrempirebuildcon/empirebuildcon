@@ -12,7 +12,8 @@ object-level rule (access.scope_leads), so the dashboard shows sales their own l
 from __future__ import annotations
 
 import uuid
-from datetime import date, timedelta
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
@@ -22,7 +23,8 @@ from empire_api.leads.filters import LeadFilters, conditions, ist_day_start
 from empire_api.leads.models import Lead, SiteVisit
 from empire_api.leads.present import visit_day_key
 from empire_api.leads.visits import VisitFilters, visit_query
-from empire_api.leads.vocab import OPEN_VISIT_STATUSES, VISITS_MAX_ROWS
+from empire_api.leads.vocab import CLOSED_STATUSES, OPEN_VISIT_STATUSES, VISITS_MAX_ROWS
+from empire_api.logs import mask_phone
 
 
 def project_has_leads(db: Session, project_id: uuid.UUID) -> bool:
@@ -93,3 +95,58 @@ def week_bounds(today: date) -> tuple[date, date]:
     """Monday to Sunday of the IST week holding `today`."""
     monday = today - timedelta(days=today.weekday())
     return monday, monday + timedelta(days=6)
+
+
+def open_leads_by_owner(db: Session, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    """How many open leads (not booked, lost, erased or spam) each person owns, for the round-
+    robin table in Settings. Counts only."""
+    if not user_ids:
+        return {}
+    rows = db.execute(
+        select(Lead.owner_user_id, func.count())
+        .where(
+            Lead.owner_user_id.in_(user_ids),
+            Lead.status.not_in(CLOSED_STATUSES),
+            Lead.erased_at.is_(None),
+            Lead.is_spam.is_(False),
+        )
+        .group_by(Lead.owner_user_id)
+    ).all()
+    return {owner: int(count) for owner, count in rows if owner is not None}
+
+
+@dataclass(frozen=True)
+class AlertFacts:
+    """What a lead email may say (mail/handlers.py). COMPLIANCE: the phone is masked, and the
+    email address and message are not here at all: emails get forwarded and kept."""
+
+    lead_id: uuid.UUID
+    reference: str
+    project_id: uuid.UUID | None
+    source: str
+    created_at: datetime
+    name: str
+    phone_masked: str
+    owner_user_id: uuid.UUID | None
+    is_sample: bool
+    is_spam: bool
+
+
+def alert_facts(db: Session, lead_id: uuid.UUID) -> AlertFacts | None:
+    """The lead as it is now; None when it doesn't exist or its personal data was erased (an
+    erased lead is never announced, even by a retried event)."""
+    lead = db.get(Lead, lead_id)
+    if lead is None or lead.erased_at is not None:
+        return None
+    return AlertFacts(
+        lead_id=lead.id,
+        reference=lead.reference,
+        project_id=lead.project_id,
+        source=lead.source,
+        created_at=lead.created_at,
+        name=lead.name,
+        phone_masked=mask_phone(lead.phone_e164),
+        owner_user_id=lead.owner_user_id,
+        is_sample=lead.is_sample,
+        is_spam=lead.is_spam,
+    )
