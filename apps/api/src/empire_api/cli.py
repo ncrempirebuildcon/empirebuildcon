@@ -260,7 +260,10 @@ def openapi(
     settings = Settings(**{**get_settings().model_dump(), **forced})
     spec = create_app(settings).openapi()
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(spec, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+    out.write_text(
+        json.dumps(spec, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
     _out(f"Wrote {out}")
 
 

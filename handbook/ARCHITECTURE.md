@@ -134,9 +134,14 @@ The `/_internal/revalidate` route lives outside `/api/*` so it is handled by Nex
 
 ## 7. Listing visibility and order (public site)
 
-1. Only `publish_state = published`, `is_sample = false` (production), and `sales_status != off_market`.
-2. Sort: `available` before `sold_out`; within each group, featured order, then the chosen sort (recommended = possession date, then newest).
-3. A project page always shows the **RERA authority, registration number, QR code and the regulator's website**. Publish is blocked until the number and QR are present (D-002). Phase-wise registrations show per tower/phase.
+1. Central visibility helper (`empire_api.public.visibility`) enforces rules across all public endpoints.
+2. Only `publish_state = published`, `is_sample = false` (in production, D-015), and `sales_status != off_market`.
+3. Bracketed `[placeholders]` in settings/copy are sanitized to `null` in production, and preserved elsewhere for inspection.
+4. Sort: `available` before `sold_out`; within each group, featured order, then the chosen sort (recommended = possession date, then newest).
+5. A project page always shows the **RERA authority, registration number, QR code and the regulator's website** (D-002). Phase-wise registrations show per tower/phase.
+6. **Hero/cover image selection rule (D-038):** pinned cover if visible and labelled with an honest label; else first visible labelled gallery photo in sort order; else none.
+7. **Area display:** carpet area comes first, in both sq ft and sq m, calculated from stored square metres.
+8. **Price display:** "excludes GST, stamp duty and registration" note; `price_on_request` suppresses all numeric prices.
 
 ## 8. Lead handling
 
@@ -301,7 +306,9 @@ Every create, update, delete, publish, export, login and permission change write
 
 ## 14. Search
 
-- PostgreSQL full-text search (generated `tsvector` over name, locality, city, tagline) plus `pg_trgm` for typos, and structured filters (status, city, locality, type, BHK, budget). Filters live in the URL.
+- PostgreSQL full-text search (generated `tsvector` column `project.search_vector` over name and tagline, plus joined city and locality names) combined with `pg_trgm` trigram word similarity (`>= 0.3`) for typo tolerance (replaces `LIKE`, Task 5.1, D-038).
+- Migration `0007_search.py` adds the generated `search_vector` column and GIN indexes on `project(search_vector)`, `project.name`, `locality.name`, and `city.name`, with a fully tested downgrade.
+- Structured filters (`status`, `city`, `locality`, `type`, `bhk`, `budget_min`, `budget_max`, `featured`, `sort`) live in URL query params.
 - The `vector` extension (pgvector) is enabled by the first migration wherever the server has it (Neon, CI and the Docker image do), so Phase 7 needs no database change (D-013). A bare local PostgreSQL without pgvector still works until Phase 7 (D-026).
 
 ## 15. Languages

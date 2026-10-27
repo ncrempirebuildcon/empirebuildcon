@@ -636,3 +636,40 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 - **Decisions:** the developer proposes the next `D-0xx` as "(Proposed)"; the manager accepts or changes it at review.
 - **Gate:** a merge needs a green CI and the manager's "Merge" verdict. The owner can always overrule.
 **Verified / assumed:** Antigravity reads a root `AGENTS.md` (since IDE 1.20.5, per a third-party guide dated 5 Aug 2026; Google's own docs weren't checked), so the agent rules stay in `AGENTS.md`. Each rules file is limited to 12,000 characters; `AGENTS.md` is about 3,600.
+
+## D-038 · Public API read-only endpoints, caching and search (Proposed, 2026-10-26)
+
+**Context:** Task 5.1 builds the 13 read-only public endpoints under `/api/v1/public/*` needed by the public website. They must return only published, non-off-market data in shapes made for the site, without leaking staff fields, drafts, private notes, or sample data in production.
+
+**Decision:**
+- **Visibility rules:**
+  - Enforced centrally in `visibility.py` across all endpoints, project and property lists, blocks, detail queries, and sitemaps.
+  - Published only (`publish_state = 'published'`); `sales_status = 'off_market'` items are hidden; `sold_out` items appear after `available` ones with their badge.
+  - Sample isolation (D-015): in production (`APP_ENV = 'production'`), `is_sample = true` rows are excluded everywhere. In development, test and staging they are returned with `is_sample: true`.
+  - Placeholder sanitization: values containing bracketed `[placeholder]` text return `null` in production, preserving development inspection elsewhere.
+- **Hero/cover image selection rule:**
+  1. The pinned cover (`is_cover = true`) if visible and carrying an honest label (`artist_impression`, `actual_photo`, `progress_photo`).
+  2. Otherwise, the first visible labelled gallery photo in `sort_order`.
+  3. Otherwise, `None` (no image displayed).
+- **Search and typo tolerance (ARCHITECTURE §14):**
+  - Migration `0007_search.py` adds `search_vector` generated `tsvector` column on `project` and GIN `pg_trgm` indexes on `project.name`, `locality.name`, and `city.name`.
+  - Search queries match full-text terms and `word_similarity >= 0.3` for 1-typo tolerance.
+  - Working downgrade drops indexes and generated column safely.
+- **Caching and limits:**
+  - Responses set `Cache-Control: public, max-age=60, stale-while-revalidate=300` and a strong SHA-256 `ETag`.
+  - Matching `If-None-Match` returns `304 Not Modified` with an empty body and cache headers.
+  - Rate limit: 120 requests/minute per network key (`public:<net>`), returning 429 with `Retry-After`.
+- **Translations (D-014):**
+  - English default; Hindi overlay from `translations` JSON column when `locale = 'hi'` and feature flag `locale_hi` is enabled. If the flag is disabled or a field lacks Hindi text, it falls back to English.
+- **Performance:**
+  - Project detail batch-loads media links for the project and its children in one query.
+  - Multi-block pages batch-load media, FAQs, testimonials, and offers across all visible blocks in single queries, keeping total query counts bounded regardless of block or item count.
+- **Contract notes:**
+  - All 13 operations match `openapi-v1.yaml` paths, methods, and operationIds with tag `Public`.
+  - Schemas strip all internal/staff fields (`created_by`, `updated_by`, audit fields, user IDs).
+  - Detail routes raise 404 `ApiProblem` when items do not exist, are draft/archived, off-market, or sample in production.
+
+**Consequences:** The public website in 5.2+ can render all public pages and listings with 1–2 lightweight API calls. Neon and PostgreSQL 18 support `pg_trgm` natively. Cache headers and ETags enable browser and CDN caching while protecting backend databases.
+**Verified / assumed:**
+- `pg_trgm` extension verified on PostgreSQL test instance and supported by Neon.
+- Query performance verified bounded via SQLAlchemy cursor execute assertions.

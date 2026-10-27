@@ -37,6 +37,7 @@ from empire_api.middleware.trailing_slash import StripTrailingSlashMiddleware
 from empire_api.observability import init_sentry
 from empire_api.projects import routes as project_routes
 from empire_api.projects import routes_catalogue, routes_children
+from empire_api.public import routes as public_routes
 from empire_api.seo import routes as seo_routes
 from empire_api.site_settings import routes as settings_routes
 from empire_api.users import routes_admin, routes_auth, routes_two_factor
@@ -85,6 +86,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         content_marketing_routes.router,
         content_marketing_routes.offers_router,
         seo_routes.router,
+        public_routes.router,
         internal_routes.router,
     ):
         app.include_router(router)

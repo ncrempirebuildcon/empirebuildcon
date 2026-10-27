@@ -70,7 +70,7 @@ WAS_PUBLISHED: Final = (
 NOT_A_DRAFT: Final = "Only drafts can be deleted. Restore it to draft first, or keep it archived."
 HAS_LEADS: Final = "This project has leads, so it can't be deleted. Archive it instead."
 SHOWN_IN_MESSAGE: Final = 5
-_AUDIT_SKIP: Final = ("updated_by",)
+_AUDIT_SKIP: Final = ("updated_by", "search_vector")
 
 # Everything a project row loads for the full CMS view (ProjectAdmin).
 FULL: Final = (
