@@ -6,13 +6,14 @@ Implements bounded queries (batch-loading) for project detail and page blocks to
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from collections import defaultdict
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Select, case, func, select
+from sqlalchemy import Select, and_, case, func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from empire_api.content.consent import current_text
@@ -145,6 +146,7 @@ def _build_public_seo(
     raw_seo: Any,
     *,
     prod: bool = False,
+    media_map: dict[uuid.UUID, Media] | None = None,
 ) -> schemas.PublicSeo:
     d = dict(raw_seo or {}) if not isinstance(raw_seo, dict) else raw_seo
     title = d.get("title")
@@ -156,7 +158,10 @@ def _build_public_seo(
     if og_img_id:
         try:
             m_uuid = uuid.UUID(str(og_img_id))
-            m_row = db.scalar(select(Media).where(Media.id == m_uuid))
+            if media_map is not None:
+                m_row = media_map.get(m_uuid)
+            else:
+                m_row = db.scalar(select(Media).where(Media.id == m_uuid))
             if m_row:
                 og_image = _media_schema(m_row, prod=prod)
         except ValueError, TypeError:
@@ -381,7 +386,7 @@ def _build_public_summary(
     c_labels = configuration_labels(visible_configs)
     types = sorted({c.property_type for c in visible_configs if c.property_type})
 
-    cover_m = resolve_cover_image(links)
+    cover_m = resolve_cover_image(links, prod=prod)
     cover_schema = _media_schema(cover_m, prod=prod) if cover_m else None
     qr_schema = _media_schema(qr_media, prod=prod) if qr_media else None
 
@@ -1218,9 +1223,26 @@ def _batch_load_page_entities(
 
     loaded_faqs: dict[uuid.UUID, schemas.PublicFaq] = {}
     if faq_ids:
-        f_stmt = select(Faq).where(Faq.id.in_(faq_ids), Faq.is_visible.is_(True))
+        f_stmt = (
+            select(Faq)
+            .outerjoin(Project, Faq.project_id == Project.id)
+            .where(
+                Faq.id.in_(faq_ids),
+                Faq.is_visible.is_(True),
+                or_(
+                    Faq.project_id.is_(None),
+                    and_(
+                        Project.publish_state == "published",
+                        Project.sales_status != "off_market",
+                    ),
+                ),
+            )
+        )
         if prod:
-            f_stmt = f_stmt.where(Faq.is_sample.is_(False))
+            f_stmt = f_stmt.where(
+                Faq.is_sample.is_(False),
+                or_(Faq.project_id.is_(None), Project.is_sample.is_(False)),
+            )
         for f in db.scalars(f_stmt).all():
             loaded_faqs[f.id] = schemas.PublicFaq(
                 id=f.id,
@@ -1233,12 +1255,27 @@ def _batch_load_page_entities(
 
     loaded_testimonials: dict[uuid.UUID, schemas.PublicTestimonial] = {}
     if testimonial_ids:
-        t_stmt = select(Testimonial).where(
-            Testimonial.id.in_(testimonial_ids),
-            Testimonial.is_visible.is_(True),
-            Testimonial.source.isnot(None),
-            Testimonial.consent_date.isnot(None),
+        t_stmt = (
+            select(Testimonial)
+            .outerjoin(Project, Testimonial.project_id == Project.id)
+            .where(
+                Testimonial.id.in_(testimonial_ids),
+                Testimonial.is_visible.is_(True),
+                Testimonial.source.isnot(None),
+                Testimonial.consent_date.isnot(None),
+                or_(
+                    Testimonial.project_id.is_(None),
+                    and_(
+                        Project.publish_state == "published",
+                        Project.sales_status != "off_market",
+                    ),
+                ),
+            )
         )
+        if prod:
+            t_stmt = t_stmt.where(
+                or_(Testimonial.project_id.is_(None), Project.is_sample.is_(False))
+            )
         t_rows = db.scalars(t_stmt).all()
         t_photo_ids = [t.photo_media_id for t in t_rows if t.photo_media_id]
         t_photos = content_links.library_items(db, t_photo_ids) if t_photo_ids else {}
@@ -1701,30 +1738,34 @@ def _resolve_single_block(
             if prod:
                 o_stmt = o_stmt.where(Offer.is_sample.is_(False))
             candidate_offers = db.scalars(o_stmt).all()
+            cand_pids = [c.project_id for c in candidate_offers if c.project_id]
+            visible_pids: set[uuid.UUID] = set()
+            p_slugs: dict[uuid.UUID, str] = {}
+            if cand_pids:
+                p_check = select(Project.id, Project.slug).where(
+                    Project.id.in_(cand_pids),
+                    Project.publish_state == "published",
+                    Project.sales_status != "off_market",
+                )
+                if prod:
+                    p_check = p_check.where(Project.is_sample.is_(False))
+                p_rows = db.execute(p_check).all()
+                visible_pids = {r[0] for r in p_rows}
+                p_slugs = {r[0]: r[1] for r in p_rows}
+
+            cand_img_ids = [c.image_media_id for c in candidate_offers if c.image_media_id]
+            cand_images: dict[uuid.UUID, Media] = {}
+            if cand_img_ids:
+                m_rows = db.scalars(select(Media).where(Media.id.in_(cand_img_ids))).all()
+                cand_images = {m.id: m for m in m_rows}
+
             for cand in candidate_offers:
                 if is_live(cand, now=now):
-                    if cand.project_id:
-                        cand_p_stmt = select(Project.id).where(
-                            Project.id == cand.project_id,
-                            Project.publish_state == "published",
-                            Project.sales_status != "off_market",
-                        )
-                        if prod:
-                            cand_p_stmt = cand_p_stmt.where(Project.is_sample.is_(False))
-                        p_vis = db.scalar(cand_p_stmt)
-                        if not p_vis:
-                            continue
-                    raw_im = (
-                        db.scalar(select(Media).where(Media.id == cand.image_media_id))
-                        if cand.image_media_id
-                        else None
-                    )
+                    if cand.project_id and cand.project_id not in visible_pids:
+                        continue
+                    raw_im = cand_images.get(cand.image_media_id) if cand.image_media_id else None
                     im = _media_schema(raw_im, prod=prod) if raw_im else None
-                    p_slug = (
-                        db.scalar(select(Project.slug).where(Project.id == cand.project_id))
-                        if cand.project_id
-                        else None
-                    )
+                    p_slug = p_slugs.get(cand.project_id) if cand.project_id else None
                     off_data = schemas.PublicOffer(
                         id=cand.id,
                         title=cand.title,
@@ -1892,6 +1933,17 @@ def list_public_posts(
     author_ids = [p.author_id for p in posts if p.author_id]
     authors = user_refs(db, author_ids)
 
+    # R2-S4: Batch-load share images across posts on the page to prevent N+1 queries
+    og_ids: list[uuid.UUID] = []
+    for p in posts:
+        if p.seo and isinstance(p.seo, dict) and p.seo.get("og_image_id"):
+            with contextlib.suppress(ValueError, TypeError):
+                og_ids.append(uuid.UUID(str(p.seo["og_image_id"])))
+    seo_media_map: dict[uuid.UUID, Media] = {}
+    if og_ids:
+        media_rows = db.scalars(select(Media).where(Media.id.in_(og_ids))).all()
+        seo_media_map = {m.id: m for m in media_rows}
+
     items = [
         schemas.PublicPost(
             id=p.id,
@@ -1904,7 +1956,7 @@ def list_public_posts(
             tags=list(p.tags or []),
             author=authors[p.author_id].name if (p.author_id and p.author_id in authors) else None,
             published_at=p.published_at,
-            seo=_build_public_seo(db, p.seo or {}, prod=prod),
+            seo=_build_public_seo(db, p.seo or {}, prod=prod, media_map=seo_media_map),
         )
         for p in posts
     ]

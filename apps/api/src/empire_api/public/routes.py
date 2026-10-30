@@ -113,7 +113,9 @@ def public_get_project(
     caching.check_public_rate_limit(request)
     data = service.get_public_project(db, slug=slug, locale=locale)
     if data is None:
-        raise ApiProblem(404, f"Project '{slug}' was not found.")
+        raise ApiProblem(
+            404, f"Project '{slug}' was not found.", headers={"Cache-Control": "no-store"}
+        )
     return caching.cached_response(request, data)
 
 
@@ -136,7 +138,11 @@ def public_get_property(
         db, project_slug=slug, config_slug=config_slug, locale=locale
     )
     if data is None:
-        raise ApiProblem(404, f"Configuration '{config_slug}' was not found.")
+        raise ApiProblem(
+            404,
+            f"Configuration '{config_slug}' was not found.",
+            headers={"Cache-Control": "no-store"},
+        )
     return caching.cached_response(request, data)
 
 
@@ -214,7 +220,9 @@ def public_get_page(
     caching.check_public_rate_limit(request)
     data = service.get_public_page(db, slug=slug, locale=locale)
     if data is None:
-        raise ApiProblem(404, f"Page '{slug}' was not found.")
+        raise ApiProblem(
+            404, f"Page '{slug}' was not found.", headers={"Cache-Control": "no-store"}
+        )
     return caching.cached_response(request, data)
 
 
@@ -254,7 +262,9 @@ def public_get_post(
     caching.check_public_rate_limit(request)
     data = service.get_public_post(db, slug=slug, locale=locale)
     if data is None:
-        raise ApiProblem(404, f"Post '{slug}' was not found.")
+        raise ApiProblem(
+            404, f"Post '{slug}' was not found.", headers={"Cache-Control": "no-store"}
+        )
     return caching.cached_response(request, data)
 
 

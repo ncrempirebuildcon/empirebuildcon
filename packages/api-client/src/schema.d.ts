@@ -5942,7 +5942,10 @@ export interface components {
             bathrooms: number | null;
             /** Bhk */
             bhk: number | null;
-            /** Floor Plans */
+            /**
+             * Floor Plans
+             * @description Media links with role floor_plan (image or PDF; at most one)
+             */
             floor_plans: components["schemas"]["PublicLinkedMedia"][];
             /**
              * Id
@@ -5951,16 +5954,23 @@ export interface components {
             id: string;
             /**
              * Is Sample
+             * @description Sample data — never shown in production
              * @default false
              */
             is_sample: boolean;
             /** Name */
             name: string;
             price: components["schemas"]["Price"];
-            /** Property Type */
-            property_type: string;
-            /** Sales Status */
-            sales_status: string;
+            /**
+             * Property Type
+             * @enum {string}
+             */
+            property_type: "apartment" | "villa" | "plot" | "penthouse" | "shop" | "office" | "other";
+            /**
+             * Sales Status
+             * @enum {string}
+             */
+            sales_status: "available" | "sold_out" | "off_market";
             /** Slug */
             slug: string;
             /** Sort Order */
@@ -6325,7 +6335,10 @@ export interface components {
             bathrooms: number | null;
             /** Bhk */
             bhk: number | null;
-            /** Floor Plans */
+            /**
+             * Floor Plans
+             * @description Media links with role floor_plan (image or PDF; at most one)
+             */
             floor_plans: components["schemas"]["PublicLinkedMedia"][];
             /**
              * Id
@@ -6334,6 +6347,7 @@ export interface components {
             id: string;
             /**
              * Is Sample
+             * @description Sample data — never shown in production
              * @default false
              */
             is_sample: boolean;
@@ -6341,10 +6355,16 @@ export interface components {
             name: string;
             price: components["schemas"]["Price"];
             project: components["schemas"]["PublicProjectSummary"];
-            /** Property Type */
-            property_type: string;
-            /** Sales Status */
-            sales_status: string;
+            /**
+             * Property Type
+             * @enum {string}
+             */
+            property_type: "apartment" | "villa" | "plot" | "penthouse" | "shop" | "office" | "other";
+            /**
+             * Sales Status
+             * @enum {string}
+             */
+            sales_status: "available" | "sold_out" | "off_market";
             /** Slug */
             slug: string;
             /** Sort Order */
@@ -6371,6 +6391,7 @@ export interface components {
             id: string;
             /**
              * Is Sample
+             * @description Sample data — never shown in production
              * @default false
              */
             is_sample: boolean;
@@ -6378,10 +6399,16 @@ export interface components {
             name: string;
             price: components["schemas"]["Price"];
             project: components["schemas"]["PublicProjectRef"];
-            /** Property Type */
-            property_type: string;
-            /** Sales Status */
-            sales_status: string;
+            /**
+             * Property Type
+             * @enum {string}
+             */
+            property_type: "apartment" | "villa" | "plot" | "penthouse" | "shop" | "office" | "other";
+            /**
+             * Sales Status
+             * @enum {string}
+             */
+            sales_status: "available" | "sold_out" | "off_market";
             /** Slug */
             slug: string;
         };

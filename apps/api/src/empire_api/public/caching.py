@@ -20,7 +20,8 @@ from empire_api.platform.crypto import client_ip, hash_ip, network_key
 from empire_api.platform.rate_limit import hit
 
 PUBLIC_CACHE_CONTROL: Final = "public, max-age=60, stale-while-revalidate=300"
-PUBLIC_RATE_LIMIT: Final = 120
+PUBLIC_RATE_LIMIT: Final = 120  # requests per minute per visitor network
+SERVER_RATE_LIMIT: Final = 3000  # requests per minute for edge-verified server renders
 PUBLIC_RATE_WINDOW: Final = 60
 
 
@@ -48,20 +49,25 @@ def matches_etag(if_none_match: str | None, etag: str) -> bool:
 def check_public_rate_limit(request: Request) -> None:
     """Enforce per-network rate limit on public endpoints.
 
-    M6: Edge-verified requests carrying no X-Empire-Client-IP header are internal Next.js
-    server-side renders (SSR / ISR) or build pre-fetches and are exempt from the per-visitor limit.
+    M6 / R2-M2: Edge-verified requests carrying no X-Empire-Client-IP header are internal Next.js
+    server-side renders (SSR / ISR) or build pre-fetches. Rather than being unlimited (which would
+    fail open if the edge proxy misconfigured the client-IP header), they are given their own
+    high-capacity server bucket (public:server at 3,000 req/min, D-038).
     Visitor requests forwarded by the edge proxy carry X-Empire-Client-IP, which is
-    network-bucketed (/64 for IPv6) and pseudonymized via hash_ip.
+    network-bucketed (/64 for IPv6) and pseudonymized via hash_ip (120 req/min).
     """
     is_edge = bool(request.scope.get("empire_edge_verified"))
     has_client_header = "x-empire-client-ip" in request.headers
     if is_edge and not has_client_header:
-        return
+        key = "public:server"
+        limit = SERVER_RATE_LIMIT
+    else:
+        ip = client_ip(request)
+        net = network_key(ip)
+        key = f"public:{hash_ip(net)}"
+        limit = PUBLIC_RATE_LIMIT
 
-    ip = client_ip(request)
-    net = network_key(ip)
-    key = f"public:{hash_ip(net)}"
-    result = hit(key, limit=PUBLIC_RATE_LIMIT, window_seconds=PUBLIC_RATE_WINDOW)
+    result = hit(key, limit=limit, window_seconds=PUBLIC_RATE_WINDOW)
     if not result.allowed:
         raise ApiProblem(
             429,
@@ -92,7 +98,7 @@ def cached_response(
     body_bytes = json.dumps(body_dict, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     etag = make_etag(body_bytes)
 
-    cache_control = "no-store" if status_code >= 400 else PUBLIC_CACHE_CONTROL
+    cache_control = PUBLIC_CACHE_CONTROL
 
     if matches_etag(request.headers.get("if-none-match"), etag):
         return Response(

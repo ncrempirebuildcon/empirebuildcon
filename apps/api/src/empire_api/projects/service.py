@@ -213,7 +213,11 @@ def update_project(db: Session, project_id: uuid.UUID, body: ProjectUpdate, acto
     dangling = project_input.drop_dangling_share_image(db, project, sent, changes)
     _check_transition(project.publish_state, target, actor)  # 2
     visibility_changed = _check_visibility(project, changes, actor)
-    merged = {column.key: getattr(project, column.key) for column in Project.__table__.columns}
+    merged = {
+        column.key: getattr(project, column.key)
+        for column in Project.__table__.columns
+        if column.computed is None and column.key != "search_vector"
+    }
     merged.update(changes)
     if target is not None:
         merged["publish_state"] = target

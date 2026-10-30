@@ -10261,6 +10261,7 @@
             "title": "Bhk"
           },
           "floor_plans": {
+            "description": "Media links with role floor_plan (image or PDF; at most one)",
             "items": {
               "$ref": "#/components/schemas/PublicLinkedMedia"
             },
@@ -10274,6 +10275,7 @@
           },
           "is_sample": {
             "default": false,
+            "description": "Sample data — never shown in production",
             "title": "Is Sample",
             "type": "boolean"
           },
@@ -10285,10 +10287,24 @@
             "$ref": "#/components/schemas/Price"
           },
           "property_type": {
+            "enum": [
+              "apartment",
+              "villa",
+              "plot",
+              "penthouse",
+              "shop",
+              "office",
+              "other"
+            ],
             "title": "Property Type",
             "type": "string"
           },
           "sales_status": {
+            "enum": [
+              "available",
+              "sold_out",
+              "off_market"
+            ],
             "title": "Sales Status",
             "type": "string"
           },
@@ -11529,6 +11545,7 @@
             "title": "Bhk"
           },
           "floor_plans": {
+            "description": "Media links with role floor_plan (image or PDF; at most one)",
             "items": {
               "$ref": "#/components/schemas/PublicLinkedMedia"
             },
@@ -11542,6 +11559,7 @@
           },
           "is_sample": {
             "default": false,
+            "description": "Sample data — never shown in production",
             "title": "Is Sample",
             "type": "boolean"
           },
@@ -11556,10 +11574,24 @@
             "$ref": "#/components/schemas/PublicProjectSummary"
           },
           "property_type": {
+            "enum": [
+              "apartment",
+              "villa",
+              "plot",
+              "penthouse",
+              "shop",
+              "office",
+              "other"
+            ],
             "title": "Property Type",
             "type": "string"
           },
           "sales_status": {
+            "enum": [
+              "available",
+              "sold_out",
+              "off_market"
+            ],
             "title": "Sales Status",
             "type": "string"
           },
@@ -11657,6 +11689,7 @@
           },
           "is_sample": {
             "default": false,
+            "description": "Sample data — never shown in production",
             "title": "Is Sample",
             "type": "boolean"
           },
@@ -11671,10 +11704,24 @@
             "$ref": "#/components/schemas/PublicProjectRef"
           },
           "property_type": {
+            "enum": [
+              "apartment",
+              "villa",
+              "plot",
+              "penthouse",
+              "shop",
+              "office",
+              "other"
+            ],
             "title": "Property Type",
             "type": "string"
           },
           "sales_status": {
+            "enum": [
+              "available",
+              "sold_out",
+              "off_market"
+            ],
             "title": "Sales Status",
             "type": "string"
           },

@@ -306,8 +306,8 @@ Every create, update, delete, publish, export, login and permission change write
 
 ## 14. Search
 
-- PostgreSQL full-text search (generated `tsvector` over name, locality, city, tagline) plus `pg_trgm` for typos, and structured filters (status, city, locality, type, BHK, budget). Filters live in the URL.
-- PostgreSQL generated columns cannot reference foreign tables, so `project.search_vector` indexes `name` and `tagline` directly on the project row, while search queries combine this with tsvector expressions and `pg_trgm` word similarity operators (`<%`) on `city.name` and `locality.name`, accelerated by GIN indexes on `project(search_vector)`, `project.name`, `locality.name`, and `city.name` (migration `0007_search.py`, Task 5.1, D-038). Replaces `LIKE` in both public catalogue and admin project searches.
+- PostgreSQL full-text search (generated `tsvector` on project name and tagline, combined with city and locality in queries) plus `pg_trgm` for typos, and structured filters (status, city, locality, type, BHK, budget). Filters live in the URL.
+- PostgreSQL generated columns cannot reference foreign tables, so `project.search_vector` indexes `name` and `tagline` directly on the project row, while search queries combine this with tsvector expressions and `pg_trgm` word similarity operators (`<%`) on `city.name` and `locality.name`, accelerated by GIN indexes on `project(search_vector)`, `project.name`, `locality.name`, and `city.name` (migration `0007_search.py`, Task 5.1, D-038). Replaces text-match `LIKE` in public catalogue search, while admin project search pairs full-text and trigram matching with `LIKE` for slug matching.
 - The `vector` extension (pgvector) is enabled by the first migration wherever the server has it (Neon, CI and the Docker image do), so Phase 7 needs no database change (D-013). A bare local PostgreSQL without pgvector still works until Phase 7 (D-026).
 
 ## 15. Languages

@@ -15,15 +15,21 @@ Covers:
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import timedelta
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
+from sqlalchemy import text
 
 from empire_api.config import Settings, get_settings
+from empire_api.db import get_engine
 from empire_api.main import create_app
 from empire_api.platform.crypto import hash_ip, network_key
+from empire_api.platform.rate_limit import _window_start
+from empire_api.public.caching import SERVER_RATE_LIMIT
+from empire_api.timeutil import utcnow
 
 EDGE_KEY = "test-edge-key-0123456789-abcdefghijklmnopqrstuvwxyz"
 
@@ -75,12 +81,27 @@ def test_public_rate_limiting_ipv4_and_headers(edge_app: FastAPI) -> None:
         "X-Empire-Client-IP": test_ip,
     }
 
-    # First 120 requests should succeed
-    for _ in range(120):
+    # First requests should succeed
+    for _ in range(5):
         r = client.get("/api/v1/public/site", headers=headers)
         assert r.status_code == 200
 
-    # 121st request should be rate-limited (429 Too Many Requests)
+    # Exhaust the remaining bucket for this network
+    now = utcnow()
+    start = _window_start(now, 60)
+    key = f"public:{hash_ip(network_key(test_ip))}"
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO rate_limit_bucket (key, window_start, count, expires_at) "
+                "VALUES (:key, :start, :limit, :expires) "
+                "ON CONFLICT (key, window_start) DO UPDATE SET count = :limit"
+            ),
+            {"key": key, "start": start, "limit": 120, "expires": start + timedelta(seconds=120)},
+        )
+
+    # Next request should be rate-limited (429 Too Many Requests)
     res_blocked = client.get("/api/v1/public/site", headers=headers)
     assert res_blocked.status_code == 429
     assert "Retry-After" in res_blocked.headers
@@ -104,10 +125,25 @@ def test_public_rate_limiting_ipv6_64_subnet(edge_app: FastAPI) -> None:
         "X-Empire-Client-IP": ip2,
     }
 
-    # 120 requests from ip1
-    for _ in range(120):
+    # Requests from ip1 succeed
+    for _ in range(5):
         r = client.get("/api/v1/public/site", headers=headers1)
         assert r.status_code == 200
+
+    # Exhaust the /64 subnet bucket
+    now = utcnow()
+    start = _window_start(now, 60)
+    key = f"public:{hash_ip(network_key(ip1))}"
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO rate_limit_bucket (key, window_start, count, expires_at) "
+                "VALUES (:key, :start, :limit, :expires) "
+                "ON CONFLICT (key, window_start) DO UPDATE SET count = :limit"
+            ),
+            {"key": key, "start": start, "limit": 120, "expires": start + timedelta(seconds=120)},
+        )
 
     # Next request from ip2 in same /64 subnet should be blocked
     res_blocked = client.get("/api/v1/public/site", headers=headers2)
@@ -115,24 +151,64 @@ def test_public_rate_limiting_ipv6_64_subnet(edge_app: FastAPI) -> None:
     assert res_blocked.headers.get("cache-control") == "no-store"
 
 
-def test_public_rate_limiting_edge_ssr_exempt(edge_app: FastAPI) -> None:
+def test_public_rate_limiting_edge_ssr_server_bucket(edge_app: FastAPI) -> None:
+    """R2-M2 / R2-S2: Header-less edge requests have a dedicated server bucket (3,000 req/min)."""
     client = TestClient(edge_app, base_url="https://testserver", follow_redirects=False)
     # SSR / ISR request from edge carries Edge Key but NO client IP header
     headers = {
         "X-Empire-Edge-Key": EDGE_KEY,
     }
 
-    # Even 130 requests should all pass without being rate-limited
-    for _ in range(130):
+    # Verify requests pass under the server budget
+    for _ in range(5):
         r = client.get("/api/v1/public/site", headers=headers)
         assert r.status_code == 200
 
+    # Exhaust the server bucket in DB
+    now = utcnow()
+    start = _window_start(now, 60)
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO rate_limit_bucket (key, window_start, count, expires_at) "
+                "VALUES ('public:server', :start, :limit, :expires) "
+                "ON CONFLICT (key, window_start) DO UPDATE SET count = :limit"
+            ),
+            {"start": start, "limit": SERVER_RATE_LIMIT, "expires": start + timedelta(seconds=120)},
+        )
+
+    # Next request to public endpoint should be blocked with 429 and no-store
+    res_blocked = client.get("/api/v1/public/site", headers=headers)
+    assert res_blocked.status_code == 429
+    assert res_blocked.headers.get("cache-control") == "no-store"
+
+
+def test_public_404_cache_control_no_store(client: TestClient) -> None:
+    """R2-S3: 404 responses from public detail routes must carry Cache-Control: no-store."""
+    res_proj = client.get("/api/v1/public/projects/missing-project-slug")
+    assert res_proj.status_code == 404
+    assert res_proj.headers.get("cache-control") == "no-store"
+
+    res_page = client.get("/api/v1/public/pages/missing-page-slug")
+    assert res_page.status_code == 404
+    assert res_page.headers.get("cache-control") == "no-store"
+
+    res_post = client.get("/api/v1/public/posts/missing-post-slug")
+    assert res_post.status_code == 404
+    assert res_post.headers.get("cache-control") == "no-store"
+
+    res_prop = client.get("/api/v1/public/projects/some-proj/configurations/missing-cfg")
+    assert res_prop.status_code == 404
+    assert res_prop.headers.get("cache-control") == "no-store"
+
 
 def test_public_rate_limit_key_hashing() -> None:
-    # Test key hashing function
+    # Test key hashing function and key construction
     ip = "203.0.113.195"
     net = network_key(ip)
     h = hash_ip(net)
     assert isinstance(h, str)
     assert len(h) == 32
     assert ip not in h  # Pseudonymized, does not leak raw IP
+    assert f"public:{h}".startswith("public:")

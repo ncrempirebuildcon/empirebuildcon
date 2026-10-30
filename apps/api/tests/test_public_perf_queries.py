@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
-from empire_api.content.models import Faq, Page, PageBlock
+from empire_api.content.models import Faq, Page, PageBlock, Post
 from empire_api.db import get_engine
 from empire_api.media.models import Media, MediaLink
 from empire_api.projects.models import City, Configuration, Locality, Project, Tower
@@ -230,6 +230,52 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
         res = client.get(f"/api/v1/public/pages/{page.slug}")
         assert res.status_code == 200
 
-    # Ensure query count is strictly bounded (<= 25 queries for 9 blocks including grids)
-    msg = f"Expected <= 25 queries for multi-block page with grids, got {len(queries)}"
-    assert len(queries) <= 25, msg
+    # Ensure query count is strictly bounded (<= 10 queries, S6)
+    msg = f"Expected <= 10 queries for multi-block page with grids, got {len(queries)}"
+    assert len(queries) <= 10, msg
+
+
+def test_post_list_og_images_query_count_bounded(db: Session, client: TestClient) -> None:
+    """R2-S4: Listing posts with share images must batch-load og_images without N+1 queries."""
+    # Seed 10 media items for share images
+    media_items = [
+        Media(
+            kind="image",
+            store="cloudinary",
+            resource_type="image",
+            public_id=f"perf-og-img-{i}-{uuid.uuid4().hex[:6]}",
+            title=f"OG Photo {i}",
+            label="artist_impression",
+            version=1,
+            format="jpg",
+            bytes=1000,
+            width=1200,
+            height=630,
+            created_by=uuid.uuid4(),
+        )
+        for i in range(1, 11)
+    ]
+    db.add_all(media_items)
+    db.flush()
+
+    posts = [
+        Post(
+            slug=f"perf-post-seo-{i}-{uuid.uuid4().hex[:4]}",
+            title=f"Post Title {i}",
+            body=f"Post Body {i}",
+            publish_state="published",
+            seo={"title": f"SEO Title {i}", "og_image_id": str(media_items[i - 1].id)},
+        )
+        for i in range(1, 11)
+    ]
+    db.add_all(posts)
+    db.commit()
+
+    with count_queries() as queries:
+        res = client.get("/api/v1/public/posts?per_page=10")
+        assert res.status_code == 200
+
+    # Query count must remain bounded (count, posts, covers, authors, og_images <= 6 queries)
+    assert len(queries) <= 6, (
+        f"Expected <= 6 queries for post list with share images, got {len(queries)}"
+    )

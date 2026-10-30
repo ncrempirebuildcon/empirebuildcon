@@ -54,17 +54,22 @@ def sanitize_placeholders(value: Any, *, in_production: bool | None = None) -> A
     return value
 
 
-def resolve_cover_image(links: Sequence[MediaLink]) -> Media | None:
+def resolve_cover_image(links: Sequence[MediaLink], *, prod: bool = False) -> Media | None:
     """Hero/cover image decision rule (D-038):
 
-    1. The pinned cover (`is_cover=True`) if visible and labelled (`label` non-empty).
-    2. Otherwise, the first visible labelled gallery photo in sort_order.
+    1. The pinned cover (`is_cover=True`) if visible, labelled (`label` non-empty),
+       and (in production) non-sample.
+    2. Otherwise, the first visible labelled non-sample gallery photo in sort_order.
     3. Otherwise, None.
     """
     gallery_links = [
         lnk
         for lnk in links
-        if lnk.role == "gallery" and lnk.is_visible and lnk.media and bool(lnk.media.label)
+        if lnk.role == "gallery"
+        and lnk.is_visible
+        and lnk.media
+        and bool(lnk.media.label)
+        and (not prod or not lnk.media.is_sample)
     ]
     if not gallery_links:
         return None

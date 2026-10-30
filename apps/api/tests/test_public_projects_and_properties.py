@@ -13,10 +13,13 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from empire_api.config import get_settings
+from empire_api.content.models import Page, Post
 from empire_api.media.models import Media, MediaLink
 from empire_api.projects.models import City, Configuration, Locality, Project
 
@@ -478,3 +481,160 @@ def test_directions_url_on_project_detail(db: Session, client: TestClient) -> No
     assert "google.com/maps/dir" in res["location"]["directions_url"]
     assert "26.8467" in res["location"]["directions_url"]
     assert "80.9462" in res["location"]["directions_url"]
+
+
+def test_property_sorting_tie_breaker_uses_id(db: Session, client: TestClient) -> None:
+    """S15: Properties with identical price and area are stably ordered by Configuration.id."""
+    city, locality = _seed_city_and_locality(db)
+    proj = Project(
+        slug=f"tie-breaker-proj-{uuid.uuid4().hex[:4]}",
+        name="Tie Breaker Project",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        locality_id=locality.id,
+        rera_number="UPRERATIE1",
+    )
+    db.add(proj)
+    db.flush()
+
+    c1 = Configuration(
+        project_id=proj.id,
+        name="Tie Unit A",
+        slug="tie-unit-a",
+        property_type="apartment",
+        sales_status="available",
+        price_min_inr=10_000_000,
+        price_max_inr=10_000_000,
+        area_min_sqm=Decimal("100.0"),
+        area_max_sqm=Decimal("100.0"),
+        sort_order=1,
+    )
+    c2 = Configuration(
+        project_id=proj.id,
+        name="Tie Unit B",
+        slug="tie-unit-b",
+        property_type="apartment",
+        sales_status="available",
+        price_min_inr=10_000_000,
+        price_max_inr=10_000_000,
+        area_min_sqm=Decimal("100.0"),
+        area_max_sqm=Decimal("100.0"),
+        sort_order=1,
+    )
+    db.add_all([c1, c2])
+    db.commit()
+
+    expected_first = c1.slug if c1.id < c2.id else c2.slug
+    expected_second = c2.slug if c1.id < c2.id else c1.slug
+
+    res = client.get("/api/v1/public/properties?project_status=ongoing&sort=price_asc").json()
+    items = [c["slug"] for c in res["items"] if c["slug"] in (c1.slug, c2.slug)]
+    assert items == [expected_first, expected_second]
+
+
+def test_sitemap_excludes_landing_noindex_and_draft_legal(db: Session, client: TestClient) -> None:
+    """S4: Sitemap excludes landing pages, noindex content, and includes canonical paths."""
+    city, locality = _seed_city_and_locality(db)
+    proj = Project(
+        slug=f"sitemap-proj-{uuid.uuid4().hex[:4]}",
+        name="Sitemap Project",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        locality_id=locality.id,
+        rera_number="UPRERASMAP1",
+    )
+    landing_page = Page(
+        slug=f"sitemap-landing-{uuid.uuid4().hex[:4]}",
+        title="Landing Page",
+        kind="landing",
+        publish_state="published",
+    )
+    noindex_page = Page(
+        slug=f"sitemap-noindex-p-{uuid.uuid4().hex[:4]}",
+        title="Noindex Page",
+        kind="standard",
+        publish_state="published",
+        seo={"noindex": True},
+    )
+    normal_page = Page(
+        slug=f"sitemap-normal-p-{uuid.uuid4().hex[:4]}",
+        title="Normal Page",
+        kind="standard",
+        publish_state="published",
+    )
+    noindex_post = Post(
+        slug=f"sitemap-noindex-post-{uuid.uuid4().hex[:4]}",
+        title="Noindex Post",
+        body="Text",
+        publish_state="published",
+        seo={"noindex": True},
+    )
+    normal_post = Post(
+        slug=f"sitemap-normal-post-{uuid.uuid4().hex[:4]}",
+        title="Normal Post",
+        body="Text",
+        publish_state="published",
+    )
+    db.add_all([proj, landing_page, noindex_page, normal_page, noindex_post, normal_post])
+    db.commit()
+
+    res = client.get("/api/v1/public/sitemap")
+    assert res.status_code == 200
+    paths = [entry["path"] for entry in res.json()]
+
+    assert f"/projects/{proj.slug}" in paths
+    assert f"/{normal_page.slug}" in paths
+    assert f"/blog/{normal_post.slug}" in paths
+
+    assert f"/{landing_page.slug}" not in paths
+    assert f"/{noindex_page.slug}" not in paths
+    assert f"/blog/{noindex_post.slug}" not in paths
+
+
+def test_city_counts_in_production(
+    db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """S16: /public/cities project count excludes sample projects in production."""
+    city = City(name="Count Test City", slug=f"cnt-city-{uuid.uuid4().hex[:4]}", state="UP")
+    db.add(city)
+    db.flush()
+
+    p_real = Project(
+        slug=f"cnt-real-{uuid.uuid4().hex[:4]}",
+        name="Real Project",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        is_sample=False,
+    )
+    p_sample = Project(
+        slug=f"cnt-sample-{uuid.uuid4().hex[:4]}",
+        name="Sample Project",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        is_sample=True,
+    )
+    db.add_all([p_real, p_sample])
+    db.commit()
+
+    # In dev/test: includes sample
+    res_dev = client.get("/api/v1/public/cities").json()
+    city_dev = next(c for c in res_dev if c["slug"] == city.slug)
+    assert city_dev["project_count"] == 2
+
+    # In production: sample excluded
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+    res_prod = client.get("/api/v1/public/cities").json()
+    city_prod = next(c for c in res_prod if c["slug"] == city.slug)
+    assert city_prod["project_count"] == 1

@@ -11,9 +11,10 @@ Covers:
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from empire_api.db import get_engine
 from empire_api.projects.models import City, Locality, Project
 
 
@@ -129,3 +130,18 @@ def test_public_project_search(db: Session, client: TestClient) -> None:
     assert "search-emerald-heights" in slugs9
     # Kashi Riverside Villas has "Riverside" in name and should rank first or equal
     assert slugs9[0] == "search-kashi-villas"
+
+
+def test_trgm_threshold_persists_after_rollback_on_pooled_connection() -> None:
+    """R2-S1 / R2-M1: Verify that pg_trgm threshold persists across rollback."""
+    engine = get_engine()
+    # 1. Check out connection 1, issue rollback, close (return to pool)
+    conn1 = engine.connect()
+    conn1.rollback()
+    conn1.close()
+
+    # 2. Check out connection 2 from pool and assert threshold is stably 0.5
+    conn2 = engine.connect()
+    val = conn2.execute(text("SHOW pg_trgm.word_similarity_threshold")).scalar()
+    conn2.close()
+    assert val == "0.5"

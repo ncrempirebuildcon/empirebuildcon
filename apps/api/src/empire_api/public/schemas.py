@@ -28,6 +28,7 @@ from empire_api.projects.schemas_shared import (
     Location,
     Price,
 )
+from empire_api.projects.vocab import PropertyType, SalesStatus
 from empire_api.users.schemas import PageMeta
 
 
@@ -164,16 +165,19 @@ class PublicConfiguration(OutModel):
     slug: str
     name: str
     tower_id: uuid.UUID | None = None
-    property_type: str
+    property_type: PropertyType
     bhk: float | None = None
     bathrooms: int | None = None
     balconies: int | None = None
     area: Area
     price: Price
-    sales_status: str
-    floor_plans: list[PublicLinkedMedia] = Field(default_factory=list)
+    sales_status: SalesStatus
+    floor_plans: list[PublicLinkedMedia] = Field(
+        default_factory=list,
+        description="Media links with role floor_plan (image or PDF; at most one)",
+    )
     sort_order: int
-    is_sample: bool = False
+    is_sample: bool = Field(default=False, description="Sample data — never shown in production")
 
 
 class PublicProjectDetail(PublicProjectSummary):
@@ -214,14 +218,14 @@ class PublicPropertySummary(OutModel):
     id: uuid.UUID
     slug: str
     name: str
-    property_type: str
+    property_type: PropertyType
     bhk: float | None = None
     area: Area
     price: Price
-    sales_status: str
+    sales_status: SalesStatus
     cover: PublicMedia | None = None
     project: PublicProjectRef
-    is_sample: bool = False
+    is_sample: bool = Field(default=False, description="Sample data — never shown in production")
 
 
 class PublicPropertyDetail(PublicConfiguration):

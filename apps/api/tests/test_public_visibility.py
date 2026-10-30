@@ -12,17 +12,21 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from empire_api.config import get_settings
-from empire_api.content.models import Faq, Offer, Page, Post, Testimonial
+from empire_api.content.models import Faq, Offer, Page, PageBlock, Post
+from empire_api.content.models import Testimonial as DbTestimonial
+from empire_api.media.models import Media, MediaLink
 from empire_api.projects.models import City, Configuration, Locality, Project
-from empire_api.public.visibility import sanitize_placeholders
+from empire_api.public.visibility import resolve_cover_image, sanitize_placeholders
 from empire_api.seo.models import Redirect
 
 
@@ -268,15 +272,34 @@ def test_visibility_across_all_content_types(
     faq_smp = Faq(question="Sample FAQ", answer="Answer", is_visible=True, is_sample=True)
     db.add_all([faq_vis, faq_hid, faq_smp])
 
-    # 2. Testimonials: consented & visible vs unconsented / hidden
-    t_consented = Testimonial(
+    # 2. Testimonials: S16 (2) proves consent is required
+    # A) Attempting to set is_visible=True without consent_date is blocked by DB check constraint
+    with pytest.raises(IntegrityError):
+        invalid_t = DbTestimonial(
+            person_name="Invalid User",
+            quote="No consent but visible",
+            source="google",
+            consent_date=None,
+            is_visible=True,
+        )
+        db.add(invalid_t)
+        db.flush()
+    db.rollback()
+
+    # Re-seed FAQs because rollback rolled back uncommitted flush
+    faq_vis = Faq(question="Visible FAQ", answer="Answer", is_visible=True, is_sample=False)
+    faq_hid = Faq(question="Hidden FAQ", answer="Answer", is_visible=False, is_sample=False)
+    faq_smp = Faq(question="Sample FAQ", answer="Answer", is_visible=True, is_sample=True)
+    db.add_all([faq_vis, faq_hid, faq_smp])
+
+    t_consented = DbTestimonial(
         person_name="Consented User",
         quote="Loved the home",
         source="google",
         consent_date=datetime.now(UTC).date(),
         is_visible=True,
     )
-    t_unconsented = Testimonial(
+    t_unconsented = DbTestimonial(
         person_name="Unconsented User",
         quote="Do not show this",
         source="google",
@@ -366,3 +389,326 @@ def test_visibility_across_all_content_types(
     assert "Valid Site Offer" in offer_titles
     assert "Inactive Offer" not in offer_titles
     assert "Draft Proj Offer" not in offer_titles
+
+
+def test_resolve_cover_image_skips_sample_media_in_production(
+    db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # R2-N1 / S14: when primary cover is sample media,
+    # production skips it and falls back to non-sample
+    proj = _seed_project(db, f"cover-sample-fallback-{uuid.uuid4().hex[:4]}")
+
+    m_sample = Media(
+        kind="image",
+        store="cloudinary",
+        resource_type="image",
+        public_id=f"sample-cover-{uuid.uuid4().hex[:6]}",
+        title="Sample Cover",
+        alt_text="Sample Cover Alt",
+        label="artist_impression",
+        version=1,
+        format="jpg",
+        bytes=1024,
+        width=1200,
+        height=800,
+        is_sample=True,
+    )
+    m_real = Media(
+        kind="image",
+        store="cloudinary",
+        resource_type="image",
+        public_id=f"real-gallery-{uuid.uuid4().hex[:6]}",
+        title="Real Photo",
+        alt_text="Real Photo Alt",
+        label="artist_impression",
+        version=1,
+        format="jpg",
+        bytes=2048,
+        width=1200,
+        height=800,
+        is_sample=False,
+    )
+    db.add_all([m_sample, m_real])
+    db.flush()
+
+    link_sample_cover = MediaLink(
+        media_id=m_sample.id,
+        project_id=proj.id,
+        role="gallery",
+        is_cover=True,
+        is_visible=True,
+        sort_order=1,
+    )
+    link_real_gallery = MediaLink(
+        media_id=m_real.id,
+        project_id=proj.id,
+        role="gallery",
+        is_cover=False,
+        is_visible=True,
+        sort_order=2,
+    )
+    db.add_all([link_sample_cover, link_real_gallery])
+    db.commit()
+
+    # Unit check of helper
+    chosen_dev = resolve_cover_image([link_sample_cover, link_real_gallery], prod=False)
+    assert chosen_dev is not None and chosen_dev.id == m_sample.id
+
+    chosen_prod = resolve_cover_image([link_sample_cover, link_real_gallery], prod=True)
+    assert chosen_prod is not None and chosen_prod.id == m_real.id
+
+    # Endpoint check: in dev / test, cover image is the sample media
+    res_dev = client.get(f"/api/v1/public/projects/{proj.slug}").json()
+    assert res_dev["cover"]["id"] == str(m_sample.id)
+
+    # In production, cover image skips the sample media and falls back to real gallery media
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+    res_prod = client.get(f"/api/v1/public/projects/{proj.slug}").json()
+    assert res_prod["cover"]["id"] == str(m_real.id)
+
+
+def test_site_navigation_and_offers_filtering(
+    db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # S16 (4): Nav and offers filtering (inactive, ended, sample, draft project)
+    p_nav_pub = Page(
+        slug=f"nav-pub-{uuid.uuid4().hex[:4]}",
+        title="Nav Pub",
+        kind="standard",
+        publish_state="published",
+        show_in_nav=True,
+        nav_order=1,
+        is_sample=False,
+    )
+    p_nav_draft = Page(
+        slug=f"nav-draft-{uuid.uuid4().hex[:4]}",
+        title="Nav Draft",
+        kind="standard",
+        publish_state="draft",
+        show_in_nav=True,
+        nav_order=2,
+        is_sample=False,
+    )
+    p_nav_sample = Page(
+        slug=f"nav-smp-{uuid.uuid4().hex[:4]}",
+        title="Nav Sample",
+        kind="standard",
+        publish_state="published",
+        show_in_nav=True,
+        nav_order=3,
+        is_sample=True,
+    )
+    db.add_all([p_nav_pub, p_nav_draft, p_nav_sample])
+
+    now = datetime.now(UTC)
+    off_active = Offer(
+        title="Off Active",
+        placement="home",
+        is_active=True,
+        starts_at=now - timedelta(days=2),
+        ends_at=now + timedelta(days=2),
+        is_sample=False,
+    )
+    off_ended = Offer(
+        title="Off Ended",
+        placement="home",
+        is_active=True,
+        starts_at=now - timedelta(days=10),
+        ends_at=now - timedelta(days=1),
+        is_sample=False,
+    )
+    off_sample = Offer(
+        title="Off Sample",
+        placement="home",
+        is_active=True,
+        starts_at=now - timedelta(days=1),
+        ends_at=now + timedelta(days=5),
+        is_sample=True,
+    )
+    db.add_all([off_active, off_ended, off_sample])
+    db.commit()
+
+    # In dev:
+    site_dev = client.get("/api/v1/public/site").json()
+    nav_labels_dev = [n["label"] for n in site_dev["nav"]]
+    assert "Nav Pub" in nav_labels_dev
+    assert "Nav Sample" in nav_labels_dev
+    assert "Nav Draft" not in nav_labels_dev
+
+    off_titles_dev = [o["title"] for o in site_dev["offers"]]
+    assert "Off Active" in off_titles_dev
+    assert "Off Sample" in off_titles_dev
+    assert "Off Ended" not in off_titles_dev
+
+    # In production:
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+    site_prod = client.get("/api/v1/public/site").json()
+    nav_labels_prod = [n["label"] for n in site_prod["nav"]]
+    assert "Nav Pub" in nav_labels_prod
+    assert "Nav Sample" not in nav_labels_prod
+    assert "Nav Draft" not in nav_labels_prod
+
+    off_titles_prod = [o["title"] for o in site_prod["offers"]]
+    assert "Off Active" in off_titles_prod
+    assert "Off Sample" not in off_titles_prod
+    assert "Off Ended" not in off_titles_prod
+
+
+def test_hidden_media_links_omitted_from_project_detail(db: Session, client: TestClient) -> None:
+    # S16 (5): Media links with is_visible=False are omitted from public detail responses
+    proj = _seed_project(db, f"hidden-media-{uuid.uuid4().hex[:4]}")
+
+    m1 = Media(
+        kind="image",
+        store="cloudinary",
+        resource_type="image",
+        public_id=f"g-vis-{uuid.uuid4().hex[:6]}",
+        title="Vis Gallery",
+        alt_text="Alt",
+        label="artist_impression",
+        version=1,
+        format="jpg",
+        bytes=1024,
+        width=800,
+        height=600,
+    )
+    m2 = Media(
+        kind="image",
+        store="cloudinary",
+        resource_type="image",
+        public_id=f"g-hid-{uuid.uuid4().hex[:6]}",
+        title="Hid Gallery",
+        alt_text="Alt",
+        label="artist_impression",
+        version=1,
+        format="jpg",
+        bytes=1024,
+        width=800,
+        height=600,
+    )
+    m3 = Media(
+        kind="video",
+        store="cloudinary",
+        resource_type="video",
+        public_id=f"v-vis-{uuid.uuid4().hex[:6]}",
+        title="Vis Video",
+        alt_text="Alt",
+        label=None,
+        version=1,
+        format="mp4",
+        bytes=1024,
+        width=1280,
+        height=720,
+    )
+    m4 = Media(
+        kind="video",
+        store="cloudinary",
+        resource_type="video",
+        public_id=f"v-hid-{uuid.uuid4().hex[:6]}",
+        title="Hid Video",
+        alt_text="Alt",
+        label=None,
+        version=1,
+        format="mp4",
+        bytes=1024,
+        width=1280,
+        height=720,
+    )
+    db.add_all([m1, m2, m3, m4])
+    db.flush()
+
+    lnk1 = MediaLink(
+        media_id=m1.id, project_id=proj.id, role="gallery", is_visible=True, sort_order=1
+    )
+    lnk2 = MediaLink(
+        media_id=m2.id, project_id=proj.id, role="gallery", is_visible=False, sort_order=2
+    )
+    lnk3 = MediaLink(
+        media_id=m3.id, project_id=proj.id, role="video", is_visible=True, sort_order=1
+    )
+    lnk4 = MediaLink(
+        media_id=m4.id, project_id=proj.id, role="video", is_visible=False, sort_order=2
+    )
+    db.add_all([lnk1, lnk2, lnk3, lnk4])
+    db.commit()
+
+    detail = client.get(f"/api/v1/public/projects/{proj.slug}").json()
+    gallery_ids = [img["id"] for img in detail["gallery"]]
+    video_ids = [vid["id"] for vid in detail["videos"]]
+
+    assert str(m1.id) in gallery_ids
+    assert str(m2.id) not in gallery_ids
+    assert str(m3.id) in video_ids
+    assert str(m4.id) not in video_ids
+
+
+def test_sample_items_inside_grids_omitted_in_production(
+    db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # S16 (6): Sample items inside project_grid and property_grid omitted in production
+    p_real = _seed_project(db, f"grid-p-real-{uuid.uuid4().hex[:4]}", is_sample=False)
+    p_sample = _seed_project(db, f"grid-p-sample-{uuid.uuid4().hex[:4]}", is_sample=True)
+
+    c_real = Configuration(
+        project_id=p_real.id,
+        slug=f"grid-c-real-{uuid.uuid4().hex[:4]}",
+        name="Real Config",
+        property_type="apartment",
+        sales_status="available",
+        price_min_inr=5_000_000,
+        price_max_inr=5_000_000,
+    )
+    c_sample = Configuration(
+        project_id=p_sample.id,
+        slug=f"grid-c-sample-{uuid.uuid4().hex[:4]}",
+        name="Sample Config",
+        property_type="apartment",
+        sales_status="available",
+        price_min_inr=6_000_000,
+        price_max_inr=6_000_000,
+    )
+    db.add_all([c_real, c_sample])
+    db.flush()
+
+    page = Page(
+        slug=f"grid-page-{uuid.uuid4().hex[:4]}",
+        title="Grid Page",
+        kind="standard",
+        publish_state="published",
+    )
+    db.add(page)
+    db.flush()
+
+    b_pgrid = PageBlock(
+        page_id=page.id,
+        type="project_grid",
+        data={"mode": "curated", "project_ids": [str(p_real.id), str(p_sample.id)]},
+        sort_order=1,
+    )
+    b_cgrid = PageBlock(
+        page_id=page.id,
+        type="property_grid",
+        data={"mode": "curated", "property_ids": [str(c_real.id), str(c_sample.id)]},
+        sort_order=2,
+    )
+    db.add_all([b_pgrid, b_cgrid])
+    db.commit()
+
+    # In dev: both real and sample appear
+    res_dev = client.get(f"/api/v1/public/pages/{page.slug}").json()
+    p_slugs_dev = [p["slug"] for p in res_dev["blocks"][0]["data"]["projects"]]
+    c_slugs_dev = [c["slug"] for c in res_dev["blocks"][1]["data"]["properties"]]
+    assert p_real.slug in p_slugs_dev
+    assert p_sample.slug in p_slugs_dev
+    assert c_real.slug in c_slugs_dev
+    assert c_sample.slug in c_slugs_dev
+
+    # In production: sample items are omitted from grids
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+    res_prod = client.get(f"/api/v1/public/pages/{page.slug}").json()
+    p_slugs_prod = [p["slug"] for p in res_prod["blocks"][0]["data"]["projects"]]
+    c_slugs_prod = [c["slug"] for c in res_prod["blocks"][1]["data"]["properties"]]
+    assert p_real.slug in p_slugs_prod
+    assert p_sample.slug not in p_slugs_prod
+    assert c_real.slug in c_slugs_prod
+    assert c_sample.slug not in c_slugs_prod

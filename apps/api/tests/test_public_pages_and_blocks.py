@@ -27,7 +27,10 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from empire_api.content.models import ConsentText, Faq, Offer, Page, PageBlock, Testimonial
+from empire_api.content.block_types import BlockInput
+from empire_api.content.models import ConsentText, Faq, Offer, Page, PageBlock
+from empire_api.content.models import Testimonial as DbTestimonial
+from empire_api.content.page_blocks import _stored
 from empire_api.media.models import Media
 from empire_api.projects.models import City, Locality, Project
 from empire_api.site_settings.models import FeatureFlag
@@ -131,7 +134,7 @@ def test_page_blocks_resolution_and_stored_shapes(db: Session, client: TestClien
     # 4. Seed Testimonials: 4 testimonials to test limit (default 3)
     t_items = []
     for i in range(4):
-        t = Testimonial(
+        t = DbTestimonial(
             person_name=f"Customer {i + 1}",
             person_detail="Homeowner",
             quote=f"Great experience purchasing my home {i + 1}.",
@@ -443,3 +446,129 @@ def test_legal_page_draft_marker(db: Session, client: TestClient) -> None:
 
     res_final = client.get("/api/v1/public/pages/terms-final").json()
     assert res_final["is_draft_text"] is False
+
+
+def test_project_mode_faq_and_testimonial_blocks_with_block_input(
+    db: Session, client: TestClient
+) -> None:
+    # M2 & S16 (7): Project-mode FAQ and testimonial blocks built through BlockInput -> _stored
+    city = City(name="Ayodhya", slug=f"ayodhya-{uuid.uuid4().hex[:4]}", state="UP")
+    db.add(city)
+    db.flush()
+    proj = Project(
+        name="Ramayan Greens",
+        slug=f"ramayan-{uuid.uuid4().hex[:4]}",
+        tagline="Divine living",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        price_min_inr=5_000_000,
+    )
+    db.add(proj)
+    db.flush()
+
+    # Seed 2 FAQs attached to this project and 1 site-wide FAQ
+    faq_proj_1 = Faq(
+        question="What is the phase 1 delivery date?",
+        answer="Mid 2028",
+        project_id=proj.id,
+        is_visible=True,
+        sort_order=1,
+    )
+    faq_proj_2 = Faq(
+        question="Is parking included?",
+        answer="Yes, covered parking",
+        project_id=proj.id,
+        is_visible=True,
+        sort_order=2,
+    )
+    faq_sitewide = Faq(
+        question="General questions?",
+        answer="Call our hotline",
+        project_id=None,
+        is_visible=True,
+        sort_order=3,
+    )
+    db.add_all([faq_proj_1, faq_proj_2, faq_sitewide])
+
+    # Seed 3 testimonials attached to this project
+    t_items = []
+    for i in range(3):
+        t = DbTestimonial(
+            person_name=f"Ayodhya Buyer {i + 1}",
+            person_detail="Resident",
+            quote=f"Delighted with my purchase {i + 1}.",
+            source="google",
+            source_url="https://google.com/review/123",
+            consent_date=datetime.now(UTC).date(),
+            is_visible=True,
+            project_id=proj.id,
+        )
+        t_items.append(t)
+    db.add_all(t_items)
+    db.flush()
+
+    # Build blocks through BlockInput and _stored (validates schema contract)
+    input_faq = BlockInput.model_validate(
+        {
+            "type": "faq_list",
+            "data": {"project_id": str(proj.id), "heading": "Project Questions"},
+        }
+    )
+    input_testimonials = BlockInput.model_validate(
+        {
+            "type": "testimonials",
+            "data": {"project_id": str(proj.id), "limit": 2, "heading": "Buyer Stories"},
+        }
+    )
+
+    page = Page(
+        slug=f"project-mode-page-{uuid.uuid4().hex[:4]}",
+        title="Project Showcase Page",
+        kind="standard",
+        publish_state="published",
+    )
+    db.add(page)
+    db.flush()
+
+    b_faq = PageBlock(
+        page_id=page.id,
+        type="faq_list",
+        data=_stored(input_faq.root),
+        sort_order=1,
+    )
+    b_test = PageBlock(
+        page_id=page.id,
+        type="testimonials",
+        data=_stored(input_testimonials.root),
+        sort_order=2,
+    )
+    db.add_all([b_faq, b_test])
+    db.commit()
+
+    res = client.get(f"/api/v1/public/pages/{page.slug}")
+    assert res.status_code == 200
+    blocks = res.json()["blocks"]
+    assert len(blocks) == 2
+
+    # Verify project FAQs resolved
+    faq_block = blocks[0]
+    assert faq_block["type"] == "faq_list"
+    resolved_faqs = faq_block["data"]["faqs"]
+    assert len(resolved_faqs) == 2
+    faq_questions = [f["question"] for f in resolved_faqs]
+    assert "What is the phase 1 delivery date?" in faq_questions
+    assert "Is parking included?" in faq_questions
+    assert "General questions?" not in faq_questions
+
+    # Verify project testimonials resolved with limit=2 applied
+    test_block = blocks[1]
+    assert test_block["type"] == "testimonials"
+    resolved_testimonials = test_block["data"]["testimonials"]
+    assert len(resolved_testimonials) == 2
+    for t_res in resolved_testimonials:
+        assert "consent_date" not in t_res
+        assert "source_url" not in t_res
+        assert "project_id" not in t_res

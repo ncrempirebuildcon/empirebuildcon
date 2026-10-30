@@ -7,12 +7,19 @@ personal contact records, staff user ids) may ever be present in any public sche
 from __future__ import annotations
 
 import inspect
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
+from empire_api.content.models import Faq, Page, Post
+from empire_api.content.models import Testimonial as DbTestimonial
+from empire_api.projects.models import City, Configuration, Project
 from empire_api.public import schemas
+from empire_api.seo.models import Redirect
 
 FORBIDDEN_FIELD_NAMES = frozenset(
     {
@@ -70,8 +77,74 @@ def test_public_schemas_contain_no_forbidden_fields() -> None:
     assert checked_models >= 10
 
 
-def test_real_endpoint_responses_have_no_forbidden_fields(client: TestClient) -> None:
-    """S16: Validate actual JSON responses from real public endpoints."""
+def test_real_endpoint_responses_have_no_forbidden_fields(db: Session, client: TestClient) -> None:
+    """S16: Validate actual JSON responses from real public endpoints with seeded database."""
+    # Seed live entities across all public content types
+    city = City(name="Probe City", slug="probe-city-secure", state="UP")
+    db.add(city)
+    db.flush()
+
+    p = Project(
+        name="Probe Project",
+        slug="probe-project-secure",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+    )
+    db.add(p)
+    db.flush()
+
+    cfg = Configuration(
+        project_id=p.id,
+        name="Probe Config",
+        slug="probe-cfg-secure",
+        property_type="apartment",
+        sales_status="available",
+        price_min_inr=1_000_000,
+        price_max_inr=2_000_000,
+        area_min_sqm=Decimal("50.0"),
+        area_max_sqm=Decimal("60.0"),
+        sort_order=1,
+    )
+    db.add(cfg)
+
+    faq = Faq(question="Security FAQ?", answer="Safe answer.", sort_order=1, is_visible=True)
+    db.add(faq)
+
+    testimonial = DbTestimonial(
+        person_name="Secure User",
+        quote="Clean experience.",
+        source="google",
+        consent_date=datetime.now(UTC),
+        is_visible=True,
+    )
+    db.add(testimonial)
+
+    post = Post(
+        title="Secure Post",
+        slug="probe-post-secure",
+        body="Post body text.",
+        publish_state="published",
+    )
+    db.add(post)
+
+    page = Page(
+        title="Secure Page",
+        slug="probe-page-secure",
+        kind="standard",
+        publish_state="published",
+    )
+    db.add(page)
+
+    redirect = Redirect(
+        from_path="/old-secure-probe",
+        to_path="/new-secure-probe",
+        status_code=308,
+        is_active=True,
+    )
+    db.add(redirect)
+    db.commit()
 
     def _check_payload(val: Any, path: str = "") -> None:
         if isinstance(val, dict):
@@ -88,11 +161,15 @@ def test_real_endpoint_responses_have_no_forbidden_fields(client: TestClient) ->
     endpoints_to_probe = [
         "/api/v1/public/site",
         "/api/v1/public/projects",
+        f"/api/v1/public/projects/{p.slug}",
         "/api/v1/public/properties",
+        f"/api/v1/public/projects/{p.slug}/configurations/{cfg.slug}",
         "/api/v1/public/cities",
         "/api/v1/public/faqs",
         "/api/v1/public/testimonials",
         "/api/v1/public/posts",
+        f"/api/v1/public/posts/{post.slug}",
+        f"/api/v1/public/pages/{page.slug}",
         "/api/v1/public/redirects",
         "/api/v1/public/sitemap",
     ]
@@ -103,7 +180,8 @@ def test_real_endpoint_responses_have_no_forbidden_fields(client: TestClient) ->
         payload = res.json()
         _check_payload(payload, ep)
 
-        # S2: Redirects must never expose an "id" field
+        # S2: Redirects must never expose an "id" field and must return populated items
         if ep.endswith("/redirects"):
+            assert len(payload) >= 1, "Redirects list must contain seeded items"
             for redirect_item in payload:
                 assert "id" not in redirect_item
