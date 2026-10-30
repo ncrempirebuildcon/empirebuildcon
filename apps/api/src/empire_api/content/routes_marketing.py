@@ -5,7 +5,7 @@ HTTP only: the rules are in faqs.py, testimonials.py and offers.py. Permissions 
 §11, design contract): FAQs read `content.read`, write `content.write` (showing one needs
 `content.publish`, checked in faqs.py); testimonials read `content.read`, write
 `content.publish`; offers `offers.manage`.
-TODO(phase-5): the public `/api/v1/public/faqs` and `/api/v1/public/testimonials`.
+Public FAQ and testimonial endpoints are in public/routes.py (Task 5.1).
 """
 
 from __future__ import annotations

@@ -29,7 +29,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, literal, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from empire_api.content import queries as content_queries
@@ -113,15 +113,20 @@ def load_project(db: Session, project_id: uuid.UUID) -> Project:
 def list_projects(
     db: Session, paging: PageParams, filters: ProjectFilters
 ) -> tuple[list[Project], int]:
-    """The CMS list, most recent edit first. `q` matches name or slug, ignoring case.
-
-    TODO(phase-5): full-text search (tsvector + pg_trgm, ARCHITECTURE §14) replaces the LIKE.
+    """The CMS list, most recent edit first.
+    `q` matches full-text search, trigram similarity or slug.
     """
     stmt = select(Project)
     if filters.q and filters.q.strip():
-        pattern = like_pattern(filters.q)
+        cleaned_q = filters.q.strip()
+        pattern = like_pattern(cleaned_q)
+        ts_query = func.plainto_tsquery("english", cleaned_q)
+        fts_match = Project.search_vector.op("@@")(ts_query)
+        trgm_match = literal(cleaned_q).op("<%")(Project.name)
         stmt = stmt.where(
             or_(
+                fts_match,
+                trgm_match,
                 func.lower(Project.name).like(pattern, escape="\\"),
                 Project.slug.like(pattern, escape="\\"),
             )

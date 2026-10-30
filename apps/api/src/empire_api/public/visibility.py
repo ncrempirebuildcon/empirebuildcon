@@ -17,8 +17,8 @@ import re
 from collections.abc import Sequence
 from typing import Any, TypeVar
 
-from sqlalchemy import Select, case, exists, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy import Select, case, exists, func, literal, or_, select
+from sqlalchemy.orm import Session, aliased
 
 from empire_api.config import get_settings
 from empire_api.media.models import Media, MediaLink
@@ -136,26 +136,52 @@ def _apply_search_filter(
     cleaned_q = q.strip()
     ts_query = func.plainto_tsquery("english", cleaned_q)
     fts_project = Project.search_vector.op("@@")(ts_query)
-    fts_city = func.to_tsvector("english", func.coalesce(City.name, "")).op("@@")(ts_query)
-    fts_locality = func.to_tsvector("english", func.coalesce(Locality.name, "")).op("@@")(ts_query)
 
-    trgm_name = func.word_similarity(cleaned_q, Project.name) >= 0.3
-    trgm_tagline = func.word_similarity(cleaned_q, func.coalesce(Project.tagline, "")) >= 0.3
-    trgm_city = func.word_similarity(cleaned_q, func.coalesce(City.name, "")) >= 0.3
-    trgm_locality = func.word_similarity(cleaned_q, func.coalesce(Locality.name, "")) >= 0.3
+    # Word similarity on project name and tagline using gin_trgm_ops index:
+    trgm_name = literal(cleaned_q).op("<%")(Project.name)
+    trgm_tagline = literal(cleaned_q).op("<%")(func.coalesce(Project.tagline, ""))
 
-    stmt = stmt.outerjoin(City, Project.city_id == City.id)
-    stmt = stmt.outerjoin(Locality, Project.locality_id == Locality.id)
+    # Use aliased EXISTS subqueries for City and Locality so we never cause duplicate join aliases
+    # or auto-correlation conflicts with outer city/locality filters
+    search_city = aliased(City)
+    city_tsv = func.to_tsvector("english", func.coalesce(search_city.name, ""))
+    exists_city = (
+        select(1)
+        .select_from(search_city)
+        .where(
+            search_city.id == Project.city_id,
+            or_(
+                city_tsv.op("@@")(ts_query),
+                literal(cleaned_q).op("<%")(search_city.name),
+            ),
+        )
+        .correlate(Project)
+        .exists()
+    )
+
+    search_locality = aliased(Locality)
+    loc_tsv = func.to_tsvector("english", func.coalesce(search_locality.name, ""))
+    exists_locality = (
+        select(1)
+        .select_from(search_locality)
+        .where(
+            search_locality.id == Project.locality_id,
+            or_(
+                loc_tsv.op("@@")(ts_query),
+                literal(cleaned_q).op("<%")(search_locality.name),
+            ),
+        )
+        .correlate(Project)
+        .exists()
+    )
 
     return stmt.where(
         or_(
             fts_project,
-            fts_city,
-            fts_locality,
             trgm_name,
             trgm_tagline,
-            trgm_city,
-            trgm_locality,
+            exists_city,
+            exists_locality,
         )
     )
 
@@ -163,6 +189,7 @@ def _apply_search_filter(
 def _apply_order_by(
     stmt: Select[Any],
     sort: str | None,
+    q: str | None = None,
 ) -> Select[Any]:
     sales_order = case((Project.sales_status == "available", 0), else_=1)
     featured_order = case((Project.is_featured.is_(True), 0), else_=1)
@@ -173,11 +200,23 @@ def _apply_order_by(
         Project.featured_order.asc().nulls_last(),
     ]
 
+    cleaned_q = q.strip() if q else None
     sort_type = (sort or "recommended").lower()
+
+    # S11: When q is provided with default recommended sort, order by relevance first
+    if sort_type == "recommended" and cleaned_q:
+        ts_query = func.plainto_tsquery("english", cleaned_q)
+        order_clauses.append(func.ts_rank(Project.search_vector, ts_query).desc())
+        order_clauses.append(func.similarity(Project.name, cleaned_q).desc())
+
+    # S5: Treat price_on_request projects as NULL price so hidden numbers cannot be bisected
+    eff_min = case((Project.price_on_request.is_(True), None), else_=Project.price_min_inr)
+    eff_max = case((Project.price_on_request.is_(True), None), else_=Project.price_max_inr)
+
     if sort_type == "price_asc":
-        order_clauses.append(Project.price_min_inr.asc().nulls_last())
+        order_clauses.append(eff_min.asc().nulls_last())
     elif sort_type == "price_desc":
-        order_clauses.append(Project.price_max_inr.desc().nulls_last())
+        order_clauses.append(eff_max.desc().nulls_last())
     elif sort_type == "possession":
         order_clauses.append(Project.possession_date.asc().nulls_last())
     elif sort_type == "newest":
@@ -228,12 +267,17 @@ def apply_project_filters(
 
     stmt = _apply_config_filter(stmt, property_type=property_type, bhk=bhk, prod=prod)
 
+    # S5: Treat price_on_request as NULL price.
+    # Bisection protection: NULL price never matches budget bounds.
+    eff_min = case((Project.price_on_request.is_(True), None), else_=Project.price_min_inr)
+    eff_max = case((Project.price_on_request.is_(True), None), else_=Project.price_max_inr)
+
     if budget_min is not None:
-        stmt = stmt.where((Project.price_max_inr.is_(None)) | (Project.price_max_inr >= budget_min))
+        stmt = stmt.where(eff_max.is_not(None) & (eff_max >= budget_min))
     if budget_max is not None:
-        stmt = stmt.where((Project.price_min_inr.is_(None)) | (Project.price_min_inr <= budget_max))
+        stmt = stmt.where(eff_min.is_not(None) & (eff_min <= budget_max))
 
     stmt = _apply_search_filter(stmt, q)
     if order:
-        return _apply_order_by(stmt, sort)
+        return _apply_order_by(stmt, sort, q=q)
     return stmt

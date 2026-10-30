@@ -15,7 +15,6 @@ from pydantic import Field
 from empire_api.projects.fields import OutModel
 from empire_api.projects.schemas_catalogue import Amenity
 from empire_api.projects.schemas_children import (
-    Configuration,
     ConstructionUpdate,
     LocationAdvantage,
     PaymentPlan,
@@ -28,8 +27,6 @@ from empire_api.projects.schemas_shared import (
     LocalityRef,
     Location,
     Price,
-    Seo,
-    Translations,
 )
 from empire_api.users.schemas import PageMeta
 
@@ -39,10 +36,8 @@ class PublicMedia(OutModel):
     kind: str
     url: str
     thumbnail_url: str | None = None
-    title: str | None = None
     alt_text: str | None = None
     format: str | None = None
-    bytes: int | None = None
     width: int | None = None
     height: int | None = None
     duration_s: float | None = None
@@ -52,11 +47,17 @@ class PublicMedia(OutModel):
 
 
 class PublicLinkedMedia(PublicMedia):
-    link_id: uuid.UUID
     role: str
     sort_order: int
     is_cover: bool
-    is_visible: bool
+
+
+class PublicSeo(OutModel):
+    title: str | None = None
+    description: str | None = None
+    og_image: PublicMedia | None = None
+    noindex: bool = False
+    canonical_path: str | None = None
 
 
 class PublicCompany(OutModel):
@@ -158,6 +159,23 @@ class PublicProjectSummary(OutModel):
     is_sample: bool = False
 
 
+class PublicConfiguration(OutModel):
+    id: uuid.UUID
+    slug: str
+    name: str
+    tower_id: uuid.UUID | None = None
+    property_type: str
+    bhk: float | None = None
+    bathrooms: int | None = None
+    balconies: int | None = None
+    area: Area
+    price: Price
+    sales_status: str
+    floor_plans: list[PublicLinkedMedia] = Field(default_factory=list)
+    sort_order: int
+    is_sample: bool = False
+
+
 class PublicProjectDetail(PublicProjectSummary):
     tagline: str | None = None
     description: str | None = None
@@ -167,7 +185,7 @@ class PublicProjectDetail(PublicProjectSummary):
     launch_date: date | None = None
     location: Location
     towers: list[Tower] = Field(default_factory=list)
-    configurations: list[Configuration] = Field(default_factory=list)
+    configurations: list[PublicConfiguration] = Field(default_factory=list)
     amenities: list[Amenity] = Field(default_factory=list)
     specifications: list[Specification] = Field(default_factory=list)
     location_advantages: list[LocationAdvantage] = Field(default_factory=list)
@@ -179,8 +197,7 @@ class PublicProjectDetail(PublicProjectSummary):
     brochure: PublicLinkedMedia | None = None
     brochure_gated: bool = False
     faqs: list[PublicFaq] = Field(default_factory=list)
-    seo: Seo
-    translations: Translations
+    seo: PublicSeo
     updated_at: datetime
 
 
@@ -207,7 +224,7 @@ class PublicPropertySummary(OutModel):
     is_sample: bool = False
 
 
-class PublicPropertyDetail(Configuration):
+class PublicPropertyDetail(PublicConfiguration):
     project: PublicProjectSummary
 
 
@@ -232,14 +249,12 @@ class PublicPage(OutModel):
     slug: str
     title: str
     kind: str
-    publish_state: str = "published"
     show_in_nav: bool = False
     nav_order: int | None = None
     blocks: list[PublicBlock] = Field(default_factory=list)
     legal_version: str | None = None
     is_draft_text: bool = False
-    seo: Seo
-    translations: Translations
+    seo: PublicSeo
     updated_at: datetime
 
 
@@ -254,18 +269,15 @@ class PublicPost(OutModel):
     tags: list[str] = Field(default_factory=list)
     author: str | None = None  # Author display name only
     published_at: datetime | None = None
-    seo: Seo
-    translations: Translations
+    seo: PublicSeo
 
 
 class PublicFaq(OutModel):
     id: uuid.UUID
-    project_id: uuid.UUID | None = None
     question: str
     answer: str
     sort_order: int = 0
     is_visible: bool = True
-    translations: Translations
 
 
 class PublicTestimonial(OutModel):
@@ -273,17 +285,11 @@ class PublicTestimonial(OutModel):
     person_name: str
     person_detail: str | None = None
     quote: str
-    project_id: uuid.UUID | None = None
-    source: str
-    source_url: str | None = None
-    consent_date: date | None = None
     rating: int | None = None
     photo: PublicMedia | None = None
-    is_visible: bool = True
 
 
 class PublicRedirect(OutModel):
-    id: uuid.UUID
     from_path: str
     to_path: str
     status_code: int = 308

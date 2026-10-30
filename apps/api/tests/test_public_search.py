@@ -101,3 +101,31 @@ def test_public_project_search(db: Session, client: TestClient) -> None:
     res5 = client.get("/api/v1/public/projects?q=Emerld").json()
     slugs5 = [p["slug"] for p in res5["items"]]
     assert "search-emerald-heights" in slugs5
+
+    # Search 6: q + city filter together (M1 regression test)
+    res6 = client.get("/api/v1/public/projects?city=search-lucknow&q=Emerald")
+    assert res6.status_code == 200
+    slugs6 = [p["slug"] for p in res6.json()["items"]]
+    assert slugs6 == ["search-emerald-heights"]
+
+    # Search 7: q + non-matching city filter
+    res7 = client.get("/api/v1/public/projects?city=search-varanasi&q=Emerald")
+    assert res7.status_code == 200
+    assert len(res7.json()["items"]) == 0
+
+    # Search 8: q + locality filter together (M1 regression test)
+    res8 = client.get("/api/v1/public/projects?locality=search-hazratganj&q=Emerald")
+    assert res8.status_code == 200
+    slugs8 = [p["slug"] for p in res8.json()["items"]]
+    assert slugs8 == ["search-emerald-heights"]
+
+    # Search 9: Relevance ranking (S11)
+    # Project with name match vs project with tagline match for query 'riverside'
+    res9 = client.get("/api/v1/public/projects?q=riverside&sort=recommended")
+    assert res9.status_code == 200
+    items9 = res9.json()["items"]
+    slugs9 = [p["slug"] for p in items9]
+    assert "search-kashi-villas" in slugs9
+    assert "search-emerald-heights" in slugs9
+    # Kashi Riverside Villas has "Riverside" in name and should rank first or equal
+    assert slugs9[0] == "search-kashi-villas"

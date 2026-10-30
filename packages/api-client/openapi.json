@@ -10222,6 +10222,116 @@
         "title": "PublicCompany",
         "type": "object"
       },
+      "PublicConfiguration": {
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/Area"
+          },
+          "balconies": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balconies"
+          },
+          "bathrooms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bathrooms"
+          },
+          "bhk": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bhk"
+          },
+          "floor_plans": {
+            "items": {
+              "$ref": "#/components/schemas/PublicLinkedMedia"
+            },
+            "title": "Floor Plans",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_sample": {
+            "default": false,
+            "title": "Is Sample",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "price": {
+            "$ref": "#/components/schemas/Price"
+          },
+          "property_type": {
+            "title": "Property Type",
+            "type": "string"
+          },
+          "sales_status": {
+            "title": "Sales Status",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "tower_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tower Id"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "tower_id",
+          "property_type",
+          "bhk",
+          "bathrooms",
+          "balconies",
+          "area",
+          "price",
+          "sales_status",
+          "floor_plans",
+          "sort_order",
+          "is_sample"
+        ],
+        "title": "PublicConfiguration",
+        "type": "object"
+      },
       "PublicConsentText": {
         "properties": {
           "body": {
@@ -10272,18 +10382,6 @@
             "title": "Is Visible",
             "type": "boolean"
           },
-          "project_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id"
-          },
           "question": {
             "title": "Question",
             "type": "string"
@@ -10292,19 +10390,14 @@
             "default": 0,
             "title": "Sort Order",
             "type": "integer"
-          },
-          "translations": {
-            "$ref": "#/components/schemas/Translations"
           }
         },
         "required": [
           "id",
-          "project_id",
           "question",
           "answer",
           "sort_order",
-          "is_visible",
-          "translations"
+          "is_visible"
         ],
         "title": "PublicFaq",
         "type": "object"
@@ -10321,17 +10414,6 @@
               }
             ],
             "title": "Alt Text"
-          },
-          "bytes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bytes"
           },
           "duration_s": {
             "anyOf": [
@@ -10380,10 +10462,6 @@
             "title": "Is Sample",
             "type": "boolean"
           },
-          "is_visible": {
-            "title": "Is Visible",
-            "type": "boolean"
-          },
           "kind": {
             "title": "Kind",
             "type": "string"
@@ -10410,11 +10488,6 @@
             ],
             "title": "Label Month"
           },
-          "link_id": {
-            "format": "uuid",
-            "title": "Link Id",
-            "type": "string"
-          },
           "role": {
             "title": "Role",
             "type": "string"
@@ -10433,17 +10506,6 @@
               }
             ],
             "title": "Thumbnail Url"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
           },
           "url": {
             "title": "Url",
@@ -10466,21 +10528,17 @@
           "kind",
           "url",
           "thumbnail_url",
-          "title",
           "alt_text",
           "format",
-          "bytes",
           "width",
           "height",
           "duration_s",
           "label",
           "label_month",
           "is_sample",
-          "link_id",
           "role",
           "sort_order",
-          "is_cover",
-          "is_visible"
+          "is_cover"
         ],
         "title": "PublicLinkedMedia",
         "type": "object"
@@ -10497,17 +10555,6 @@
               }
             ],
             "title": "Alt Text"
-          },
-          "bytes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bytes"
           },
           "duration_s": {
             "anyOf": [
@@ -10589,17 +10636,6 @@
             ],
             "title": "Thumbnail Url"
           },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
           "url": {
             "title": "Url",
             "type": "string"
@@ -10621,10 +10657,8 @@
           "kind",
           "url",
           "thumbnail_url",
-          "title",
           "alt_text",
           "format",
-          "bytes",
           "width",
           "height",
           "duration_s",
@@ -10805,13 +10839,8 @@
             ],
             "title": "Nav Order"
           },
-          "publish_state": {
-            "default": "published",
-            "title": "Publish State",
-            "type": "string"
-          },
           "seo": {
-            "$ref": "#/components/schemas/Seo"
+            "$ref": "#/components/schemas/PublicSeo"
           },
           "show_in_nav": {
             "default": false,
@@ -10826,9 +10855,6 @@
             "title": "Title",
             "type": "string"
           },
-          "translations": {
-            "$ref": "#/components/schemas/Translations"
-          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -10840,14 +10866,12 @@
           "slug",
           "title",
           "kind",
-          "publish_state",
           "show_in_nav",
           "nav_order",
           "blocks",
           "legal_version",
           "is_draft_text",
           "seo",
-          "translations",
           "updated_at"
         ],
         "title": "PublicPage",
@@ -10920,7 +10944,7 @@
             "title": "Published At"
           },
           "seo": {
-            "$ref": "#/components/schemas/Seo"
+            "$ref": "#/components/schemas/PublicSeo"
           },
           "slug": {
             "title": "Slug",
@@ -10936,9 +10960,6 @@
           "title": {
             "title": "Title",
             "type": "string"
-          },
-          "translations": {
-            "$ref": "#/components/schemas/Translations"
           }
         },
         "required": [
@@ -10952,8 +10973,7 @@
           "tags",
           "author",
           "published_at",
-          "seo",
-          "translations"
+          "seo"
         ],
         "title": "PublicPost",
         "type": "object"
@@ -11021,7 +11041,7 @@
           },
           "configurations": {
             "items": {
-              "$ref": "#/components/schemas/Configuration"
+              "$ref": "#/components/schemas/PublicConfiguration"
             },
             "title": "Configurations",
             "type": "array"
@@ -11177,7 +11197,7 @@
             "type": "string"
           },
           "seo": {
-            "$ref": "#/components/schemas/Seo"
+            "$ref": "#/components/schemas/PublicSeo"
           },
           "slug": {
             "title": "Slug",
@@ -11222,9 +11242,6 @@
             },
             "title": "Towers",
             "type": "array"
-          },
-          "translations": {
-            "$ref": "#/components/schemas/Translations"
           },
           "updated_at": {
             "format": "date-time",
@@ -11276,7 +11293,6 @@
           "brochure_gated",
           "faqs",
           "seo",
-          "translations",
           "updated_at"
         ],
         "title": "PublicProjectDetail",
@@ -11513,9 +11529,8 @@
             "title": "Bhk"
           },
           "floor_plans": {
-            "description": "Media links with role floor_plan (image or PDF; at most one)",
             "items": {
-              "$ref": "#/components/schemas/LinkedMedia"
+              "$ref": "#/components/schemas/PublicLinkedMedia"
             },
             "title": "Floor Plans",
             "type": "array"
@@ -11526,14 +11541,11 @@
             "type": "string"
           },
           "is_sample": {
-            "description": "Sample data — never shown in production",
+            "default": false,
             "title": "Is Sample",
             "type": "boolean"
           },
           "name": {
-            "examples": [
-              "2 BHK Premium"
-            ],
             "title": "Name",
             "type": "string"
           },
@@ -11544,24 +11556,10 @@
             "$ref": "#/components/schemas/PublicProjectSummary"
           },
           "property_type": {
-            "enum": [
-              "apartment",
-              "villa",
-              "plot",
-              "penthouse",
-              "shop",
-              "office",
-              "other"
-            ],
             "title": "Property Type",
             "type": "string"
           },
           "sales_status": {
-            "enum": [
-              "available",
-              "sold_out",
-              "off_market"
-            ],
             "title": "Sales Status",
             "type": "string"
           },
@@ -11584,9 +11582,6 @@
               }
             ],
             "title": "Tower Id"
-          },
-          "translations": {
-            "$ref": "#/components/schemas/Translations"
           }
         },
         "required": [
@@ -11604,7 +11599,6 @@
           "floor_plans",
           "sort_order",
           "is_sample",
-          "translations",
           "project"
         ],
         "title": "PublicPropertyDetail",
@@ -11711,11 +11705,6 @@
             "title": "From Path",
             "type": "string"
           },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
           "status_code": {
             "default": 308,
             "title": "Status Code",
@@ -11727,7 +11716,6 @@
           }
         },
         "required": [
-          "id",
           "from_path",
           "to_path",
           "status_code"
@@ -11825,6 +11813,67 @@
           "qr"
         ],
         "title": "PublicRera",
+        "type": "object"
+      },
+      "PublicSeo": {
+        "properties": {
+          "canonical_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Path"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "noindex": {
+            "default": false,
+            "title": "Noindex",
+            "type": "boolean"
+          },
+          "og_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicMedia"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "og_image",
+          "noindex",
+          "canonical_path"
+        ],
+        "title": "PublicSeo",
         "type": "object"
       },
       "PublicSeoDefaults": {
@@ -11993,27 +12042,10 @@
       },
       "PublicTestimonial": {
         "properties": {
-          "consent_date": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Consent Date"
-          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
-          },
-          "is_visible": {
-            "default": true,
-            "title": "Is Visible",
-            "type": "boolean"
           },
           "person_detail": {
             "anyOf": [
@@ -12040,18 +12072,6 @@
               }
             ]
           },
-          "project_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id"
-          },
           "quote": {
             "title": "Quote",
             "type": "string"
@@ -12066,21 +12086,6 @@
               }
             ],
             "title": "Rating"
-          },
-          "source": {
-            "title": "Source",
-            "type": "string"
-          },
-          "source_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Url"
           }
         },
         "required": [
@@ -12088,13 +12093,8 @@
           "person_name",
           "person_detail",
           "quote",
-          "project_id",
-          "source",
-          "source_url",
-          "consent_date",
           "rating",
-          "photo",
-          "is_visible"
+          "photo"
         ],
         "title": "PublicTestimonial",
         "type": "object"

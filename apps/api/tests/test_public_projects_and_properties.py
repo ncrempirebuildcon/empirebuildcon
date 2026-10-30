@@ -284,3 +284,197 @@ def test_d038_hero_cover_selection_rule(db: Session, client: TestClient) -> None
 
     res_no_hero = client.get(f"/api/v1/public/projects/{project.slug}").json()
     assert res_no_hero["cover"] is None
+
+
+def test_gated_brochure_hidden_from_public_detail(db: Session, client: TestClient) -> None:
+    # M4: A gated brochure must not expose delivery URL openly
+    city, locality = _seed_city_and_locality(db)
+
+    brochure_media = Media(
+        kind="document",
+        store="cloudinary",
+        resource_type="raw",
+        public_id=f"brochure-{uuid.uuid4().hex[:6]}",
+        title="Project Brochure",
+        version=1,
+        format="pdf",
+        bytes=50000,
+        created_by=uuid.uuid4(),
+    )
+    db.add(brochure_media)
+    db.flush()
+
+    p_gated = Project(
+        slug=f"gated-proj-{uuid.uuid4().hex[:4]}",
+        name="Gated Brochure Project",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        locality_id=locality.id,
+        rera_number="UPRERAGATED1",
+        brochure_gated=True,  # GATED!
+    )
+    db.add(p_gated)
+    db.flush()
+
+    link_gated = MediaLink(
+        media_id=brochure_media.id,
+        project_id=p_gated.id,
+        role="brochure",
+        is_visible=True,
+    )
+    db.add(link_gated)
+
+    p_open = Project(
+        slug=f"open-proj-{uuid.uuid4().hex[:4]}",
+        name="Open Brochure Project",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        locality_id=locality.id,
+        rera_number="UPRERAOPEN1",
+        brochure_gated=False,  # OPEN!
+    )
+    db.add(p_open)
+    db.flush()
+
+    link_open = MediaLink(
+        media_id=brochure_media.id,
+        project_id=p_open.id,
+        role="brochure",
+        is_visible=True,
+    )
+    db.add(link_open)
+    db.commit()
+
+    # Gated project detail must return brochure: None
+    res_gated = client.get(f"/api/v1/public/projects/{p_gated.slug}").json()
+    assert res_gated["brochure_gated"] is True
+    assert res_gated["brochure"] is None
+
+    # Open project detail returns brochure delivery URL
+    res_open = client.get(f"/api/v1/public/projects/{p_open.slug}").json()
+    assert res_open["brochure_gated"] is False
+    assert res_open["brochure"] is not None
+    assert res_open["brochure"]["id"] == str(brochure_media.id)
+    assert "url" in res_open["brochure"]
+
+
+def test_off_market_and_sample_configurations_excluded_from_labels(
+    db: Session, client: TestClient
+) -> None:
+    # M5: Off-market configurations must not leak into configuration_labels or property_types
+    city, locality = _seed_city_and_locality(db)
+
+    p = Project(
+        slug=f"config-filter-proj-{uuid.uuid4().hex[:4]}",
+        name="Config Filter Project",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        locality_id=locality.id,
+        rera_number="UPRERACFG1",
+    )
+    db.add(p)
+    db.flush()
+
+    c_avail = Configuration(
+        project_id=p.id,
+        slug=f"2bhk-{uuid.uuid4().hex[:4]}",
+        name="2 BHK Premium",
+        property_type="apartment",
+        bhk=Decimal("2.0"),
+        bathrooms=2,
+        area_min_sqm=Decimal("90.0"),
+        area_max_sqm=Decimal("90.0"),
+        sales_status="available",  # Available
+        price_min_inr=5_000_000,
+        price_max_inr=5_000_000,
+    )
+    c_off_market = Configuration(
+        project_id=p.id,
+        slug=f"4bhk-penthouse-{uuid.uuid4().hex[:4]}",
+        name="4 BHK Penthouse",
+        property_type="penthouse",
+        bhk=Decimal("4.0"),
+        bathrooms=4,
+        area_min_sqm=Decimal("250.0"),
+        area_max_sqm=Decimal("250.0"),
+        sales_status="off_market",  # Off-market!
+        price_min_inr=25_000_000,
+        price_max_inr=25_000_000,
+    )
+    db.add_all([c_avail, c_off_market])
+    db.commit()
+
+    res = client.get(f"/api/v1/public/projects/{p.slug}").json()
+    # 4 BHK and penthouse must NOT be in configuration_labels or property_types!
+    assert res["configuration_labels"] == ["2 BHK"]
+    assert res["property_types"] == ["apartment"]
+
+    # Also on project summary card
+    res_list = client.get(f"/api/v1/public/projects?city={city.slug}").json()
+    p_summary = next(item for item in res_list["items"] if item["slug"] == p.slug)
+    assert p_summary["configuration_labels"] == ["2 BHK"]
+    assert p_summary["property_types"] == ["apartment"]
+
+
+def test_price_on_request_bisection_protection(db: Session, client: TestClient) -> None:
+    # S5: budget filters treat price_on_request as NULL
+    city, locality = _seed_city_and_locality(db)
+
+    p_por = Project(
+        slug=f"bisect-por-{uuid.uuid4().hex[:4]}",
+        name="Bisect POR Project",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        locality_id=locality.id,
+        rera_number="UPRERAPORBIS",
+        price_min_inr=20_000_000,
+        price_max_inr=20_000_000,
+        price_on_request=True,  # Hidden!
+    )
+    db.add(p_por)
+    db.commit()
+
+    # Filtering with budget_max=25M should NOT match p_por because price is on request!
+    res = client.get(f"/api/v1/public/projects?budget_max=25000000&city={city.slug}").json()
+    slugs = [item["slug"] for item in res["items"]]
+    assert p_por.slug not in slugs
+
+
+def test_directions_url_on_project_detail(db: Session, client: TestClient) -> None:
+    # S9: directions_url is generated from present.directions_url
+    city, locality = _seed_city_and_locality(db)
+
+    p = Project(
+        slug=f"map-dir-proj-{uuid.uuid4().hex[:4]}",
+        name="Directions Test Project",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        locality_id=locality.id,
+        rera_number="UPRERAMAP1",
+        lat=Decimal("26.8467"),
+        lng=Decimal("80.9462"),
+    )
+    db.add(p)
+    db.commit()
+
+    res = client.get(f"/api/v1/public/projects/{p.slug}").json()
+    assert res["location"] is not None
+    assert res["location"]["directions_url"] is not None
+    assert "google.com/maps/dir" in res["location"]["directions_url"]
+    assert "26.8467" in res["location"]["directions_url"]
+    assert "80.9462" in res["location"]["directions_url"]

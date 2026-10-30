@@ -204,6 +204,7 @@ class Project(Timestamps, PriceColumns, Base):
             persisted=True,
         ),
         nullable=True,
+        deferred=True,
     )
 
     publish_state: Mapped[str] = mapped_column(String(12), server_default=sql("'draft'"))

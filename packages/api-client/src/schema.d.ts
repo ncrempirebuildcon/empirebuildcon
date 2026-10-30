@@ -5933,6 +5933,41 @@ export interface components {
             /** Whatsapp Message */
             whatsapp_message: string | null;
         };
+        /** PublicConfiguration */
+        PublicConfiguration: {
+            area: components["schemas"]["Area"];
+            /** Balconies */
+            balconies: number | null;
+            /** Bathrooms */
+            bathrooms: number | null;
+            /** Bhk */
+            bhk: number | null;
+            /** Floor Plans */
+            floor_plans: components["schemas"]["PublicLinkedMedia"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Sample
+             * @default false
+             */
+            is_sample: boolean;
+            /** Name */
+            name: string;
+            price: components["schemas"]["Price"];
+            /** Property Type */
+            property_type: string;
+            /** Sales Status */
+            sales_status: string;
+            /** Slug */
+            slug: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Tower Id */
+            tower_id: string | null;
+        };
         /** PublicConsentText */
         PublicConsentText: {
             /** Body */
@@ -5963,8 +5998,6 @@ export interface components {
              * @default true
              */
             is_visible: boolean;
-            /** Project Id */
-            project_id: string | null;
             /** Question */
             question: string;
             /**
@@ -5972,14 +6005,11 @@ export interface components {
              * @default 0
              */
             sort_order: number;
-            translations: components["schemas"]["Translations"];
         };
         /** PublicLinkedMedia */
         PublicLinkedMedia: {
             /** Alt Text */
             alt_text: string | null;
-            /** Bytes */
-            bytes: number | null;
             /** Duration S */
             duration_s: number | null;
             /** Format */
@@ -5998,27 +6028,18 @@ export interface components {
              * @default false
              */
             is_sample: boolean;
-            /** Is Visible */
-            is_visible: boolean;
             /** Kind */
             kind: string;
             /** Label */
             label: string | null;
             /** Label Month */
             label_month: string | null;
-            /**
-             * Link Id
-             * Format: uuid
-             */
-            link_id: string;
             /** Role */
             role: string;
             /** Sort Order */
             sort_order: number;
             /** Thumbnail Url */
             thumbnail_url: string | null;
-            /** Title */
-            title: string | null;
             /** Url */
             url: string;
             /** Width */
@@ -6028,8 +6049,6 @@ export interface components {
         PublicMedia: {
             /** Alt Text */
             alt_text: string | null;
-            /** Bytes */
-            bytes: number | null;
             /** Duration S */
             duration_s: number | null;
             /** Format */
@@ -6054,8 +6073,6 @@ export interface components {
             label_month: string | null;
             /** Thumbnail Url */
             thumbnail_url: string | null;
-            /** Title */
-            title: string | null;
             /** Url */
             url: string;
             /** Width */
@@ -6113,12 +6130,7 @@ export interface components {
             legal_version: string | null;
             /** Nav Order */
             nav_order: number | null;
-            /**
-             * Publish State
-             * @default published
-             */
-            publish_state: string;
-            seo: components["schemas"]["Seo"];
+            seo: components["schemas"]["PublicSeo"];
             /**
              * Show In Nav
              * @default false
@@ -6128,7 +6140,6 @@ export interface components {
             slug: string;
             /** Title */
             title: string;
-            translations: components["schemas"]["Translations"];
             /**
              * Updated At
              * Format: date-time
@@ -6153,14 +6164,13 @@ export interface components {
             id: string;
             /** Published At */
             published_at: string | null;
-            seo: components["schemas"]["Seo"];
+            seo: components["schemas"]["PublicSeo"];
             /** Slug */
             slug: string;
             /** Tags */
             tags: string[];
             /** Title */
             title: string;
-            translations: components["schemas"]["Translations"];
         };
         /** PublicPostList */
         PublicPostList: {
@@ -6182,7 +6192,7 @@ export interface components {
             /** Configuration Labels */
             configuration_labels: string[];
             /** Configurations */
-            configurations: components["schemas"]["Configuration"][];
+            configurations: components["schemas"]["PublicConfiguration"][];
             /** Construction Updates */
             construction_updates: components["schemas"]["ConstructionUpdate"][];
             cover: components["schemas"]["PublicMedia"] | null;
@@ -6230,7 +6240,7 @@ export interface components {
             rera: components["schemas"]["PublicRera"];
             /** Sales Status */
             sales_status: string;
-            seo: components["schemas"]["Seo"];
+            seo: components["schemas"]["PublicSeo"];
             /** Slug */
             slug: string;
             /** Specifications */
@@ -6243,7 +6253,6 @@ export interface components {
             total_units: number | null;
             /** Towers */
             towers: components["schemas"]["Tower"][];
-            translations: components["schemas"]["Translations"];
             /**
              * Updated At
              * Format: date-time
@@ -6316,11 +6325,8 @@ export interface components {
             bathrooms: number | null;
             /** Bhk */
             bhk: number | null;
-            /**
-             * Floor Plans
-             * @description Media links with role floor_plan (image or PDF; at most one)
-             */
-            floor_plans: components["schemas"]["LinkedMedia"][];
+            /** Floor Plans */
+            floor_plans: components["schemas"]["PublicLinkedMedia"][];
             /**
              * Id
              * Format: uuid
@@ -6328,33 +6334,23 @@ export interface components {
             id: string;
             /**
              * Is Sample
-             * @description Sample data — never shown in production
+             * @default false
              */
             is_sample: boolean;
-            /**
-             * Name
-             * @example 2 BHK Premium
-             */
+            /** Name */
             name: string;
             price: components["schemas"]["Price"];
             project: components["schemas"]["PublicProjectSummary"];
-            /**
-             * Property Type
-             * @enum {string}
-             */
-            property_type: "apartment" | "villa" | "plot" | "penthouse" | "shop" | "office" | "other";
-            /**
-             * Sales Status
-             * @enum {string}
-             */
-            sales_status: "available" | "sold_out" | "off_market";
+            /** Property Type */
+            property_type: string;
+            /** Sales Status */
+            sales_status: string;
             /** Slug */
             slug: string;
             /** Sort Order */
             sort_order: number;
             /** Tower Id */
             tower_id: string | null;
-            translations: components["schemas"]["Translations"];
         };
         /** PublicPropertyList */
         PublicPropertyList: {
@@ -6393,11 +6389,6 @@ export interface components {
         PublicRedirect: {
             /** From Path */
             from_path: string;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
             /**
              * Status Code
              * @default 308
@@ -6440,6 +6431,21 @@ export interface components {
             qr: components["schemas"]["PublicMedia"] | null;
             /** Url */
             url: string | null;
+        };
+        /** PublicSeo */
+        PublicSeo: {
+            /** Canonical Path */
+            canonical_path: string | null;
+            /** Description */
+            description: string | null;
+            /**
+             * Noindex
+             * @default false
+             */
+            noindex: boolean;
+            og_image: components["schemas"]["PublicMedia"] | null;
+            /** Title */
+            title: string | null;
         };
         /** PublicSeoDefaults */
         PublicSeoDefaults: {
@@ -6491,33 +6497,20 @@ export interface components {
         };
         /** PublicTestimonial */
         PublicTestimonial: {
-            /** Consent Date */
-            consent_date: string | null;
             /**
              * Id
              * Format: uuid
              */
             id: string;
-            /**
-             * Is Visible
-             * @default true
-             */
-            is_visible: boolean;
             /** Person Detail */
             person_detail: string | null;
             /** Person Name */
             person_name: string;
             photo: components["schemas"]["PublicMedia"] | null;
-            /** Project Id */
-            project_id: string | null;
             /** Quote */
             quote: string;
             /** Rating */
             rating: number | null;
-            /** Source */
-            source: string;
-            /** Source Url */
-            source_url: string | null;
         };
         /** PublicTracking */
         PublicTracking: {

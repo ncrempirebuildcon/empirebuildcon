@@ -113,7 +113,38 @@ def test_public_translations_and_gating(db: Session, client: TestClient) -> None
     res_p_hi = client.get("/api/v1/public/projects/tr-project-1?locale=hi").json()
     assert res_p_hi["name"] == "रॉयल पाल्म्स"
     assert res_p_hi["tagline"] == "लखनऊ में बेहतरीन जीवनशैली"
+    # S3: raw translations dictionary must NEVER be exposed in public responses
+    assert "translations" not in res_p_hi
 
     # Page with Hindi title
     res_page_hi = client.get("/api/v1/public/pages/tr-contact?locale=hi").json()
     assert res_page_hi["title"] == "संपर्क करें"
+    assert "translations" not in res_page_hi
+
+    # S16: Test partial translation fallback:
+    # Seed a project where only name is translated in Hindi, but tagline is missing in hi
+    p_partial = Project(
+        slug="tr-partial-proj",
+        name="Silver Oak",
+        tagline="Affordable Comfort in Gomti",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        locality_id=locality.id,
+        rera_number="UPRERATR002",
+        translations={
+            "hi": {
+                "name": "सिल्वर ओक",
+                # tagline omitted!
+            }
+        },
+    )
+    db.add(p_partial)
+    db.commit()
+
+    res_partial_hi = client.get("/api/v1/public/projects/tr-partial-proj?locale=hi").json()
+    assert res_partial_hi["name"] == "सिल्वर ओक"  # Translated
+    assert res_partial_hi["tagline"] == "Affordable Comfort in Gomti"  # Falls back to English!
+    assert "translations" not in res_partial_hi

@@ -9,6 +9,7 @@ from __future__ import annotations
 import inspect
 from typing import Any
 
+from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 from empire_api.public import schemas
@@ -35,6 +36,8 @@ FORBIDDEN_FIELD_NAMES = frozenset(
         "secret_key",
         "user_id",
         "staff_id",
+        "consent_date",  # S12: dropped from public testimonials
+        "source_url",  # S12: dropped from public testimonials
     }
 )
 
@@ -67,18 +70,40 @@ def test_public_schemas_contain_no_forbidden_fields() -> None:
     assert checked_models >= 10
 
 
-def test_json_payloads_have_no_forbidden_fields() -> None:
-    def _check_payload(val: Any) -> None:
+def test_real_endpoint_responses_have_no_forbidden_fields(client: TestClient) -> None:
+    """S16: Validate actual JSON responses from real public endpoints."""
+
+    def _check_payload(val: Any, path: str = "") -> None:
         if isinstance(val, dict):
             for k, v in val.items():
-                assert k not in FORBIDDEN_FIELD_NAMES, f"Payload contains forbidden field: {k}"
-                _check_payload(v)
+                cur_path = f"{path}.{k}" if path else k
+                assert k not in FORBIDDEN_FIELD_NAMES, (
+                    f"Real response at {cur_path} contains forbidden field: {k}"
+                )
+                _check_payload(v, cur_path)
         elif isinstance(val, list):
-            for item in val:
-                _check_payload(item)
+            for idx, item in enumerate(val):
+                _check_payload(item, f"{path}[{idx}]")
 
-    # Test dummy instances of schemas
-    company = schemas.PublicCompany(name="Test Co")
-    regulator = schemas.PublicRegulator()
-    site = schemas.PublicSite(company=company, regulator=regulator)
-    _check_payload(site.model_dump())
+    endpoints_to_probe = [
+        "/api/v1/public/site",
+        "/api/v1/public/projects",
+        "/api/v1/public/properties",
+        "/api/v1/public/cities",
+        "/api/v1/public/faqs",
+        "/api/v1/public/testimonials",
+        "/api/v1/public/posts",
+        "/api/v1/public/redirects",
+        "/api/v1/public/sitemap",
+    ]
+
+    for ep in endpoints_to_probe:
+        res = client.get(ep)
+        assert res.status_code == 200, f"Endpoint {ep} failed with status {res.status_code}"
+        payload = res.json()
+        _check_payload(payload, ep)
+
+        # S2: Redirects must never expose an "id" field
+        if ep.endswith("/redirects"):
+            for redirect_item in payload:
+                assert "id" not in redirect_item

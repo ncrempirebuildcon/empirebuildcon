@@ -2,32 +2,44 @@
 
 Covers:
 - Page blocks arrive resolved with everything a block needs (media delivery URL, width, height,
-  label, FAQs, offers, consent text).
+  label, FAQs, offers, consent text, map coordinates, video delivery URL).
+- Stored block shapes (faq_ids: [], testimonial_ids: []) resolve auto items (M2).
 - Dead references dropped: blocks whose references are gone/hidden/inactive are omitted.
-- Empty picks stay empty: an empty pick list is never widened to all items (D-035).
+- Block resolvers (M3):
+  - offer_banner with placement.
+  - map with project coordinates/address and visibility gating.
+  - video with media_id library resolution.
+  - lead_form with dual consent (lead_form + marketing) and visibility gating.
+- Testimonial privacy: stripped consent_date, source_url, project_id (S12).
+- Testimonials limit honored (default 3) (M2).
+- Hindi translation for picked FAQs (S7).
 - Landing pages return noindex: true.
 - Legal pages return is_draft_text.
+- Resolved OG image delivery URL in SEO (S13).
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from empire_api.content.models import ConsentText, Faq, Offer, Page, PageBlock
+from empire_api.content.models import ConsentText, Faq, Offer, Page, PageBlock, Testimonial
 from empire_api.media.models import Media
+from empire_api.projects.models import City, Locality, Project
+from empire_api.site_settings.models import FeatureFlag
 
 
-def test_page_blocks_resolved_and_dead_refs_dropped(db: Session, client: TestClient) -> None:
-    # 1. Seed library media
-    media_item = Media(
+def test_page_blocks_resolution_and_stored_shapes(db: Session, client: TestClient) -> None:
+    # 1. Seed library media (image & video)
+    hero_img = Media(
         kind="image",
         store="cloudinary",
         resource_type="image",
-        public_id=f"page-img-{uuid.uuid4().hex[:6]}",
+        public_id=f"page-hero-{uuid.uuid4().hex[:6]}",
         title="Page Hero Image",
         alt_text="A grand facade",
         label="artist_impression",
@@ -38,30 +50,112 @@ def test_page_blocks_resolved_and_dead_refs_dropped(db: Session, client: TestCli
         height=1080,
         created_by=uuid.uuid4(),
     )
-    db.add(media_item)
+    og_img = Media(
+        kind="image",
+        store="cloudinary",
+        resource_type="image",
+        public_id=f"page-og-{uuid.uuid4().hex[:6]}",
+        title="OG Image",
+        alt_text="OG Social Share",
+        label="artist_impression",
+        version=1,
+        format="jpg",
+        bytes=1024,
+        width=1200,
+        height=630,
+        created_by=uuid.uuid4(),
+    )
+    promo_vid = Media(
+        kind="video",
+        store="cloudinary",
+        resource_type="video",
+        public_id=f"promo-vid-{uuid.uuid4().hex[:6]}",
+        title="Promo Video",
+        alt_text="Video walkthrough",
+        label=None,
+        version=1,
+        format="mp4",
+        bytes=1048576,
+        width=1280,
+        height=720,
+        duration_s=Decimal("45.00"),
+        created_by=uuid.uuid4(),
+    )
+    db.add_all([hero_img, og_img, promo_vid])
     db.flush()
 
-    # 2. Seed FAQ
-    faq = Faq(
+    # 2. Seed city, locality and project
+    city = City(name="Noida", slug=f"noida-{uuid.uuid4().hex[:4]}", state="UP")
+    db.add(city)
+    db.flush()
+    loc = Locality(name="Sector 150", slug=f"sec150-{uuid.uuid4().hex[:4]}", city_id=city.id)
+    db.add(loc)
+    db.flush()
+    proj = Project(
+        name="Empire Heights",
+        slug=f"heights-{uuid.uuid4().hex[:4]}",
+        tagline="Luxury green living",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        locality_id=loc.id,
+        rera_number="UPRERA12345",
+        lat=Decimal("28.4595"),
+        lng=Decimal("77.5020"),
+        address_line="Sector 150 Expressway",
+        price_min_inr=10_000_000,
+    )
+
+    db.add(proj)
+    db.flush()
+
+    # 3. Seed FAQs: one picked with Hindi translation, one site-wide
+    faq_picked = Faq(
         question="What is the possession timeline?",
         answer="Possession begins December 2027.",
+        translations={"hi": {"question": "कब्ज़ा कब मिलेगा?", "answer": "दिसंबर 2027 में।"}},
         sort_order=1,
         is_visible=True,
     )
-    db.add(faq)
+    faq_general = Faq(
+        question="Are home loans available?",
+        answer="Yes, all major banks approve loans.",
+        sort_order=2,
+        is_visible=True,
+    )
+    db.add_all([faq_picked, faq_general])
     db.flush()
 
-    # 3. Seed active offer
-    offer = Offer(
-        title="Festival Offer",
+    # 4. Seed Testimonials: 4 testimonials to test limit (default 3)
+    t_items = []
+    for i in range(4):
+        t = Testimonial(
+            person_name=f"Customer {i + 1}",
+            person_detail="Homeowner",
+            quote=f"Great experience purchasing my home {i + 1}.",
+            source="google",
+            source_url="https://google.com/review/123",
+            consent_date=datetime.now(UTC).date(),
+            is_visible=True,
+            project_id=proj.id,
+        )
+        t_items.append(t)
+    db.add_all(t_items)
+    db.flush()
+
+    # 5. Seed active offer with placement
+    offer_p = Offer(
+        title="Festive Cashback",
         placement="home",
         is_active=True,
     )
-    db.add(offer)
+    db.add(offer_p)
     db.flush()
 
-    # 4. Seed consent text
-    consent = ConsentText(
+    # 6. Seed dual consent texts
+    c_lead = ConsentText(
         kind="lead_form",
         version=1,
         body="I agree to receive project updates.",
@@ -69,109 +163,226 @@ def test_page_blocks_resolved_and_dead_refs_dropped(db: Session, client: TestCli
         is_current=True,
         published_at=datetime.now(UTC),
     )
-    db.add(consent)
+    c_mkt = ConsentText(
+        kind="marketing",
+        version=1,
+        body="I agree to receive marketing brochures via WhatsApp.",
+        checkbox_label="Optional WhatsApp updates",
+        is_current=True,
+        published_at=datetime.now(UTC),
+    )
+    db.add_all([c_lead, c_mkt])
     db.flush()
 
-    # 5. Create Page with blocks:
-    #   - b1: Valid image block
-    #   - b2: Dead image block (non-existent UUID)
-    #   - b3: FAQ list block with valid picked FAQ
-    #   - b4: FAQ list block with empty faq_ids (empty pick list -> should be dropped per D-035)
-    #   - b5: Offer banner with valid offer
-    #   - b6: Lead form block
+    # 7. Create Page with blocks
     page = Page(
-        slug="test-about",
-        title="About Us",
+        slug="test-full-blocks",
+        title="Full Blocks Test Page",
+        kind="standard",
+        publish_state="published",
+        seo={"title": "Page SEO", "og_image_id": str(og_img.id)},
+    )
+    db.add(page)
+    db.flush()
+
+    # Blocks:
+    # 1. Valid image block
+    b1 = PageBlock(
+        page_id=page.id,
+        type="image",
+        data={"image_id": str(hero_img.id), "caption": "Our vision"},
+        sort_order=1,
+    )
+    # 2. Dead image block (must be dropped)
+    b2 = PageBlock(
+        page_id=page.id,
+        type="image",
+        data={"image_id": str(uuid.uuid4())},
+        sort_order=2,
+    )
+    # 3. Picked FAQ list with faq_ids non-empty
+    b3 = PageBlock(
+        page_id=page.id,
+        type="faq_list",
+        data={"faq_ids": [str(faq_picked.id)]},
+        sort_order=3,
+    )
+    # 4. Auto FAQ list with stored shape faq_ids: [] (resolves site-wide FAQs, M2)
+    b4 = PageBlock(
+        page_id=page.id,
+        type="faq_list",
+        data={"faq_ids": [], "project_id": None},
+        sort_order=4,
+    )
+    # 5. Testimonials block with stored shape testimonial_ids: [] (resolves latest, max 3, M2)
+    b5 = PageBlock(
+        page_id=page.id,
+        type="testimonials",
+        data={"testimonial_ids": []},
+        sort_order=5,
+    )
+    # 6. Offer banner with placement="home" (M3)
+    b6 = PageBlock(
+        page_id=page.id,
+        type="offer_banner",
+        data={"placement": "home"},
+        sort_order=6,
+    )
+    # 7. Map block with published project (M3)
+    b7 = PageBlock(
+        page_id=page.id,
+        type="map",
+        data={"project_id": str(proj.id)},
+        sort_order=7,
+    )
+    # 8. Video block with library media_id (M3)
+    b8 = PageBlock(
+        page_id=page.id,
+        type="video",
+        data={"media_id": str(promo_vid.id)},
+        sort_order=8,
+    )
+    # 9. Lead form block with published project (M3)
+    b9 = PageBlock(
+        page_id=page.id,
+        type="lead_form",
+        data={"project_id": str(proj.id), "source": "project_form"},
+        sort_order=9,
+    )
+    db.add_all([b1, b2, b3, b4, b5, b6, b7, b8, b9])
+    db.commit()
+
+    # Query public page (English)
+    res = client.get("/api/v1/public/pages/test-full-blocks")
+    assert res.status_code == 200
+    data = res.json()
+
+    # Verify SEO OG image resolution (S13)
+    assert data["seo"] is not None
+    assert data["seo"]["og_image"] is not None
+    assert data["seo"]["og_image"]["id"] == str(og_img.id)
+    assert data["seo"]["og_image"]["width"] == 1200
+    assert "url" in data["seo"]["og_image"]
+
+    blocks = data["blocks"]
+    # b2 (dead image) is dropped. b1, b3, b4, b5, b6, b7, b8, b9 should all be resolved (8 blocks)
+    assert len(blocks) == 8
+    block_types = [b["type"] for b in blocks]
+    assert block_types == [
+        "image",
+        "faq_list",
+        "faq_list",
+        "testimonials",
+        "offer_banner",
+        "map",
+        "video",
+        "lead_form",
+    ]
+
+    # Verify b3 (picked FAQ)
+    assert blocks[1]["data"]["faqs"][0]["question"] == "What is the possession timeline?"
+
+    # Verify b4 (auto FAQ list) resolved site-wide FAQs
+    assert len(blocks[2]["data"]["faqs"]) >= 2
+
+    # Verify b5 (testimonials) honours limit 3 (M2) and strips consent/source/project_id (S12)
+    t_res = blocks[3]["data"]["testimonials"]
+    assert len(t_res) == 3  # Honoured limit 3!
+    for t_item in t_res:
+        assert "person_name" in t_item
+        assert "quote" in t_item
+        # S12: dropped sensitive internal fields
+        assert "consent_date" not in t_item
+        assert "source_url" not in t_item
+        assert "project_id" not in t_item
+
+    # Verify b6 (offer banner with placement)
+    assert blocks[4]["data"]["offer"]["title"] == "Festive Cashback"
+
+    # Verify b7 (map) resolved coordinates and address
+    map_data = blocks[5]["data"]["project"]
+    assert map_data["lat"] == 28.4595
+    assert map_data["lng"] == 77.5020
+    assert "Sector 150 Expressway" in map_data["address"]
+    assert "directions_url" in map_data
+
+    # Verify b8 (video) resolved delivery URL
+    vid_data = blocks[6]["data"]["media"]
+    assert vid_data["id"] == str(promo_vid.id)
+    assert "url" in vid_data
+    assert vid_data["width"] == 1280
+
+    # Verify b9 (lead form) attached dual consent (lead_form + marketing)
+    form_data = blocks[7]["data"]
+    assert form_data["consent"]["body"] == "I agree to receive project updates."
+    assert form_data["marketing_consent"] is not None
+    assert "WhatsApp" in form_data["marketing_consent"]["checkbox_label"]
+
+    # Query in Hindi: verify picked FAQ translation (S7)
+    # Enable locale_hi feature flag first (D-014 gating)
+    flag = db.get(FeatureFlag, "locale_hi")
+    if not flag:
+        flag = FeatureFlag(key="locale_hi", enabled=True, description="Hindi pages")
+        db.add(flag)
+    else:
+        flag.enabled = True
+    db.commit()
+
+    res_hi = client.get("/api/v1/public/pages/test-full-blocks?locale=hi")
+    assert res_hi.status_code == 200
+    data_hi = res_hi.json()
+    b3_hi = data_hi["blocks"][1]
+    assert b3_hi["data"]["faqs"][0]["question"] == "कब्ज़ा कब मिलेगा?"
+    assert b3_hi["data"]["faqs"][0]["answer"] == "दिसंबर 2027 में।"
+
+
+def test_blocks_with_draft_project_are_dropped(db: Session, client: TestClient) -> None:
+    # Test that map and lead_form blocks referencing draft/unpublished projects are dropped (M3)
+    city = City(name="Kanpur", slug=f"kanpur-{uuid.uuid4().hex[:4]}", state="UP")
+    db.add(city)
+    db.flush()
+    draft_proj = Project(
+        name="Secret Draft Project",
+        slug=f"draft-{uuid.uuid4().hex[:4]}",
+        tagline="Coming soon",
+        project_type="residential",
+        status="upcoming",
+        publish_state="draft",  # DRAFT!
+        city_id=city.id,
+        lat=Decimal("26.4499"),
+        lng=Decimal("80.3319"),
+    )
+    db.add(draft_proj)
+    db.flush()
+
+    page = Page(
+        slug=f"draft-ref-page-{uuid.uuid4().hex[:4]}",
+        title="Draft Reference Test",
         kind="standard",
         publish_state="published",
     )
     db.add(page)
     db.flush()
 
-    b1 = PageBlock(
+    b_map = PageBlock(
         page_id=page.id,
-        type="image",
-        data={"image_id": str(media_item.id), "caption": "Our vision"},
+        type="map",
+        data={"project_id": str(draft_proj.id)},
         sort_order=1,
-        is_visible=True,
     )
-    b2 = PageBlock(
-        page_id=page.id,
-        type="image",
-        data={"image_id": str(uuid.uuid4()), "caption": "Ghost image"},
-        sort_order=2,
-        is_visible=True,
-    )
-    b3 = PageBlock(
-        page_id=page.id,
-        type="faq_list",
-        data={"faq_ids": [str(faq.id)]},
-        sort_order=3,
-        is_visible=True,
-    )
-    b4 = PageBlock(
-        page_id=page.id,
-        type="faq_list",
-        data={"faq_ids": []},  # Explicit empty pick list
-        sort_order=4,
-        is_visible=True,
-    )
-    b5 = PageBlock(
-        page_id=page.id,
-        type="offer_banner",
-        data={"offer_id": str(offer.id)},
-        sort_order=5,
-        is_visible=True,
-    )
-    b6 = PageBlock(
+    b_form = PageBlock(
         page_id=page.id,
         type="lead_form",
-        data={"source": "about_form"},
-        sort_order=6,
-        is_visible=True,
+        data={"project_id": str(draft_proj.id)},
+        sort_order=2,
     )
-    db.add_all([b1, b2, b3, b4, b5, b6])
+    db.add_all([b_map, b_form])
     db.commit()
 
-    # Fetch public page
-    res = client.get("/api/v1/public/pages/test-about")
+    res = client.get(f"/api/v1/public/pages/{page.slug}")
     assert res.status_code == 200
-    data = res.json()
-
-    assert data["slug"] == "test-about"
-    assert data["title"] == "About Us"
-
-    # Blocks assertions
-    blocks = data["blocks"]
-    assert [b["type"] for b in blocks] == ["image", "faq_list", "offer_banner", "lead_form"]
-
-    # b2 (dead image) and b4 (empty faq_ids) must be dropped!
-    assert len(blocks) == 4
-
-    # b1: Image block is resolved
-    img_b = blocks[0]
-    assert img_b["type"] == "image"
-    assert "image" in img_b["data"]
-    assert img_b["data"]["image"]["id"] == str(media_item.id)
-    assert img_b["data"]["image"]["width"] == 1920
-    assert img_b["data"]["image"]["label"] == "artist_impression"
-    assert "url" in img_b["data"]["image"]
-
-    # b3: FAQ list resolved
-    faq_b = blocks[1]
-    assert faq_b["type"] == "faq_list"
-    assert len(faq_b["data"]["faqs"]) == 1
-    assert faq_b["data"]["faqs"][0]["question"] == "What is the possession timeline?"
-
-    # b5: Offer banner resolved
-    offer_b = blocks[2]
-    assert offer_b["type"] == "offer_banner"
-    assert offer_b["data"]["offer"]["title"] == "Festival Offer"
-
-    # b6: Lead form resolved with consent text
-    form_b = blocks[3]
-    assert form_b["type"] == "lead_form"
-    assert form_b["data"]["consent"]["body"] == "I agree to receive project updates."
+    # Both blocks should be dropped because project is draft!
+    assert len(res.json()["blocks"]) == 0
 
 
 def test_landing_page_noindex(db: Session, client: TestClient) -> None:

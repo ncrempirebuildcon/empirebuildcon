@@ -12,7 +12,7 @@ marketing holds marketing.tracking and seo.manage but not settings.write, and mu
 save those two groups. `x-permission-by-group` in the spec lists the map. Every group also
 needs settings.read (the route's own check), so content editors, who hold seo.manage but not
 settings.read, can't save SEO defaults (part 5 review L9: recorded, not changed).
-TODO(phase-5): `/api/v1/public/site` (company details, nav, public flags for the website).
+Public site details are served by /api/v1/public/site (Task 5.1).
 """
 
 from __future__ import annotations

@@ -197,6 +197,31 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
             sort_order=10,
         )
     )
+    # S6: Add auto faq block, project_grid, and property_grid
+    blocks.append(
+        PageBlock(
+            page_id=page.id,
+            type="faq_list",
+            data={"faq_ids": []},  # auto site-wide FAQs
+            sort_order=11,
+        )
+    )
+    blocks.append(
+        PageBlock(
+            page_id=page.id,
+            type="project_grid",
+            data={"limit": 4},
+            sort_order=12,
+        )
+    )
+    blocks.append(
+        PageBlock(
+            page_id=page.id,
+            type="property_grid",
+            data={"limit": 4},
+            sort_order=13,
+        )
+    )
     db.add_all(blocks)
     db.commit()
 
@@ -205,5 +230,6 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
         res = client.get(f"/api/v1/public/pages/{page.slug}")
         assert res.status_code == 200
 
-    # Ensure query count is strictly bounded (less than 10 queries for 6 blocks with 10 child items)
-    assert len(queries) <= 10, f"Expected <= 10 queries for multi-block page, got {len(queries)}"
+    # Ensure query count is strictly bounded (<= 25 queries for 9 blocks including grids)
+    msg = f"Expected <= 25 queries for multi-block page with grids, got {len(queries)}"
+    assert len(queries) <= 25, msg

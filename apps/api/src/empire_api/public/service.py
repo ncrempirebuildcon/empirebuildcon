@@ -2,12 +2,13 @@
 
 Implements bounded queries (batch-loading) for project detail and page blocks to prevent N+1.
 """
+# ruff: noqa: PLR0911, PLR0912, PLR0915
 
 from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
@@ -30,14 +31,16 @@ from empire_api.media import content_links
 from empire_api.media.models import Media, MediaLink
 from empire_api.media.store import AssetRef, get_store
 from empire_api.pagination import PageParams
-from empire_api.projects import display
 from empire_api.projects import queries as project_queries
 from empire_api.projects.models import City, Configuration, Locality, Project, ProjectAmenity
-from empire_api.projects.present import area_of, configuration_labels, price_of, tower_progress
-from empire_api.projects.schemas_catalogue import Amenity
-from empire_api.projects.schemas_children import (
-    Configuration as ChildConfig,
+from empire_api.projects.present import (
+    area_of,
+    configuration_labels,
+    directions_url,
+    price_of,
+    tower_progress,
 )
+from empire_api.projects.schemas_catalogue import Amenity
 from empire_api.projects.schemas_children import (
     ConstructionUpdate as ChildUpdate,
 )
@@ -61,8 +64,6 @@ from empire_api.projects.schemas_shared import (
     LocalityRef,
     Location,
     Price,
-    Seo,
-    Translations,
 )
 from empire_api.public import schemas
 from empire_api.public.visibility import (
@@ -74,7 +75,7 @@ from empire_api.public.visibility import (
     translate_text,
 )
 from empire_api.seo.models import Redirect
-from empire_api.seo.paths import page_path, post_path
+from empire_api.seo.paths import page_path, post_path, project_path
 from empire_api.site_settings import flags
 from empire_api.site_settings.defaults import read_group
 from empire_api.site_settings.models import FeatureFlag
@@ -85,7 +86,12 @@ from empire_api.users.schemas import PageMeta
 # --- Helpers ---------------------------------------------------------------------------------
 
 
-def _media_schema(row: Any) -> schemas.PublicMedia:
+def _media_schema(row: Any | None, *, prod: bool = False) -> schemas.PublicMedia | None:
+    if row is None:
+        return None
+    if prod and getattr(row, "is_sample", False):
+        return None
+
     if hasattr(row, "storage_key") or (hasattr(row, "public_id") and not hasattr(row, "url")):
         urls = get_store().urls(
             AssetRef(
@@ -99,18 +105,16 @@ def _media_schema(row: Any) -> schemas.PublicMedia:
         url = urls.url
         thumbnail_url = urls.thumbnail_url
     else:
-        url = row.url
-        thumbnail_url = row.thumbnail_url
+        url = getattr(row, "url", None) or ""
+        thumbnail_url = getattr(row, "thumbnail_url", None)
 
     return schemas.PublicMedia(
         id=row.id,
         kind=row.kind,
         url=url,
         thumbnail_url=thumbnail_url,
-        title=row.title,
         alt_text=row.alt_text,
         format=row.format,
-        bytes=row.bytes,
         width=row.width,
         height=row.height,
         duration_s=float(row.duration_s) if row.duration_s is not None else None,
@@ -120,21 +124,61 @@ def _media_schema(row: Any) -> schemas.PublicMedia:
     )
 
 
-def _linked_media_schema(link: MediaLink) -> schemas.PublicLinkedMedia:
-    m = _media_schema(link.media)
+def _linked_media_schema(
+    link: MediaLink | None, *, prod: bool = False
+) -> schemas.PublicLinkedMedia | None:
+    if link is None or link.media is None or not link.is_visible:
+        return None
+    m = _media_schema(link.media, prod=prod)
+    if m is None:
+        return None
     return schemas.PublicLinkedMedia(
         **m.model_dump(),
-        link_id=link.id,
         role=link.role,
         sort_order=link.sort_order,
         is_cover=link.is_cover,
-        is_visible=link.is_visible,
+    )
+
+
+def _build_public_seo(
+    db: Session,
+    raw_seo: Any,
+    *,
+    prod: bool = False,
+) -> schemas.PublicSeo:
+    d = dict(raw_seo or {}) if not isinstance(raw_seo, dict) else raw_seo
+    title = d.get("title")
+    description = d.get("description")
+    noindex = bool(d.get("noindex", False))
+    canonical_path = d.get("canonical_path")
+    og_img_id = d.get("og_image_id")
+    og_image: schemas.PublicMedia | None = None
+    if og_img_id:
+        try:
+            m_uuid = uuid.UUID(str(og_img_id))
+            m_row = db.scalar(select(Media).where(Media.id == m_uuid))
+            if m_row:
+                og_image = _media_schema(m_row, prod=prod)
+        except ValueError, TypeError:
+            og_image = None
+
+    return schemas.PublicSeo(
+        title=title,
+        description=description,
+        og_image=og_image,
+        noindex=noindex,
+        canonical_path=canonical_path,
     )
 
 
 def _public_price(row: Any) -> Price:
     base = price_of(row)
-    note = base.note or "excludes GST, stamp duty and registration"
+    std_note = "excludes GST, stamp duty and registration"
+    if base.note and std_note not in base.note:
+        note = f"{base.note} ({std_note})"
+    else:
+        note = base.note or std_note
+
     if base.on_request:
         return Price(
             on_request=True,
@@ -194,12 +238,10 @@ def get_public_site(db: Session, *, locale: str | None = None) -> schemas.Public
         emails=emails,
     )
 
-    social_vals = read_group(db, "social")
-    social = {
-        k: v for k, v in social_vals.items() if v and not (isinstance(v, str) and v.startswith("["))
-    }
+    social_vals = sanitize_placeholders(read_group(db, "social"), in_production=prod)
+    social = {k: v for k, v in social_vals.items() if v}
 
-    reg_vals = read_group(db, "regulator")
+    reg_vals = sanitize_placeholders(read_group(db, "regulator"), in_production=prod)
     regulator = schemas.PublicRegulator(
         state=reg_vals.get("state") or "UP",
         authority=reg_vals.get("authority") or "UP-RERA",
@@ -256,15 +298,30 @@ def get_public_site(db: Session, *, locale: str | None = None) -> schemas.Public
 
     offer_img_ids = [off.image_media_id for off in offer_rows if off.image_media_id]
     offer_images = content_links.library_items(db, offer_img_ids)
-    proj_refs = project_queries.project_refs(
-        db, [off.project_id for off in offer_rows if off.project_id]
-    )
+
+    # M5: Check project visibility for project-linked offers
+    proj_ids_in_offers = [off.project_id for off in offer_rows if off.project_id]
+    visible_proj_ids: set[uuid.UUID] = set()
+    if proj_ids_in_offers:
+        v_stmt = select(Project.id).where(
+            Project.id.in_(proj_ids_in_offers),
+            Project.publish_state == "published",
+            Project.sales_status != "off_market",
+        )
+        if prod:
+            v_stmt = v_stmt.where(Project.is_sample.is_(False))
+        visible_proj_ids = set(db.scalars(v_stmt).all())
+
+    proj_refs = project_queries.project_refs(db, list(visible_proj_ids))
 
     public_offers: list[schemas.PublicOffer] = []
     for off in offer_rows:
         if is_live(off, now=now):
+            if off.project_id and off.project_id not in visible_proj_ids:
+                # Offer is linked to an unpublished or draft or off-market project - drop it!
+                continue
             raw_im = offer_images.get(off.image_media_id) if off.image_media_id else None
-            im = _media_schema(raw_im) if raw_im else None
+            im = _media_schema(raw_im, prod=prod) if raw_im else None
             p_ref = proj_refs.get(off.project_id) if off.project_id else None
             public_offers.append(
                 schemas.PublicOffer(
@@ -281,7 +338,7 @@ def get_public_site(db: Session, *, locale: str | None = None) -> schemas.Public
                 )
             )
 
-    seo_vals = read_group(db, "seo_defaults")
+    seo_vals = sanitize_placeholders(read_group(db, "seo_defaults"), in_production=prod)
     seo_defaults = schemas.PublicSeoDefaults(
         default_title=seo_vals.get("default_title"),
         title_suffix=seo_vals.get("title_suffix") or " | Empire",
@@ -317,12 +374,16 @@ def _build_public_summary(
     *,
     is_hi: bool,
 ) -> schemas.PublicProjectSummary:
-    c_labels = configuration_labels(configs)
-    types = sorted({c.property_type for c in configs if c.property_type})
+    prod = is_production()
+    visible_configs = [
+        c for c in configs if c.sales_status != "off_market" and (not prod or not c.is_sample)
+    ]
+    c_labels = configuration_labels(visible_configs)
+    types = sorted({c.property_type for c in visible_configs if c.property_type})
 
     cover_m = resolve_cover_image(links)
-    cover_schema = _media_schema(cover_m) if cover_m else None
-    qr_schema = _media_schema(qr_media) if qr_media else None
+    cover_schema = _media_schema(cover_m, prod=prod) if cover_m else None
+    qr_schema = _media_schema(qr_media, prod=prod) if qr_media else None
 
     regulator_url = "https://www.up-rera.in"
     rera_block = schemas.PublicRera(
@@ -478,21 +539,21 @@ def _build_configurations(
     *,
     is_hi: bool,
     prod: bool,
-) -> list[ChildConfig]:
+) -> list[schemas.PublicConfiguration]:
     active = [c for c in configs if c.sales_status != "off_market"]
     if prod:
         active = [c for c in active if not c.is_sample]
     active.sort(key=lambda c: (0 if c.sales_status == "available" else 1, c.sort_order, c.id))
 
-    result: list[ChildConfig] = []
+    result: list[schemas.PublicConfiguration] = []
     for c in active:
         fp_links = [
-            _linked_media_schema(lnk)
+            m
             for lnk in config_links.get(c.id, [])
-            if lnk.role == "floor_plan"
+            if lnk.role == "floor_plan" and (m := _linked_media_schema(lnk, prod=prod)) is not None
         ]
         result.append(
-            ChildConfig(
+            schemas.PublicConfiguration(
                 id=c.id,
                 slug=c.slug,
                 name=translate_text(c.translations, "name", c.name, is_hi=is_hi) or c.name,
@@ -507,7 +568,6 @@ def _build_configurations(
                 floor_plans=fp_links,
                 sort_order=c.sort_order,
                 is_sample=c.is_sample,
-                translations=Translations(c.translations),
             )
         )
     return result
@@ -516,11 +576,17 @@ def _build_configurations(
 def _build_updates(
     updates: Sequence[Any],
     update_links: dict[uuid.UUID, list[MediaLink]],
+    *,
+    prod: bool,
 ) -> list[ChildUpdate]:
     published = [u for u in updates if u.publish_state == "published"]
     result: list[ChildUpdate] = []
     for u in published:
-        photos = [_linked_media_schema(lnk) for lnk in update_links.get(u.id, [])]
+        photos = [
+            m
+            for lnk in update_links.get(u.id, [])
+            if (m := _linked_media_schema(lnk, prod=prod)) is not None
+        ]
         result.append(
             ChildUpdate(
                 id=u.id,
@@ -554,13 +620,11 @@ def _load_project_faqs(
     return [
         schemas.PublicFaq(
             id=f.id,
-            project_id=f.project_id,
             question=translate_text(f.translations, "question", f.question, is_hi=is_hi)
             or f.question,
             answer=translate_text(f.translations, "answer", f.answer, is_hi=is_hi) or f.answer,
             sort_order=f.sort_order,
             is_visible=True,
-            translations=Translations(f.translations),
         )
         for f in db.scalars(faq_stmt).all()
     ]
@@ -633,10 +697,10 @@ def get_public_project(
         elif link.construction_update_id:
             update_links[link.construction_update_id].append(link)
 
+    configurations = _build_configurations(p.configurations, config_links, is_hi=is_hi, prod=prod)
     summary = _build_public_summary(p, project_links, qr_media, p.configurations, is_hi=is_hi)
     towers = _build_towers(p.towers, p.construction_updates)
-    configurations = _build_configurations(p.configurations, config_links, is_hi=is_hi, prod=prod)
-    construction_updates = _build_updates(p.construction_updates, update_links)
+    construction_updates = _build_updates(p.construction_updates, update_links, prod=prod)
     project_faqs = _load_project_faqs(db, p.id, is_hi=is_hi, prod=prod)
 
     amenities = [
@@ -682,13 +746,28 @@ def get_public_project(
     ]
 
     gallery = [
-        _linked_media_schema(lnk)
+        m
         for lnk in project_links
-        if lnk.role == "gallery" and lnk.media and bool(lnk.media.label)
+        if lnk.role == "gallery"
+        and lnk.media
+        and bool(lnk.media.label)
+        and (m := _linked_media_schema(lnk, prod=prod)) is not None
     ]
-    videos = [_linked_media_schema(lnk) for lnk in project_links if lnk.role == "video"]
-    documents = [_linked_media_schema(lnk) for lnk in project_links if lnk.role == "document"]
-    brochure = _linked_media_schema(brochure_media) if brochure_media else None
+    videos = [
+        m
+        for lnk in project_links
+        if lnk.role == "video" and (m := _linked_media_schema(lnk, prod=prod)) is not None
+    ]
+    documents = [
+        m
+        for lnk in project_links
+        if lnk.role == "document" and (m := _linked_media_schema(lnk, prod=prod)) is not None
+    ]
+    brochure = (
+        None
+        if p.brochure_gated
+        else (_linked_media_schema(brochure_media, prod=prod) if brochure_media else None)
+    )
 
     location = Location(
         address_line=p.address_line,
@@ -701,16 +780,14 @@ def get_public_project(
         google_maps_url=p.google_maps_url,
         plus_code=p.plus_code,
         pin_source=p.pin_source,
-        directions_url=display.directions_url(p.lat, p.lng)
-        if hasattr(display, "directions_url")
-        else None,
+        directions_url=directions_url(p.lat, p.lng),
     )
 
     land_area = (
         area_of(
             p.land_area_min_sqm,
             p.land_area_max_sqm,
-            p.land_area_basis or "carpet",
+            p.land_area_basis or "plot",
             p.land_area_display_unit or "sqft",
         )
         if (p.land_area_min_sqm or p.land_area_max_sqm)
@@ -740,8 +817,7 @@ def get_public_project(
         brochure=brochure,
         brochure_gated=p.brochure_gated,
         faqs=project_faqs,
-        seo=Seo.model_validate(p.seo or {}),
-        translations=Translations(p.translations),
+        seo=_build_public_seo(db, p.seo or {}, prod=prod),
         updated_at=p.updated_at,
     )
     return detail
@@ -773,14 +849,17 @@ def _apply_property_filters(
         stmt = stmt.where(Configuration.bhk == bhk)
     if project_status:
         stmt = stmt.where(Project.status == project_status)
+    eff_min = case(
+        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_min_inr
+    )
+    eff_max = case(
+        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_max_inr
+    )
+
     if budget_min is not None:
-        stmt = stmt.where(
-            (Configuration.price_max_inr.is_(None)) | (Configuration.price_max_inr >= budget_min)
-        )
+        stmt = stmt.where(eff_max.is_not(None) & (eff_max >= budget_min))
     if budget_max is not None:
-        stmt = stmt.where(
-            (Configuration.price_min_inr.is_(None)) | (Configuration.price_min_inr <= budget_max)
-        )
+        stmt = stmt.where(eff_min.is_not(None) & (eff_min <= budget_max))
     return stmt
 
 
@@ -788,16 +867,25 @@ def _property_order_clauses(sort: str | None) -> list[Any]:
     order_clauses: list[Any] = [
         case((Configuration.sales_status == "available", 0), else_=1),
     ]
+    eff_min = case(
+        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_min_inr
+    )
+    eff_max = case(
+        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_max_inr
+    )
+
     sort_type = (sort or "recommended").lower()
     if sort_type == "price_asc":
-        order_clauses.append(Configuration.price_min_inr.asc().nulls_last())
+        order_clauses.append(eff_min.asc().nulls_last())
     elif sort_type == "price_desc":
-        order_clauses.append(Configuration.price_max_inr.desc().nulls_last())
+        order_clauses.append(eff_max.desc().nulls_last())
     elif sort_type == "size_desc":
         order_clauses.append(Configuration.area_max_sqm.desc().nulls_last())
     else:
         order_clauses.append(Configuration.sort_order.asc())
-        order_clauses.append(Configuration.id.asc())
+
+    # S15: Append Configuration.id as stable tie-breaker
+    order_clauses.append(Configuration.id.asc())
     return order_clauses
 
 
@@ -901,7 +989,7 @@ def list_public_properties(
             authority="UP-RERA",
             number=p.rera_number,
             url="https://www.up-rera.in",
-            qr=_media_schema(qr_m) if qr_m else None,
+            qr=_media_schema(qr_m, prod=prod) if qr_m else None,
         )
         proj_ref = schemas.PublicProjectRef(
             slug=p.slug,
@@ -919,7 +1007,10 @@ def list_public_properties(
         visible_floor_plans = [
             lnk.media
             for lnk in fp_map.get(c.id, [])
-            if lnk.role == "floor_plan" and lnk.is_visible and lnk.media
+            if lnk.role == "floor_plan"
+            and lnk.is_visible
+            and lnk.media
+            and (not prod or not lnk.media.is_sample)
         ]
         cover_media = visible_floor_plans[0] if visible_floor_plans else None
 
@@ -933,7 +1024,7 @@ def list_public_properties(
                 area=area_of(c.area_min_sqm, c.area_max_sqm, c.area_basis, c.area_display_unit),
                 price=_public_price(c),
                 sales_status=c.sales_status,
-                cover=_media_schema(cover_media) if cover_media else None,
+                cover=_media_schema(cover_media, prod=prod) if cover_media else None,
                 project=proj_ref,
                 is_sample=c.is_sample,
             )
@@ -953,13 +1044,29 @@ def get_public_property(
     is_hi = is_hindi_active(db, locale)
     prod = is_production()
 
-    proj_detail = get_public_project(db, project_slug, locale=locale)
-    if not proj_detail:
+    # N11: Load project directly without full project detail graph
+    p_stmt = (
+        select(Project)
+        .where(
+            Project.slug == project_slug,
+            Project.publish_state == "published",
+            Project.sales_status != "off_market",
+        )
+        .options(
+            joinedload(Project.city),
+            joinedload(Project.locality),
+            selectinload(Project.configurations),
+        )
+    )
+    if prod:
+        p_stmt = p_stmt.where(Project.is_sample.is_(False))
+    p = db.scalar(p_stmt)
+    if not p:
         return None
 
     stmt = select(Configuration).where(
         Configuration.slug == config_slug,
-        Configuration.project_id == proj_detail.id,
+        Configuration.project_id == p.id,
         Configuration.sales_status != "off_market",
     )
     if prod:
@@ -979,9 +1086,22 @@ def get_public_property(
         .options(joinedload(MediaLink.media))
     ).all()
 
-    fp_links = [_linked_media_schema(lnk) for lnk in c_links]
+    fp_links = [m for lnk in c_links if (m := _linked_media_schema(lnk, prod=prod)) is not None]
 
-    base_config = ChildConfig(
+    p_links = db.scalars(
+        select(MediaLink)
+        .where(MediaLink.project_id == p.id, MediaLink.is_visible.is_(True))
+        .options(joinedload(MediaLink.media))
+    ).all()
+    qr_media = next((lnk.media for lnk in p_links if lnk.role == "rera_qr"), None)
+    vis_configs = [
+        cfg
+        for cfg in p.configurations
+        if cfg.sales_status != "off_market" and (not prod or not cfg.is_sample)
+    ]
+    proj_summary = _build_public_summary(p, p_links, qr_media, vis_configs, is_hi=is_hi)
+
+    return schemas.PublicPropertyDetail(
         id=c.id,
         slug=c.slug,
         name=translate_text(c.translations, "name", c.name, is_hi=is_hi) or c.name,
@@ -996,29 +1116,6 @@ def get_public_property(
         floor_plans=fp_links,
         sort_order=c.sort_order,
         is_sample=c.is_sample,
-        translations=Translations(c.translations),
-    )
-
-    proj_summary = schemas.PublicProjectSummary(
-        id=proj_detail.id,
-        slug=proj_detail.slug,
-        name=proj_detail.name,
-        status=proj_detail.status,
-        sales_status=proj_detail.sales_status,
-        city=proj_detail.city,
-        locality=proj_detail.locality,
-        price=proj_detail.price,
-        configuration_labels=proj_detail.configuration_labels,
-        property_types=proj_detail.property_types,
-        cover=proj_detail.cover,
-        rera=proj_detail.rera,
-        possession_date=proj_detail.possession_date,
-        is_featured=proj_detail.is_featured,
-        is_sample=proj_detail.is_sample,
-    )
-
-    return schemas.PublicPropertyDetail(
-        **base_config.model_dump(),
         project=proj_summary,
     )
 
@@ -1078,6 +1175,8 @@ def _collect_block_entity_ids(
         d = b.data or {}
         if b.type in ("image", "hero") and d.get("image_id"):
             media_ids.add(uuid.UUID(str(d["image_id"])))
+        elif b.type == "video" and d.get("media_id"):
+            media_ids.add(uuid.UUID(str(d["media_id"])))
         elif b.type == "gallery":
             for i in d.get("image_ids", []):
                 media_ids.add(uuid.UUID(str(i)))
@@ -1096,7 +1195,9 @@ def _collect_block_entity_ids(
 def _batch_load_page_entities(
     db: Session,
     blocks: Sequence[PageBlock],
+    *,
     prod: bool,
+    is_hi: bool = False,
 ) -> tuple[
     dict[uuid.UUID, schemas.PublicMedia],
     dict[uuid.UUID, schemas.PublicFaq],
@@ -1111,7 +1212,9 @@ def _batch_load_page_entities(
         if prod:
             m_stmt = m_stmt.where(Media.is_sample.is_(False))
         for m in db.scalars(m_stmt).all():
-            loaded_media[m.id] = _media_schema(m)
+            schema_m = _media_schema(m, prod=prod)
+            if schema_m:
+                loaded_media[m.id] = schema_m
 
     loaded_faqs: dict[uuid.UUID, schemas.PublicFaq] = {}
     if faq_ids:
@@ -1121,12 +1224,11 @@ def _batch_load_page_entities(
         for f in db.scalars(f_stmt).all():
             loaded_faqs[f.id] = schemas.PublicFaq(
                 id=f.id,
-                project_id=f.project_id,
-                question=f.question,
-                answer=f.answer,
+                question=translate_text(f.translations, "question", f.question, is_hi=is_hi)
+                or f.question,
+                answer=translate_text(f.translations, "answer", f.answer, is_hi=is_hi) or f.answer,
                 sort_order=f.sort_order,
                 is_visible=True,
-                translations=Translations(f.translations),
             )
 
     loaded_testimonials: dict[uuid.UUID, schemas.PublicTestimonial] = {}
@@ -1139,22 +1241,17 @@ def _batch_load_page_entities(
         )
         t_rows = db.scalars(t_stmt).all()
         t_photo_ids = [t.photo_media_id for t in t_rows if t.photo_media_id]
-        t_photos = content_links.library_items(db, t_photo_ids)
+        t_photos = content_links.library_items(db, t_photo_ids) if t_photo_ids else {}
         for t in t_rows:
             raw_ph = t_photos.get(t.photo_media_id) if t.photo_media_id else None
-            ph = _media_schema(raw_ph) if raw_ph else None
+            ph = _media_schema(raw_ph, prod=prod) if raw_ph else None
             loaded_testimonials[t.id] = schemas.PublicTestimonial(
                 id=t.id,
                 person_name=t.person_name,
                 person_detail=t.person_detail,
                 quote=t.quote,
-                project_id=t.project_id,
-                source=t.source,
-                source_url=t.source_url,
-                consent_date=t.consent_date,
                 rating=t.rating,
                 photo=ph,
-                is_visible=True,
             )
 
     loaded_offers: dict[uuid.UUID, schemas.PublicOffer] = {}
@@ -1164,16 +1261,29 @@ def _batch_load_page_entities(
         if prod:
             off_stmt = off_stmt.where(Offer.is_sample.is_(False))
         off_rows = db.scalars(off_stmt).all()
-        off_p_refs = project_queries.project_refs(
-            db, [off.project_id for off in off_rows if off.project_id]
-        )
+
+        proj_ids_in_offers = [off.project_id for off in off_rows if off.project_id]
+        visible_proj_ids: set[uuid.UUID] = set()
+        if proj_ids_in_offers:
+            v_stmt = select(Project.id).where(
+                Project.id.in_(proj_ids_in_offers),
+                Project.publish_state == "published",
+                Project.sales_status != "off_market",
+            )
+            if prod:
+                v_stmt = v_stmt.where(Project.is_sample.is_(False))
+            visible_proj_ids = set(db.scalars(v_stmt).all())
+
+        off_p_refs = project_queries.project_refs(db, list(visible_proj_ids))
         off_images = content_links.library_items(
             db, [off.image_media_id for off in off_rows if off.image_media_id]
         )
         for off in off_rows:
             if is_live(off, now=now):
+                if off.project_id and off.project_id not in visible_proj_ids:
+                    continue
                 raw_m = off_images.get(off.image_media_id) if off.image_media_id else None
-                im = _media_schema(raw_m) if raw_m else None
+                im = _media_schema(raw_m, prod=prod) if raw_m else None
                 pref = off_p_refs.get(off.project_id) if off.project_id else None
                 loaded_offers[off.id] = schemas.PublicOffer(
                     id=off.id,
@@ -1221,10 +1331,9 @@ def _resolve_faq_block(
     is_hi: bool,
     prod: bool,
 ) -> bool:
-    if "faq_ids" in data and data["faq_ids"] is not None:
+    # M2: Only treat as picked FAQs if faq_ids is non-empty
+    if data.get("faq_ids"):
         picked = [uuid.UUID(str(i)) for i in data["faq_ids"]]
-        if not picked:
-            return False
         faqs = [loaded_faqs[i].model_dump() for i in picked if i in loaded_faqs]
         if not faqs:
             return False
@@ -1232,6 +1341,18 @@ def _resolve_faq_block(
         return True
 
     pid = uuid.UUID(str(data["project_id"])) if data.get("project_id") else None
+    if pid:
+        # Check project visibility
+        p_check = select(Project.id).where(
+            Project.id == pid,
+            Project.publish_state == "published",
+            Project.sales_status != "off_market",
+        )
+        if prod:
+            p_check = p_check.where(Project.is_sample.is_(False))
+        if not db.scalar(p_check):
+            return False
+
     f_stmt = (
         select(Faq).where(Faq.is_visible.is_(True)).order_by(Faq.sort_order.asc(), Faq.id.asc())
     )
@@ -1241,13 +1362,11 @@ def _resolve_faq_block(
     data["faqs"] = [
         schemas.PublicFaq(
             id=f.id,
-            project_id=f.project_id,
             question=translate_text(f.translations, "question", f.question, is_hi=is_hi)
             or f.question,
             answer=translate_text(f.translations, "answer", f.answer, is_hi=is_hi) or f.answer,
             sort_order=f.sort_order,
             is_visible=True,
-            translations=Translations(f.translations),
         ).model_dump()
         for f in db.scalars(f_stmt).all()
     ]
@@ -1258,18 +1377,31 @@ def _resolve_testimonial_block(
     db: Session,
     data: dict[str, Any],
     loaded_testimonials: dict[uuid.UUID, schemas.PublicTestimonial],
+    *,
+    prod: bool,
 ) -> bool:
-    if "testimonial_ids" in data and data["testimonial_ids"] is not None:
+    limit = int(data.get("limit") or 3)
+    # M2: Only treat as picked testimonials if testimonial_ids is non-empty
+    if data.get("testimonial_ids"):
         picked = [uuid.UUID(str(i)) for i in data["testimonial_ids"]]
-        if not picked:
-            return False
         tests = [loaded_testimonials[i].model_dump() for i in picked if i in loaded_testimonials]
         if not tests:
             return False
-        data["testimonials"] = tests
+        data["testimonials"] = tests[:limit]
         return True
 
     pid = uuid.UUID(str(data["project_id"])) if data.get("project_id") else None
+    if pid:
+        p_check = select(Project.id).where(
+            Project.id == pid,
+            Project.publish_state == "published",
+            Project.sales_status != "off_market",
+        )
+        if prod:
+            p_check = p_check.where(Project.is_sample.is_(False))
+        if not db.scalar(p_check):
+            return False
+
     t_stmt = select(Testimonial).where(
         Testimonial.is_visible.is_(True),
         Testimonial.source.isnot(None),
@@ -1277,9 +1409,9 @@ def _resolve_testimonial_block(
     )
     if pid:
         t_stmt = t_stmt.where(Testimonial.project_id == pid)
-    t_rows = db.scalars(t_stmt.order_by(Testimonial.created_at.desc())).all()
+    t_rows = db.scalars(t_stmt.order_by(Testimonial.created_at.desc()).limit(limit)).all()
     photo_ids = [t.photo_media_id for t in t_rows if t.photo_media_id]
-    photos = content_links.library_items(db, photo_ids)
+    photos = content_links.library_items(db, photo_ids) if photo_ids else {}
 
     data["testimonials"] = [
         schemas.PublicTestimonial(
@@ -1287,15 +1419,10 @@ def _resolve_testimonial_block(
             person_name=t.person_name,
             person_detail=t.person_detail,
             quote=t.quote,
-            project_id=t.project_id,
-            source=t.source,
-            source_url=t.source_url,
-            consent_date=t.consent_date,
             rating=t.rating,
-            photo=_media_schema(photos[t.photo_media_id])
-            if (t.photo_media_id and t.photo_media_id in photos)
+            photo=_media_schema(photos.get(t.photo_media_id), prod=prod)
+            if t.photo_media_id
             else None,
-            is_visible=True,
         ).model_dump()
         for t in t_rows
     ]
@@ -1308,48 +1435,190 @@ def _resolve_grid_block(
     b_type: str,
     *,
     is_hi: bool,
+    prod: bool,
 ) -> bool:
     limit = int(data.get("limit") or 6)
-    city_slug: str | None = None
-    if data.get("city_id"):
-        city_slug = db.scalar(select(City.slug).where(City.id == uuid.UUID(str(data["city_id"]))))
+    city_id = uuid.UUID(str(data["city_id"])) if data.get("city_id") else None
 
     if b_type == "project_grid":
-        featured = True if data.get("featured_only") else None
-        status = data.get("status")
-        res = list_public_projects(
-            db,
-            PageParams(page=1, per_page=limit),
-            city=city_slug,
-            status=status,
-            featured=featured,
-            locale="hi" if is_hi else "en",
+        stmt = (
+            select(Project)
+            .where(
+                Project.publish_state == "published",
+                Project.sales_status != "off_market",
+            )
+            .options(
+                joinedload(Project.city),
+                joinedload(Project.locality),
+                selectinload(Project.configurations),
+            )
         )
-        items = [p.model_dump() for p in res.items]
-        if "project_ids" in data:
-            p_ids = {uuid.UUID(str(i)) for i in data["project_ids"]}
-            items = [p for p in items if uuid.UUID(str(p["id"])) in p_ids]
-            if not items:
-                return False
-        if not items:
+        if prod:
+            stmt = stmt.where(Project.is_sample.is_(False))
+        if city_id:
+            stmt = stmt.where(Project.city_id == city_id)
+        if data.get("featured_only"):
+            stmt = stmt.where(Project.is_featured.is_(True))
+        if data.get("status"):
+            stmt = stmt.where(Project.status == data["status"])
+        if data.get("project_ids"):
+            p_ids = [uuid.UUID(str(i)) for i in data["project_ids"]]
+            stmt = stmt.where(Project.id.in_(p_ids))
+
+        sales_order = case((Project.sales_status == "available", 0), else_=1)
+        featured_order = case((Project.is_featured.is_(True), 0), else_=1)
+        stmt = stmt.order_by(
+            sales_order,
+            featured_order,
+            Project.featured_order.asc().nulls_last(),
+            Project.possession_date.asc().nulls_last(),
+            Project.created_at.desc(),
+            Project.id,
+        ).limit(limit)
+
+        projs = db.scalars(stmt).unique().all()
+        if not projs:
             return False
+
+        proj_ids = [p.id for p in projs]
+        all_links = db.scalars(
+            select(MediaLink)
+            .where(MediaLink.project_id.in_(proj_ids), MediaLink.is_visible.is_(True))
+            .options(joinedload(MediaLink.media))
+        ).all()
+
+        links_by_p: dict[uuid.UUID, list[MediaLink]] = defaultdict(list)
+        qr_by_p: dict[uuid.UUID, Media] = {}
+        for lnk in all_links:
+            if lnk.project_id:
+                links_by_p[lnk.project_id].append(lnk)
+                if lnk.role == "rera_qr":
+                    qr_by_p[lnk.project_id] = lnk.media
+
+        items = [
+            _build_public_summary(
+                p,
+                links_by_p.get(p.id, []),
+                qr_by_p.get(p.id),
+                [
+                    c
+                    for c in p.configurations
+                    if c.sales_status != "off_market" and (not prod or not c.is_sample)
+                ],
+                is_hi=is_hi,
+            ).model_dump()
+            for p in projs
+        ]
         data["projects"] = items
+        return bool(items)
+
     elif b_type == "property_grid":
-        res_prop = list_public_properties(
-            db,
-            PageParams(page=1, per_page=limit),
-            city=city_slug,
-            locale="hi" if is_hi else "en",
+        cfg_stmt = (
+            select(Configuration)
+            .join(Project, Configuration.project_id == Project.id)
+            .where(
+                Configuration.sales_status != "off_market",
+                Project.publish_state == "published",
+                Project.sales_status != "off_market",
+            )
         )
-        prop_items = [c.model_dump() for c in res_prop.items]
-        if "configuration_ids" in data:
-            c_ids = {uuid.UUID(str(i)) for i in data["configuration_ids"]}
-            prop_items = [c for c in prop_items if uuid.UUID(str(c["id"])) in c_ids]
-            if not prop_items:
-                return False
-        if not prop_items:
+        if prod:
+            cfg_stmt = cfg_stmt.where(
+                Configuration.is_sample.is_(False), Project.is_sample.is_(False)
+            )
+        if city_id:
+            cfg_stmt = cfg_stmt.where(Project.city_id == city_id)
+        if data.get("configuration_ids"):
+            c_ids = [uuid.UUID(str(i)) for i in data["configuration_ids"]]
+            cfg_stmt = cfg_stmt.where(Configuration.id.in_(c_ids))
+
+        cfg_stmt = cfg_stmt.order_by(
+            case((Configuration.sales_status == "available", 0), else_=1),
+            Configuration.sort_order.asc(),
+            Configuration.id.asc(),
+        ).limit(limit)
+
+        configs = db.scalars(cfg_stmt).unique().all()
+        if not configs:
             return False
+
+        c_ids = [c.id for c in configs]
+        p_ids = list({c.project_id for c in configs})
+
+        projs = db.scalars(
+            select(Project)
+            .where(Project.id.in_(p_ids))
+            .options(joinedload(Project.city), joinedload(Project.locality))
+        ).all()
+        p_map = {p.id: p for p in projs}
+
+        fp_links = db.scalars(
+            select(MediaLink)
+            .where(
+                MediaLink.configuration_id.in_(c_ids),
+                MediaLink.role == "floor_plan",
+                MediaLink.is_visible.is_(True),
+            )
+            .options(joinedload(MediaLink.media))
+        ).all()
+        fp_map: dict[uuid.UUID, Media] = {}
+        for lnk in fp_links:
+            if lnk.configuration_id and lnk.media:
+                fp_map[lnk.configuration_id] = lnk.media
+
+        qr_links = db.scalars(
+            select(MediaLink)
+            .where(
+                MediaLink.project_id.in_(p_ids),
+                MediaLink.role == "rera_qr",
+                MediaLink.is_visible.is_(True),
+            )
+            .options(joinedload(MediaLink.media))
+        ).all()
+        qr_by_p = {lnk.project_id: lnk.media for lnk in qr_links if lnk.project_id and lnk.media}
+
+        prop_items = []
+        for c in configs:
+            p = p_map.get(c.project_id)
+            if not p:
+                continue
+            qr_m = qr_by_p.get(p.id)
+            rera = schemas.PublicRera(
+                authority="UP-RERA",
+                number=p.rera_number,
+                url="https://www.up-rera.in",
+                qr=_media_schema(qr_m, prod=prod) if qr_m else None,
+            )
+            proj_ref = schemas.PublicProjectRef(
+                slug=p.slug,
+                name=translate_text(p.translations, "name", p.name, is_hi=is_hi) or p.name,
+                status=p.status,
+                city=CityRef(id=p.city.id, name=p.city.name, slug=p.city.slug, state=p.city.state)
+                if p.city
+                else None,
+                locality=LocalityRef(id=p.locality.id, name=p.locality.name, slug=p.locality.slug)
+                if p.locality
+                else None,
+                rera=rera,
+            )
+            fp_m = fp_map.get(c.id)
+            prop_items.append(
+                schemas.PublicPropertySummary(
+                    id=c.id,
+                    slug=c.slug,
+                    name=translate_text(c.translations, "name", c.name, is_hi=is_hi) or c.name,
+                    property_type=c.property_type,
+                    bhk=float(c.bhk) if c.bhk is not None else None,
+                    area=area_of(c.area_min_sqm, c.area_max_sqm, c.area_basis, c.area_display_unit),
+                    price=_public_price(c),
+                    sales_status=c.sales_status,
+                    cover=_media_schema(fp_m, prod=prod) if fp_m else None,
+                    project=proj_ref,
+                    is_sample=c.is_sample,
+                ).model_dump()
+            )
         data["properties"] = prop_items
+        return bool(prop_items)
     return True
 
 
@@ -1370,29 +1639,141 @@ def _resolve_single_block(
     if b_type in ("image", "hero", "gallery"):
         if not _resolve_media_block(data, b_type, loaded_media):
             return None, False
+    elif b_type == "video":
+        if data.get("media_id"):
+            mid = uuid.UUID(str(data["media_id"]))
+            if mid not in loaded_media:
+                return None, False
+            data["media"] = loaded_media[mid].model_dump()
+    elif b_type == "map":
+        pid = uuid.UUID(str(data["project_id"])) if data.get("project_id") else None
+        if not pid:
+            return None, False
+        p_stmt = (
+            select(Project)
+            .where(
+                Project.id == pid,
+                Project.publish_state == "published",
+                Project.sales_status != "off_market",
+            )
+            .options(joinedload(Project.city), joinedload(Project.locality))
+        )
+        if prod:
+            p_stmt = p_stmt.where(Project.is_sample.is_(False))
+        p = db.scalar(p_stmt)
+        if not p:
+            return None, False
+        city_name = p.city.name if p.city else None
+        locality_name = p.locality.name if p.locality else None
+        parts = [p.address_line, locality_name, city_name, p.state, p.pincode]
+        full_address = ", ".join([pt for pt in parts if pt])
+        data["project"] = {
+            "id": str(p.id),
+            "slug": p.slug,
+            "name": translate_text(p.translations, "name", p.name, is_hi=is_hi) or p.name,
+            "lat": float(p.lat) if p.lat is not None else None,
+            "lng": float(p.lng) if p.lng is not None else None,
+            "address": full_address,
+            "directions_url": directions_url(p.lat, p.lng),
+        }
     elif b_type == "faq_list":
         if not _resolve_faq_block(db, data, loaded_faqs, is_hi=is_hi, prod=prod):
             return None, False
     elif b_type == "testimonials":
-        if not _resolve_testimonial_block(db, data, loaded_testimonials):
+        if not _resolve_testimonial_block(db, data, loaded_testimonials, prod=prod):
             return None, False
     elif b_type == "offer_banner":
         off_id = uuid.UUID(str(data["offer_id"])) if data.get("offer_id") else None
-        if not off_id or off_id not in loaded_offers:
+        placement = data.get("placement")
+        off_data: schemas.PublicOffer | None = None
+        if off_id and off_id in loaded_offers:
+            off_data = loaded_offers[off_id]
+        elif placement:
+            now = utcnow()
+            o_stmt = (
+                select(Offer)
+                .where(
+                    Offer.placement == placement,
+                    Offer.is_active.is_(True),
+                )
+                .order_by(Offer.priority.asc(), Offer.id.asc())
+            )
+            if prod:
+                o_stmt = o_stmt.where(Offer.is_sample.is_(False))
+            candidate_offers = db.scalars(o_stmt).all()
+            for cand in candidate_offers:
+                if is_live(cand, now=now):
+                    if cand.project_id:
+                        cand_p_stmt = select(Project.id).where(
+                            Project.id == cand.project_id,
+                            Project.publish_state == "published",
+                            Project.sales_status != "off_market",
+                        )
+                        if prod:
+                            cand_p_stmt = cand_p_stmt.where(Project.is_sample.is_(False))
+                        p_vis = db.scalar(cand_p_stmt)
+                        if not p_vis:
+                            continue
+                    raw_im = (
+                        db.scalar(select(Media).where(Media.id == cand.image_media_id))
+                        if cand.image_media_id
+                        else None
+                    )
+                    im = _media_schema(raw_im, prod=prod) if raw_im else None
+                    p_slug = (
+                        db.scalar(select(Project.slug).where(Project.id == cand.project_id))
+                        if cand.project_id
+                        else None
+                    )
+                    off_data = schemas.PublicOffer(
+                        id=cand.id,
+                        title=cand.title,
+                        body=cand.body,
+                        image=im,
+                        cta_label=cand.cta_label,
+                        cta_url=cand.cta_url,
+                        terms=cand.terms,
+                        terms_url=cand.terms_url,
+                        placement=cand.placement,
+                        project_slug=p_slug,
+                    )
+                    break
+        if not off_data:
             return None, False
-        data["offer"] = loaded_offers[off_id].model_dump()
+        data["offer"] = off_data.model_dump()
     elif b_type in ("project_grid", "property_grid"):
-        if not _resolve_grid_block(db, data, b_type, is_hi=is_hi):
+        if not _resolve_grid_block(db, data, b_type, is_hi=is_hi, prod=prod):
             return None, False
     elif b_type == "lead_form":
-        ct = current_text(db, "lead_form")
-        if ct:
+        if data.get("project_id"):
+            pid = uuid.UUID(str(data["project_id"]))
+            form_p_stmt = select(Project.id).where(
+                Project.id == pid,
+                Project.publish_state == "published",
+                Project.sales_status != "off_market",
+            )
+            if prod:
+                form_p_stmt = form_p_stmt.where(Project.is_sample.is_(False))
+            p_vis = db.scalar(form_p_stmt)
+            if not p_vis:
+                return None, False
+        ct_lead = current_text(db, "lead_form")
+        if ct_lead:
             data["consent"] = schemas.PublicConsentText(
-                id=ct.id,
-                kind=ct.kind,
-                version=ct.version,
-                body=ct.body,
-                checkbox_label=ct.checkbox_label,
+                id=ct_lead.id,
+                kind=ct_lead.kind,
+                version=ct_lead.version,
+                body=ct_lead.body,
+                checkbox_label=ct_lead.checkbox_label,
+            ).model_dump()
+        ct_mkt = current_text(db, "marketing")
+        if ct_mkt:
+            data["marketing_consent"] = schemas.PublicConsentText(
+                id=ct_mkt.id,
+                kind=ct_mkt.kind,
+                version=ct_mkt.version,
+                body=ct_mkt.body,
+                checkbox_label=ct_mkt.checkbox_label,
             ).model_dump()
 
     return data, True
@@ -1423,7 +1804,7 @@ def get_public_page(
     visible_blocks.sort(key=lambda b: (b.sort_order, b.id))
 
     media_map, faq_map, test_map, offer_map = _batch_load_page_entities(
-        db, visible_blocks, prod=prod
+        db, visible_blocks, prod=prod, is_hi=is_hi
     )
 
     resolved_blocks: list[schemas.PublicBlock] = []
@@ -1464,14 +1845,12 @@ def get_public_page(
         slug=page_row.slug,
         title=title,
         kind=page_row.kind,
-        publish_state=page_row.publish_state,
         show_in_nav=page_row.show_in_nav,
         nav_order=page_row.nav_order,
         blocks=resolved_blocks,
         legal_version=page_row.legal_version,
         is_draft_text=is_draft,
-        seo=Seo.model_validate(seo_obj),
-        translations=Translations(page_row.translations),
+        seo=_build_public_seo(db, seo_obj, prod=prod),
         updated_at=page_row.updated_at,
     )
 
@@ -1520,13 +1899,12 @@ def list_public_posts(
             title=translate_text(p.translations, "title", p.title, is_hi=is_hi) or p.title,
             excerpt=translate_text(p.translations, "excerpt", p.excerpt, is_hi=is_hi) or p.excerpt,
             body=translate_text(p.translations, "body", p.body, is_hi=is_hi) or p.body,
-            cover=_media_schema(covers[p.id]) if p.id in covers else None,
+            cover=_media_schema(covers.get(p.id), prod=prod) if p.id in covers else None,
             category=p.category,
             tags=list(p.tags or []),
             author=authors[p.author_id].name if (p.author_id and p.author_id in authors) else None,
             published_at=p.published_at,
-            seo=Seo.model_validate(p.seo or {}),
-            translations=Translations(p.translations),
+            seo=_build_public_seo(db, p.seo or {}, prod=prod),
         )
         for p in posts
     ]
@@ -1561,13 +1939,12 @@ def get_public_post(
         title=translate_text(p.translations, "title", p.title, is_hi=is_hi) or p.title,
         excerpt=translate_text(p.translations, "excerpt", p.excerpt, is_hi=is_hi) or p.excerpt,
         body=translate_text(p.translations, "body", p.body, is_hi=is_hi) or p.body,
-        cover=_media_schema(covers[p.id]) if p.id in covers else None,
+        cover=_media_schema(covers.get(p.id), prod=prod) if p.id in covers else None,
         category=p.category,
         tags=list(p.tags or []),
         author=authors[p.author_id].name if (p.author_id and p.author_id in authors) else None,
         published_at=p.published_at,
-        seo=Seo.model_validate(p.seo or {}),
-        translations=Translations(p.translations),
+        seo=_build_public_seo(db, p.seo or {}, prod=prod),
     )
 
 
@@ -1606,13 +1983,11 @@ def list_public_faqs(
     return [
         schemas.PublicFaq(
             id=f.id,
-            project_id=f.project_id,
             question=translate_text(f.translations, "question", f.question, is_hi=is_hi)
             or f.question,
             answer=translate_text(f.translations, "answer", f.answer, is_hi=is_hi) or f.answer,
             sort_order=f.sort_order,
             is_visible=True,
-            translations=Translations(f.translations),
         )
         for f in rows
     ]
@@ -1645,7 +2020,7 @@ def list_public_testimonials(
 
     rows = db.scalars(stmt.order_by(Testimonial.created_at.desc())).all()
     photo_ids = [t.photo_media_id for t in rows if t.photo_media_id]
-    photos = content_links.library_items(db, photo_ids)
+    photos = content_links.library_items(db, photo_ids) if photo_ids else {}
 
     return [
         schemas.PublicTestimonial(
@@ -1653,15 +2028,10 @@ def list_public_testimonials(
             person_name=t.person_name,
             person_detail=t.person_detail,
             quote=t.quote,
-            project_id=t.project_id,
-            source=t.source,
-            source_url=t.source_url,
-            consent_date=t.consent_date,
             rating=t.rating,
-            photo=_media_schema(photos[t.photo_media_id])
-            if (t.photo_media_id and t.photo_media_id in photos)
+            photo=_media_schema(photos.get(t.photo_media_id), prod=prod)
+            if t.photo_media_id
             else None,
-            is_visible=True,
         )
         for t in rows
     ]
@@ -1675,7 +2045,6 @@ def list_public_redirects(db: Session) -> list[schemas.PublicRedirect]:
     rows = db.scalars(stmt).all()
     return [
         schemas.PublicRedirect(
-            id=r.id,
             from_path=r.from_path,
             to_path=r.to_path,
             status_code=r.status_code,
@@ -1684,72 +2053,80 @@ def list_public_redirects(db: Session) -> list[schemas.PublicRedirect]:
     ]
 
 
-def _add_sitemap_pages(
-    db: Session,
-    prod: bool,
-    add_entry: Callable[[str, datetime | None], None],
-) -> None:
-    page_stmt = select(Page).where(Page.publish_state == "published")
+def get_public_sitemap(db: Session) -> list[schemas.PublicSitemapEntry]:
+    prod = is_production()
+    hi_on = flags.is_enabled(db, "locale_hi")
+    entries: list[schemas.PublicSitemapEntry] = []
+
+    def _add_entry(p_path: str, lastmod: datetime) -> None:
+        alts = {"hi": f"/hi{p_path}" if p_path != "/" else "/hi"} if hi_on else {}
+        entries.append(
+            schemas.PublicSitemapEntry(
+                path=p_path,
+                lastmod=lastmod,
+                alternates=alts,
+            )
+        )
+
+    # 1. Projects: published, not off-market, not sample in prod, and not noindex
+    proj_stmt = select(Project).where(
+        Project.publish_state == "published",
+        Project.sales_status != "off_market",
+    )
+    if prod:
+        proj_stmt = proj_stmt.where(Project.is_sample.is_(False))
+    published_projects = db.scalars(proj_stmt).all()
+
+    # 2. Pages: published, not sample in prod, not landing
+    page_stmt = select(Page).where(
+        Page.publish_state == "published",
+        Page.kind != "landing",
+    )
     if prod:
         page_stmt = page_stmt.where(Page.is_sample.is_(False))
-    for pg in db.scalars(page_stmt).all():
+    published_pages = db.scalars(page_stmt).all()
+
+    # 3. Posts: published, not sample in prod
+    post_stmt = select(Post).where(Post.publish_state == "published")
+    if prod:
+        post_stmt = post_stmt.where(Post.is_sample.is_(False))
+    published_posts = db.scalars(post_stmt).all()
+
+    # S4: Calculate stable home lastmod from maximum updated_at of underlying rows
+    all_updated = [p.updated_at for p in published_projects if p.updated_at]
+    all_updated.extend([pg.updated_at for pg in published_pages if pg.updated_at])
+    all_updated.extend([po.updated_at for po in published_posts if po.updated_at])
+    home_lastmod = max(all_updated) if all_updated else utcnow()
+
+    # Add Home "/"
+    _add_entry("/", home_lastmod)
+
+    # Add Pages
+    for pg in published_pages:
         if pg.slug == "home":
             continue
         seo = dict(pg.seo or {})
         if seo.get("noindex") or is_draft_text(pg):
             continue
-        add_entry(page_path(pg.slug), pg.updated_at)
+        _add_entry(page_path(pg.slug), pg.updated_at or home_lastmod)
 
+    # Calculate Blog index lastmod
+    post_updated = [po.updated_at for po in published_posts if po.updated_at]
+    blog_lastmod = max(post_updated) if post_updated else home_lastmod
+    _add_entry("/blog", blog_lastmod)
 
-def _add_sitemap_projects(
-    db: Session,
-    prod: bool,
-    add_entry: Callable[[str, datetime | None], None],
-) -> None:
-    p_stmt = select(Project).where(
-        Project.publish_state == "published",
-        Project.sales_status != "off_market",
-    )
-    if prod:
-        p_stmt = p_stmt.where(Project.is_sample.is_(False))
-    p_stmt = p_stmt.options(selectinload(Project.configurations))
+    # Add Posts
+    for po in published_posts:
+        seo = dict(po.seo or {})
+        if seo.get("noindex"):
+            continue
+        _add_entry(post_path(po.slug), po.updated_at or blog_lastmod)
 
-    for proj in db.scalars(p_stmt).all():
-        add_entry(f"/projects/{proj.slug}", proj.updated_at)
-        for cfg in proj.configurations:
-            if cfg.sales_status != "off_market" and (not prod or not cfg.is_sample):
-                add_entry(f"/projects/{proj.slug}/configurations/{cfg.slug}", cfg.updated_at)
-
-
-def get_public_sitemap(db: Session) -> list[schemas.PublicSitemapEntry]:
-    prod = is_production()
-    hi_on = flags.is_enabled(db, "locale_hi")
-    now = utcnow()
-    entries: list[schemas.PublicSitemapEntry] = []
-
-    def _add_entry(p_path: str, lastmod: datetime | None) -> None:
-        alts = {"hi": f"/hi{p_path}" if p_path != "/" else "/hi"} if hi_on else {}
-        entries.append(
-            schemas.PublicSitemapEntry(
-                path=p_path,
-                lastmod=lastmod or now,
-                alternates=alts,
-            )
-        )
-
-    _add_entry("/", now)
-    _add_sitemap_pages(db, prod, _add_entry)
-    _add_entry("/blog", now)
-
-    post_stmt = select(Post).where(Post.publish_state == "published")
-    if prod:
-        post_stmt = post_stmt.where(Post.is_sample.is_(False))
-    for post in db.scalars(post_stmt).all():
-        _add_entry(post_path(post.slug), post.updated_at)
-
-    _add_sitemap_projects(db, prod, _add_entry)
-
-    for c in list_public_cities(db):
-        _add_entry(f"/projects?city={c.slug}", now)
+    # Add Projects (using canonical project_path; D-038: configuration & city URLs left out)
+    for prj in published_projects:
+        seo = dict(prj.seo or {})
+        if seo.get("noindex"):
+            continue
+        _add_entry(project_path(prj.slug), prj.updated_at or home_lastmod)
 
     return entries

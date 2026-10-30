@@ -12,15 +12,18 @@ Covers:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from empire_api.config import get_settings
-from empire_api.content.models import Post
+from empire_api.content.models import Faq, Offer, Page, Post, Testimonial
 from empire_api.projects.models import City, Configuration, Locality, Project
 from empire_api.public.visibility import sanitize_placeholders
+from empire_api.seo.models import Redirect
 
 
 def _seed_project(
@@ -226,3 +229,140 @@ def test_production_sample_isolation(
     assert "/projects/sample-project" not in sitemap_paths
     assert "/blog/real-post" in sitemap_paths
     assert "/blog/sample-post" not in sitemap_paths
+
+
+def test_public_site_sanitization_in_production(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # S1: Endpoint-level test for /public/site in production
+    # Verify that company, contacts, social, regulator, and seo_defaults placeholders are sanitized
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+
+    res = client.get("/api/v1/public/site")
+    assert res.status_code == 200
+    data = res.json()
+
+    # In production, any placeholder starting with "[" must be sanitized to None / empty
+    def _assert_no_placeholders(val: object) -> None:
+        if isinstance(val, str):
+            assert not (val.startswith("[") and val.endswith("]")), (
+                f"Leaked placeholder in production: {val}"
+            )
+        elif isinstance(val, dict):
+            for v in val.values():
+                _assert_no_placeholders(v)
+        elif isinstance(val, list):
+            for item in val:
+                _assert_no_placeholders(item)
+
+    _assert_no_placeholders(data)
+
+
+def test_visibility_across_all_content_types(
+    db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # S16: Visibility of FAQs, testimonials, redirects, pages, and offers
+    # 1. FAQs: visible vs hidden vs sample
+    faq_vis = Faq(question="Visible FAQ", answer="Answer", is_visible=True, is_sample=False)
+    faq_hid = Faq(question="Hidden FAQ", answer="Answer", is_visible=False, is_sample=False)
+    faq_smp = Faq(question="Sample FAQ", answer="Answer", is_visible=True, is_sample=True)
+    db.add_all([faq_vis, faq_hid, faq_smp])
+
+    # 2. Testimonials: consented & visible vs unconsented / hidden
+    t_consented = Testimonial(
+        person_name="Consented User",
+        quote="Loved the home",
+        source="google",
+        consent_date=datetime.now(UTC).date(),
+        is_visible=True,
+    )
+    t_unconsented = Testimonial(
+        person_name="Unconsented User",
+        quote="Do not show this",
+        source="google",
+        consent_date=None,
+        is_visible=False,
+    )
+    db.add_all([t_consented, t_unconsented])
+
+    # 3. Redirects: active vs inactive
+    r_act = Redirect(from_path="/old-link", to_path="/new-link", is_active=True)
+    r_inact = Redirect(from_path="/dead-link", to_path="/nowhere", is_active=False)
+    db.add_all([r_act, r_inact])
+
+    # 4. Pages: published vs draft vs sample
+    p_pub = Page(slug="pub-page", title="Published", kind="standard", publish_state="published")
+    p_draft = Page(slug="draft-page", title="Draft", kind="standard", publish_state="draft")
+    p_smp = Page(
+        slug="smp-page",
+        title="Sample",
+        kind="standard",
+        publish_state="published",
+        is_sample=True,
+    )
+    db.add_all([p_pub, p_draft, p_smp])
+
+    # 5. Offers: active vs inactive vs draft project
+    draft_proj = _seed_project(db, "offer-draft-proj", publish_state="draft")
+    pub_proj = _seed_project(db, "offer-pub-proj", publish_state="published")
+    off_act = Offer(
+        title="Valid Site Offer",
+        placement="home",
+        is_active=True,
+        project_id=pub_proj.id,
+    )
+    off_inact = Offer(
+        title="Inactive Offer",
+        placement="home",
+        is_active=False,
+        project_id=pub_proj.id,
+    )
+    off_draft_p = Offer(
+        title="Draft Proj Offer",
+        placement="home",
+        is_active=True,
+        project_id=draft_proj.id,
+    )
+    db.add_all([off_act, off_inact, off_draft_p])
+    db.commit()
+
+    # Check in Dev:
+    # FAQs
+    faqs = client.get("/api/v1/public/faqs").json()
+    f_qs = [f["question"] for f in faqs]
+    assert "Visible FAQ" in f_qs
+    assert "Hidden FAQ" not in f_qs
+    assert "Sample FAQ" in f_qs
+
+    # Testimonials: unconsented must NEVER appear
+    testimonials = client.get("/api/v1/public/testimonials").json()
+    t_names = [t["person_name"] for t in testimonials]
+    assert "Consented User" in t_names
+    assert "Unconsented User" not in t_names
+
+    # Redirects: inactive must NEVER appear
+    redirects = client.get("/api/v1/public/redirects").json()
+    r_sources = [r["from_path"] for r in redirects]
+    assert "/old-link" in r_sources
+    assert "/dead-link" not in r_sources
+
+    # Check in Production: sample items filtered out
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+
+    # FAQs in prod
+    faqs_prod = client.get("/api/v1/public/faqs").json()
+    f_qs_prod = [f["question"] for f in faqs_prod]
+    assert "Visible FAQ" in f_qs_prod
+    assert "Sample FAQ" not in f_qs_prod
+
+    # Pages in prod
+    assert client.get("/api/v1/public/pages/pub-page").status_code == 200
+    assert client.get("/api/v1/public/pages/draft-page").status_code == 404
+    assert client.get("/api/v1/public/pages/smp-page").status_code == 404
+
+    # Offers on public site: inactive, draft project, and sample excluded
+    site_data = client.get("/api/v1/public/site").json()
+    offer_titles = [o["title"] for o in site_data.get("offers", [])]
+    assert "Valid Site Offer" in offer_titles
+    assert "Inactive Offer" not in offer_titles
+    assert "Draft Proj Offer" not in offer_titles
