@@ -463,6 +463,7 @@ def list_public_projects(
         featured=featured,
         sort=sort,
         q=q,
+        db=db,
     )
 
     count_stmt = select(func.count(Project.id))
@@ -478,6 +479,7 @@ def list_public_projects(
         featured=featured,
         sort=sort,
         q=q,
+        db=db,
         order=False,
     )
     total = db.scalar(count_stmt) or 0

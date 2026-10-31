@@ -388,6 +388,117 @@ def test_blocks_with_draft_project_are_dropped(db: Session, client: TestClient) 
     assert len(res.json()["blocks"]) == 0
 
 
+def test_picked_faq_and_testimonial_on_draft_project_are_dropped(
+    db: Session, client: TestClient
+) -> None:
+    """R2-N8 / R3-S2: Picked FAQs and testimonials referencing draft projects are omitted."""
+    city = City(name="Ayodhya", slug=f"ayodhya-{uuid.uuid4().hex[:4]}", state="UP")
+    db.add(city)
+    db.flush()
+
+    draft_proj = Project(
+        name="Secret Draft Project",
+        slug=f"draft-{uuid.uuid4().hex[:4]}",
+        tagline="Secret",
+        project_type="residential",
+        status="upcoming",
+        publish_state="draft",
+        city_id=city.id,
+    )
+    published_proj = Project(
+        name="Public Project",
+        slug=f"public-{uuid.uuid4().hex[:4]}",
+        tagline="Public",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        rera_number=f"UPRERAN8{uuid.uuid4().hex[:4]}",
+    )
+    db.add_all([draft_proj, published_proj])
+    db.flush()
+
+    # Seed FAQs: one attached to draft project, one attached to published project
+    faq_draft = Faq(
+        question="Draft FAQ?",
+        answer="Draft Answer.",
+        project_id=draft_proj.id,
+        sort_order=1,
+        is_visible=True,
+    )
+    faq_pub = Faq(
+        question="Published FAQ?",
+        answer="Published Answer.",
+        project_id=published_proj.id,
+        sort_order=2,
+        is_visible=True,
+    )
+    db.add_all([faq_draft, faq_pub])
+    db.flush()
+
+    # Seed Testimonials: one attached to draft project, one attached to published project
+    t_draft = DbTestimonial(
+        quote="Draft project quote",
+        person_name="Secret Buyer",
+        source="Google Reviews",
+        consent_date=datetime.now(UTC).date(),
+        project_id=draft_proj.id,
+        is_visible=True,
+    )
+    t_pub = DbTestimonial(
+        quote="Public project quote",
+        person_name="Happy Homeowner",
+        source="Google Reviews",
+        consent_date=datetime.now(UTC).date(),
+        project_id=published_proj.id,
+        is_visible=True,
+    )
+    db.add_all([t_draft, t_pub])
+    db.flush()
+
+    page = Page(
+        slug=f"picked-items-page-{uuid.uuid4().hex[:4]}",
+        title="Picked Items Visibility Page",
+        kind="standard",
+        publish_state="published",
+    )
+    db.add(page)
+    db.flush()
+
+    b_faq = PageBlock(
+        page_id=page.id,
+        type="faq_list",
+        data={"faq_ids": [str(faq_draft.id), str(faq_pub.id)]},
+        sort_order=1,
+    )
+    b_testi = PageBlock(
+        page_id=page.id,
+        type="testimonials",
+        data={"testimonial_ids": [str(t_draft.id), str(t_pub.id)]},
+        sort_order=2,
+    )
+    db.add_all([b_faq, b_testi])
+    db.commit()
+
+    res = client.get(f"/api/v1/public/pages/{page.slug}")
+    assert res.status_code == 200
+    blocks = res.json()["blocks"]
+    assert len(blocks) == 2
+
+    # In faq_list block, only the FAQ on the published project is present
+    faq_block = next(b for b in blocks if b["type"] == "faq_list")
+    faq_questions = [f["question"] for f in faq_block["data"]["faqs"]]
+    assert "Draft FAQ?" not in faq_questions
+    assert "Published FAQ?" in faq_questions
+
+    # In testimonials block, only the testimonial on the published project is present
+    testi_block = next(b for b in blocks if b["type"] == "testimonials")
+    testi_quotes = [t["quote"] for t in testi_block["data"]["testimonials"]]
+    assert "Draft project quote" not in testi_quotes
+    assert "Public project quote" in testi_quotes
+
+
 def test_landing_page_noindex(db: Session, client: TestClient) -> None:
     landing = Page(
         slug="autumn-campaign",

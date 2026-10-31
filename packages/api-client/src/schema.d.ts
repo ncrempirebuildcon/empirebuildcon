@@ -4795,7 +4795,7 @@ export interface components {
         };
         /**
          * OfferBannerData
-         * @description One chosen offer, or the live offers of a placement (highest priority first).
+         * @description One chosen offer, or the highest-priority live offer of a placement.
          */
         OfferBannerData: {
             /** Offer Id */

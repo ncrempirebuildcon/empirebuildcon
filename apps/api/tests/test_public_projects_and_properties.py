@@ -500,10 +500,16 @@ def test_property_sorting_tie_breaker_uses_id(db: Session, client: TestClient) -
     db.add(proj)
     db.flush()
 
+    # R3-S2: Assign explicit IDs where c1 (inserted first) has a higher ID than c2 (inserted second)
+    # This guarantees the test fails if Configuration.id tie-breaker is omitted.
+    id_higher = uuid.UUID("01900000-0000-7000-8000-000000000002")
+    id_lower = uuid.UUID("01900000-0000-7000-8000-000000000001")
+
     c1 = Configuration(
+        id=id_higher,
         project_id=proj.id,
         name="Tie Unit A",
-        slug="tie-unit-a",
+        slug=f"tie-unit-a-{uuid.uuid4().hex[:4]}",
         property_type="apartment",
         sales_status="available",
         price_min_inr=10_000_000,
@@ -512,10 +518,14 @@ def test_property_sorting_tie_breaker_uses_id(db: Session, client: TestClient) -
         area_max_sqm=Decimal("100.0"),
         sort_order=1,
     )
+    db.add(c1)
+    db.flush()
+
     c2 = Configuration(
+        id=id_lower,
         project_id=proj.id,
         name="Tie Unit B",
-        slug="tie-unit-b",
+        slug=f"tie-unit-b-{uuid.uuid4().hex[:4]}",
         property_type="apartment",
         sales_status="available",
         price_min_inr=10_000_000,
@@ -524,15 +534,13 @@ def test_property_sorting_tie_breaker_uses_id(db: Session, client: TestClient) -
         area_max_sqm=Decimal("100.0"),
         sort_order=1,
     )
-    db.add_all([c1, c2])
+    db.add(c2)
+    db.flush()
     db.commit()
-
-    expected_first = c1.slug if c1.id < c2.id else c2.slug
-    expected_second = c2.slug if c1.id < c2.id else c1.slug
 
     res = client.get("/api/v1/public/properties?project_status=ongoing&sort=price_asc").json()
     items = [c["slug"] for c in res["items"] if c["slug"] in (c1.slug, c2.slug)]
-    assert items == [expected_first, expected_second]
+    assert items == [c2.slug, c1.slug]
 
 
 def test_sitemap_excludes_landing_noindex_and_draft_legal(db: Session, client: TestClient) -> None:
@@ -581,20 +589,51 @@ def test_sitemap_excludes_landing_noindex_and_draft_legal(db: Session, client: T
         body="Text",
         publish_state="published",
     )
-    db.add_all([proj, landing_page, noindex_page, normal_page, noindex_post, normal_post])
+    # R3-S2: Seed published legal page with [DRAFT] marker vs approved legal page
+    draft_legal = Page(
+        slug=f"sitemap-draft-legal-{uuid.uuid4().hex[:4]}",
+        title="Terms of Service [DRAFT v1]",
+        kind="legal",
+        publish_state="published",
+    )
+    approved_legal = Page(
+        slug=f"sitemap-approved-legal-{uuid.uuid4().hex[:4]}",
+        title="Privacy Policy",
+        kind="legal",
+        publish_state="published",
+    )
+    db.add_all(
+        [
+            proj,
+            landing_page,
+            noindex_page,
+            normal_page,
+            noindex_post,
+            normal_post,
+            draft_legal,
+            approved_legal,
+        ]
+    )
     db.commit()
 
     res = client.get("/api/v1/public/sitemap")
     assert res.status_code == 200
-    paths = [entry["path"] for entry in res.json()]
+    entries1 = res.json()
+    paths = [entry["path"] for entry in entries1]
 
     assert f"/projects/{proj.slug}" in paths
     assert f"/{normal_page.slug}" in paths
+    assert f"/{approved_legal.slug}" in paths
     assert f"/blog/{normal_post.slug}" in paths
 
     assert f"/{landing_page.slug}" not in paths
     assert f"/{noindex_page.slug}" not in paths
+    assert f"/{draft_legal.slug}" not in paths
     assert f"/blog/{noindex_post.slug}" not in paths
+
+    # R3-S2: Assert lastmod stability across repeated queries
+    entries2 = client.get("/api/v1/public/sitemap").json()
+    assert [e["lastmod"] for e in entries1] == [e["lastmod"] for e in entries2]
 
 
 def test_city_counts_in_production(

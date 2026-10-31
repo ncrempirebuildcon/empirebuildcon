@@ -10,12 +10,15 @@ Covers:
 
 from __future__ import annotations
 
+import uuid
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from empire_api.db import get_engine
+from empire_api.pagination import PageParams
 from empire_api.projects.models import City, Locality, Project
+from empire_api.public.service import list_public_projects
 
 
 def test_public_project_search(db: Session, client: TestClient) -> None:
@@ -132,16 +135,49 @@ def test_public_project_search(db: Session, client: TestClient) -> None:
     assert slugs9[0] == "search-kashi-villas"
 
 
-def test_trgm_threshold_persists_after_rollback_on_pooled_connection() -> None:
-    """R2-S1 / R2-M1: Verify that pg_trgm threshold persists across rollback."""
-    engine = get_engine()
-    # 1. Check out connection 1, issue rollback, close (return to pool)
-    conn1 = engine.connect()
-    conn1.rollback()
-    conn1.close()
+def test_trgm_threshold_set_per_transaction_for_search(db: Session, client: TestClient) -> None:
+    """R3-M1 / R3-S1: Search sets pg_trgm threshold transaction-locally (0.5), overriding 0.6.
 
-    # 2. Check out connection 2 from pool and assert threshold is stably 0.5
-    conn2 = engine.connect()
-    val = conn2.execute(text("SHOW pg_trgm.word_similarity_threshold")).scalar()
-    conn2.close()
-    assert val == "0.5"
+    Even if session-level threshold is 0.6 (PostgreSQL default or set by a connection pooler),
+    a typo search (e.g. 'Emerld' for 'Emerald Heights') matches because search queries run
+    set_config('pg_trgm.word_similarity_threshold', '0.5', true) locally in their transaction.
+    """
+    city = db.scalar(select(City).where(City.slug == "search-lucknow-trgm"))
+    if not city:
+        city = City(name="Lucknow Trgm", slug="search-lucknow-trgm", state="UP")
+        db.add(city)
+        db.flush()
+
+    p = Project(
+        slug=f"trgm-emerald-tower-{uuid.uuid4().hex[:4]}",
+        name="Emerald Heights",
+        tagline="Panoramic luxury",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        rera_number=f"UPRERATRGM{uuid.uuid4().hex[:4]}",
+    )
+    db.add(p)
+    db.commit()
+
+    try:
+        # 1. Explicitly set session-level threshold to 0.6 and commit
+        db.execute(text("SET pg_trgm.word_similarity_threshold = 0.6"))
+        db.commit()
+
+        # 2. Call search service directly with this db session (where session is 0.6)
+        res = list_public_projects(db, PageParams(page=1, per_page=10), q="Emerld")
+        matched_slugs = [item.slug for item in res.items]
+        assert p.slug in matched_slugs, f"Expected {p.slug} in {matched_slugs}"
+
+        # 3. Verify that session setting was not altered outside local search transaction
+        # Once search transaction ends (rollback or commit), session-level 0.6 is restored
+        db.rollback()
+        current_val = db.execute(text("SHOW pg_trgm.word_similarity_threshold")).scalar()
+        assert current_val == "0.6"
+    finally:
+        # Reset session threshold for clean pool state
+        db.execute(text("RESET pg_trgm.word_similarity_threshold"))
+        db.commit()

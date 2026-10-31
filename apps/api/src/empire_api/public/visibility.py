@@ -17,7 +17,7 @@ import re
 from collections.abc import Sequence
 from typing import Any, TypeVar
 
-from sqlalchemy import Select, case, exists, func, literal, or_, select
+from sqlalchemy import Select, case, exists, func, literal, or_, select, text
 from sqlalchemy.orm import Session, aliased
 
 from empire_api.config import get_settings
@@ -82,6 +82,19 @@ def resolve_cover_image(links: Sequence[MediaLink], *, prod: bool = False) -> Me
             return lnk.media
     # 2. First visible labelled photo
     return sorted_links[0].media
+
+
+def set_search_trgm_threshold(db: Session, threshold: str = "0.5") -> None:
+    """Set pg_trgm.word_similarity_threshold transaction-locally (D-038).
+
+    COMPLIANCE: Uses is_local=true so this setting applies only to the current transaction.
+    This works reliably across connection poolers (e.g. PgBouncer on Neon in transaction mode)
+    without depending on session persistence or startup parameters.
+    """
+    db.execute(
+        text("SELECT set_config('pg_trgm.word_similarity_threshold', :val, true)"),
+        {"val": threshold},
+    )
 
 
 def is_hindi_active(db: Session, requested_locale: str | None) -> bool:
@@ -248,8 +261,11 @@ def apply_project_filters(
     sort: str | None = None,
     q: str | None = None,
     order: bool = True,
+    db: Session | None = None,
 ) -> Select[Any]:
     """Apply the public projects catalog filters and sorting rules."""
+    if q and q.strip() and db is not None:
+        set_search_trgm_threshold(db)
     prod = is_production()
     stmt = stmt.where(
         Project.publish_state == "published",

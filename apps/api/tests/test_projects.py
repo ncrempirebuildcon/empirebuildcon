@@ -355,6 +355,25 @@ def test_list_searches_filters_and_pages(owner: SignedIn) -> None:
     assert {"publish_state", "updated_at", "is_sample", "configuration_labels"} <= set(row)
 
 
+def test_admin_project_search_exact_match_beats_loose_matches(owner: SignedIn) -> None:
+    """R3-M2: Admin project search orders by relevance so exact beats loose matches."""
+    # 1. Create target project first (older updated_at)
+    target = create_project(owner, name="Target Alpha", slug="target-alpha")
+
+    # 2. Create 30 loose matches that contain "Alpha" in name or tagline with newer updated_at
+    for i in range(1, 31):
+        create_project(owner, name=f"Random Alpha Tower {i}", tagline="Luxury living Alpha")
+
+    # 3. Query CMS project list with q=target-alpha and per_page=10
+    body = ok(owner.client.get(f"{PROJECTS}?q=target-alpha&per_page=10"))
+    items = body["items"]
+
+    # Target Alpha must be item 0 on page 1, beating all 30 newer loose matches
+    assert len(items) > 0
+    assert items[0]["id"] == target["id"]
+    assert items[0]["slug"] == "target-alpha"
+
+
 def test_list_rejects_bad_filters(owner: SignedIn) -> None:
     assert owner.client.get(f"{PROJECTS}?status=finished").status_code == 422
     assert owner.client.get(f"{PROJECTS}?per_page=101").status_code == 422

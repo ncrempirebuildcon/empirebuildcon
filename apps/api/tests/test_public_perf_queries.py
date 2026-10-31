@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
-from empire_api.content.models import Faq, Page, PageBlock, Post
+from empire_api.content.models import Faq, Offer, Page, PageBlock, Post
 from empire_api.db import get_engine
 from empire_api.media.models import Media, MediaLink
 from empire_api.projects.models import City, Configuration, Locality, Project, Tower
@@ -140,23 +140,20 @@ def test_project_detail_query_count_bounded(db: Session, client: TestClient) -> 
 
 
 def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -> None:
-    # Seed page with 15 blocks
-    page = Page(
-        slug="perf-multi-block-page",
-        title="Multi Block Page",
-        kind="standard",
-        publish_state="published",
-    )
-    db.add(page)
-    db.flush()
+    # 1. Seed city, locality, media
+    city = db.scalar(select(City).where(City.slug == "perf-lucknow-grid"))
+    if not city:
+        city = City(name="Lucknow Grid", slug="perf-lucknow-grid", state="UP")
+        db.add(city)
+        db.flush()
 
-    # Seed 5 FAQs
-    faqs = [
-        Faq(question=f"Q{i}?", answer=f"A{i}.", sort_order=i, is_visible=True) for i in range(1, 6)
-    ]
-    db.add_all(faqs)
+    locality = db.scalar(select(Locality).where(Locality.slug == "perf-gomti-grid"))
+    if not locality:
+        locality = Locality(name="Gomti Grid", slug="perf-gomti-grid", city_id=city.id)
+        db.add(locality)
+        db.flush()
 
-    # Seed 5 Media items
+    # Seed 5 Media items for gallery and blocks
     media_items = [
         Media(
             kind="image",
@@ -172,23 +169,110 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
             height=600,
             created_by=uuid.uuid4(),
         )
-        for i in range(1, 6)
+        for i in range(1, 10)
     ]
     db.add_all(media_items)
     db.flush()
 
+    # Seed 4 published Projects with Configurations and MediaLinks
+    projects = []
+    configs = []
+    links = []
+    for i in range(1, 5):
+        p = Project(
+            slug=f"perf-grid-proj-{i}-{uuid.uuid4().hex[:4]}",
+            name=f"Perf Grid Project {i}",
+            project_type="residential",
+            status="ongoing",
+            sales_status="available",
+            publish_state="published",
+            city_id=city.id,
+            locality_id=locality.id,
+            rera_number=f"UPRERAGRID00{i}",
+            price_min_inr=5_000_000 * i,
+            price_max_inr=10_000_000 * i,
+        )
+        projects.append(p)
+        db.add(p)
+        db.flush()
+
+        cfg = Configuration(
+            project_id=p.id,
+            name=f"{i} BHK Premium Suite",
+            slug=f"perf-grid-cfg-{i}-{uuid.uuid4().hex[:4]}",
+            property_type="apartment",
+            bhk=float(i),
+            sales_status="available",
+            price_min_inr=5_000_000 * i,
+            price_max_inr=6_000_000 * i,
+            area_min_sqm=Decimal(f"{50 * i}.0"),
+            area_max_sqm=Decimal(f"{60 * i}.0"),
+        )
+        configs.append(cfg)
+        db.add(cfg)
+        db.flush()
+
+        ml = MediaLink(
+            media_id=media_items[i - 1].id,
+            project_id=p.id,
+            role="gallery",
+            sort_order=1,
+            is_visible=True,
+            is_cover=True,
+        )
+        links.append(ml)
+
+    db.add_all(links)
+    db.flush()
+
+    # Seed 5 site-wide FAQs and 1 project-linked FAQ
+    faqs = [
+        Faq(question=f"Q{i}?", answer=f"A{i}.", sort_order=i, is_visible=True) for i in range(1, 6)
+    ]
+    project_faq = Faq(
+        question="Project FAQ?",
+        answer="Project Answer.",
+        sort_order=10,
+        is_visible=True,
+        project_id=projects[0].id,
+    )
+    faqs.append(project_faq)
+    db.add_all(faqs)
+    db.flush()
+
+    # Seed an active placement Offer for home
+    offer = Offer(
+        title="Exclusive Festive Offer",
+        placement="home",
+        is_active=True,
+        priority=1,
+        project_id=projects[0].id,
+    )
+    db.add(offer)
+    db.flush()
+
+    # Seed page with 15 blocks
+    page = Page(
+        slug=f"perf-multi-block-page-{uuid.uuid4().hex[:4]}",
+        title="Multi Block Page",
+        kind="standard",
+        publish_state="published",
+    )
+    db.add(page)
+    db.flush()
+
     blocks = []
     # 5 image blocks
-    for i, m in enumerate(media_items):
+    for i in range(5):
         blocks.append(
             PageBlock(
                 page_id=page.id,
                 type="image",
-                data={"image_id": str(m.id)},
+                data={"image_id": str(media_items[i].id)},
                 sort_order=i,
             )
         )
-    # 1 FAQ list block referencing all 5 FAQs
+    # 1 FAQ list block referencing all FAQs (including project-linked)
     blocks.append(
         PageBlock(
             page_id=page.id,
@@ -197,15 +281,16 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
             sort_order=10,
         )
     )
-    # S6: Add auto faq block, project_grid, and property_grid
+    # 1 auto FAQ list block
     blocks.append(
         PageBlock(
             page_id=page.id,
             type="faq_list",
-            data={"faq_ids": []},  # auto site-wide FAQs
+            data={"faq_ids": []},
             sort_order=11,
         )
     )
+    # 1 project grid block
     blocks.append(
         PageBlock(
             page_id=page.id,
@@ -214,12 +299,22 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
             sort_order=12,
         )
     )
+    # 1 property grid block
     blocks.append(
         PageBlock(
             page_id=page.id,
             type="property_grid",
             data={"limit": 4},
             sort_order=13,
+        )
+    )
+    # 1 placement offer_banner block
+    blocks.append(
+        PageBlock(
+            page_id=page.id,
+            type="offer_banner",
+            data={"placement": "home"},
+            sort_order=14,
         )
     )
     db.add_all(blocks)
@@ -230,9 +325,9 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
         res = client.get(f"/api/v1/public/pages/{page.slug}")
         assert res.status_code == 200
 
-    # Ensure query count is strictly bounded (<= 10 queries, S6)
-    msg = f"Expected <= 10 queries for multi-block page with grids, got {len(queries)}"
-    assert len(queries) <= 10, msg
+    # Ensure query count is strictly bounded (R3-S2: grids + offer placement + project FAQs)
+    msg = f"Expected <= 15 queries for multi-block page, got {len(queries)}"
+    assert len(queries) <= 15, msg
 
 
 def test_post_list_og_images_query_count_bounded(db: Session, client: TestClient) -> None:

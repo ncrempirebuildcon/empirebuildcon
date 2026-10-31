@@ -16,7 +16,7 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Any
 
-from sqlalchemy import DateTime, Engine, MetaData, create_engine, event, func
+from sqlalchemy import DateTime, Engine, MetaData, create_engine, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
@@ -65,21 +65,8 @@ def get_engine() -> Engine:
         max_overflow=settings.db_pool_size,
         # WHY: Neon's pooled endpoint is PgBouncer in transaction mode, which breaks
         # server-side prepared statements. psycopg prepares nothing when this is None.
-        connect_args={
-            "prepare_threshold": None,
-            "options": "-c pg_trgm.word_similarity_threshold=0.5",
-        },
+        connect_args={"prepare_threshold": None},
     )
-
-    @event.listens_for(engine, "connect")
-    def _on_connect(dbapi_connection: Any, connection_record: Any) -> None:
-        with dbapi_connection.cursor() as cursor:
-            cursor.execute("SET pg_trgm.word_similarity_threshold = 0.5")
-        if hasattr(dbapi_connection, "commit") and not getattr(
-            dbapi_connection, "autocommit", False
-        ):
-            dbapi_connection.commit()
-
     return engine
 
 

@@ -29,7 +29,7 @@ Generated from [openapi-v1.yaml](openapi-v1.yaml). Permission keys are explained
 
 ## Public
 
-Public read-only endpoints (Task 5.1). Responses set `Cache-Control: public, max-age=60, stale-while-revalidate=300` and `ETag`, returning `304 Not Modified` on matching `If-None-Match`. Enforces 120 req/min per network bucket with `Retry-After` on 429 (`Cache-Control: no-store`). Next.js server-side renders (SSR/ISR) carrying the edge secret without client IP are exempt from per-visitor limits.
+Public read-only endpoints (Task 5.1). Responses set `Cache-Control: public, max-age=60, stale-while-revalidate=300` and `ETag`, returning `304 Not Modified` on matching `If-None-Match`. Error responses (404, 429) set `Cache-Control: no-store`. Enforces 120 req/min per network bucket with `Retry-After` on 429. Internal Next.js server-side renders (SSR/ISR) carrying the edge secret without a client-IP header are limited via a dedicated server bucket (`public:server`) capped at 3,000 req/min.
 
 | Method | Path | Needs | What it does |
 |---|---|---|---|
