@@ -256,7 +256,7 @@ class TestimonialsData(StrictModel):
 
 
 class OfferBannerData(StrictModel):
-    """One chosen offer, or the live offers of a placement (highest priority first)."""
+    """One chosen offer, or the highest-priority live offer of a placement."""
 
     offer_id: uuid.UUID | None = None
     placement: OfferPlacement | None = None

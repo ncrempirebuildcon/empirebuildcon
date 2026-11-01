@@ -25,6 +25,7 @@ from typing import Any
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Computed,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -35,7 +36,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy import text as sql
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from empire_api.db import Base, created_at_column, uuid_pk
@@ -98,6 +99,15 @@ class City(Timestamps, Base):
     slug: Mapped[str] = mapped_column(String(120), unique=True)
     state: Mapped[str] = mapped_column(String(60))
 
+    __table_args__ = (
+        Index(
+            "ix_city_name_trgm",
+            "name",
+            postgresql_using="gin",
+            postgresql_ops={"name": "gin_trgm_ops"},
+        ),
+    )
+
 
 class Locality(Timestamps, Base):
     __tablename__ = "locality"
@@ -116,6 +126,12 @@ class Locality(Timestamps, Base):
         UniqueConstraint("city_id", "slug"),
         # Target of project's composite foreign key (INVARIANT in the module header).
         UniqueConstraint("city_id", "id"),
+        Index(
+            "ix_locality_name_trgm",
+            "name",
+            postgresql_using="gin",
+            postgresql_ops={"name": "gin_trgm_ops"},
+        ),
     )
 
 
@@ -181,6 +197,16 @@ class Project(Timestamps, PriceColumns, Base):
     seo: Mapped[dict[str, Any]] = mapped_column(server_default=sql("'{}'::jsonb"))
     translations: Mapped[dict[str, Any]] = mapped_column(server_default=sql("'{}'::jsonb"))
 
+    search_vector: Mapped[Any | None] = mapped_column(
+        TSVECTOR,
+        Computed(
+            "to_tsvector('english', coalesce(name, '') || ' ' || coalesce(tagline, ''))",
+            persisted=True,
+        ),
+        nullable=True,
+        deferred=True,
+    )
+
     publish_state: Mapped[str] = mapped_column(String(12), server_default=sql("'draft'"))
     published_at: Mapped[datetime | None] = mapped_column()
     is_featured: Mapped[bool] = mapped_column(server_default=sql("false"))
@@ -234,6 +260,13 @@ class Project(Timestamps, PriceColumns, Base):
         Index("ix_project_publish_state_sales_status", "publish_state", "sales_status"),
         Index("ix_project_city_id_locality_id", "city_id", "locality_id"),
         Index("ix_project_locality_id", "locality_id"),
+        Index("ix_project_search_vector", "search_vector", postgresql_using="gin"),
+        Index(
+            "ix_project_name_trgm",
+            "name",
+            postgresql_using="gin",
+            postgresql_ops={"name": "gin_trgm_ops"},
+        ),
         CheckConstraint(check_in("status", PROJECT_STATUSES), name="status_valid"),
         CheckConstraint(check_in("sales_status", SALES_STATUSES), name="sales_status_valid"),
         CheckConstraint(check_in("publish_state", PUBLISH_STATES), name="publish_state_valid"),

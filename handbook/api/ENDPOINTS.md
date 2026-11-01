@@ -29,21 +29,23 @@ Generated from [openapi-v1.yaml](openapi-v1.yaml). Permission keys are explained
 
 ## Public
 
+Public read-only endpoints (Task 5.1). Responses set `Cache-Control: public, max-age=60, stale-while-revalidate=300` and `ETag`, returning `304 Not Modified` on matching `If-None-Match`. Error responses (404, 429) set `Cache-Control: no-store`. Enforces 120 req/min per network bucket with `Retry-After` on 429. Internal Next.js server-side renders (SSR/ISR) carrying the edge secret without a client-IP header are limited via a dedicated server bucket (`public:server`) capped at 3,000 req/min.
+
 | Method | Path | Needs | What it does |
 |---|---|---|---|
 | GET | `/api/v1/public/site` | public | Company details, nav, public flags, consent texts, active offers |
-| GET | `/api/v1/public/projects` | public | Search projects (available first, then sold out; off-market hidden) |
-| GET | `/api/v1/public/projects/{slug}` | public | Project detail |
-| GET | `/api/v1/public/projects/{slug}/configurations/{config_slug}` | public | Property (configuration) detail |
-| GET | `/api/v1/public/properties` | public | Search properties (configurations) across projects |
-| GET | `/api/v1/public/cities` | public | Cities with published projects |
-| GET | `/api/v1/public/pages/{slug}` | public | Published page with blocks (incl. legal and landing pages) |
-| GET | `/api/v1/public/posts` | public | Blog and news |
-| GET | `/api/v1/public/posts/{slug}` | public | Article |
+| GET | `/api/v1/public/projects` | public | Search projects (available first, then sold out; off-market hidden; FTS + trigram `q`) |
+| GET | `/api/v1/public/projects/{slug}` | public | Project detail (RERA block, QR, specs, updates, gated brochure hidden) |
+| GET | `/api/v1/public/projects/{slug}/configurations/{config_slug}` | public | Property (configuration) detail with project summary |
+| GET | `/api/v1/public/properties` | public | Search properties (configurations) across projects (stable sort tie-breaker) |
+| GET | `/api/v1/public/cities` | public | Cities with published projects and project counts |
+| GET | `/api/v1/public/pages/{slug}` | public | Published page with blocks eagerly resolved (landing pages force noindex) |
+| GET | `/api/v1/public/posts` | public | Blog and news articles list (filtered by category/tag) |
+| GET | `/api/v1/public/posts/{slug}` | public | Article detail (author display name, body, cover image, SEO) |
 | GET | `/api/v1/public/faqs` | public | FAQs (site-wide, or for one project) |
-| GET | `/api/v1/public/testimonials` | public | Published, sourced testimonials |
-| GET | `/api/v1/public/redirects` | public | Active redirects (read by the web app, cached) |
-| GET | `/api/v1/public/sitemap` | public | All public URLs with last-modified (web app builds sitemap.xml) |
+| GET | `/api/v1/public/testimonials` | public | Published testimonials (author name, quote, rating, photo; no private/audit fields) |
+| GET | `/api/v1/public/redirects` | public | Active redirects (`from_path`, `to_path`, `status_code`; no ids or hit counts) |
+| GET | `/api/v1/public/sitemap` | public | All public content URLs with deterministic last-modified timestamps |
 
 ## Lead intake
 

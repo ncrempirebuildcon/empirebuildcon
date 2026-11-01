@@ -636,3 +636,55 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 - **Decisions:** the developer proposes the next `D-0xx` as "(Proposed)"; the manager accepts or changes it at review.
 - **Gate:** a merge needs a green CI and the manager's "Merge" verdict. The owner can always overrule.
 **Verified / assumed:** Antigravity reads a root `AGENTS.md` (since IDE 1.20.5, per a third-party guide dated 5 Aug 2026; Google's own docs weren't checked), so the agent rules stay in `AGENTS.md`. Each rules file is limited to 12,000 characters; `AGENTS.md` is about 3,600.
+
+## D-038 · Public API read-only endpoints, caching and search (Proposed, 2026-10-30)
+
+**Context:** Task 5.1 builds the 13 read-only public endpoints under `/api/v1/public/*` needed by the public website. They must return only published, non-off-market data in shapes made for the site, without leaking staff fields, drafts, private notes, or sample data in production.
+
+**Decision:**
+- **Visibility rules:**
+  - Enforced centrally in `visibility.py` across all endpoints, project and property lists, blocks, detail queries, and sitemaps.
+  - Published only (`publish_state = 'published'`); `sales_status = 'off_market'` items are hidden; `sold_out` items appear after `available` ones with their badge.
+  - Sample isolation (D-015): in production (`APP_ENV = 'production'`), `is_sample = true` rows are excluded everywhere (including blocks, grids, sitemaps, media, and counts). In development, test and staging they are returned with `is_sample: true`.
+  - Placeholder sanitization: values containing bracketed `[placeholder]` text return `null` across all settings groups (`company`, `contacts`, `social`, `regulator`, `seo_defaults`) in production, preserving development inspection elsewhere.
+  - Gated brochure protection: when `brochure_gated = true`, the public project detail returns `brochure: null` (preserving `brochure_gated: true` indicator) so delivery URLs cannot be accessed without submitting a lead form with consent.
+- **Hero/cover image selection rule:**
+  1. The pinned cover (`is_cover = true`) if visible and carrying an honest label (`artist_impression`, `actual_photo`, `progress_photo`).
+  2. Otherwise, the first visible labelled gallery photo in `sort_order`.
+  3. Otherwise, `None` (no image displayed).
+  In production (`APP_ENV = 'production'`), sample media (`is_sample = true`) is strictly excluded from cover selection.
+- **Search and typo tolerance (ARCHITECTURE §14):**
+  - PostgreSQL generated columns cannot reference foreign tables, so `project.search_vector` generated `tsvector` column indexes `name` and `tagline` directly on the project row.
+  - Search queries combine `Project.search_vector @@ plainto_tsquery` with `EXISTS` subqueries over `city` and `locality` to prevent duplicate join collisions when `city` or `locality` filter chips are also active.
+  - Typo tolerance uses `pg_trgm` word similarity operators (`cleaned_q <% col`), accelerated by GIN `gin_trgm_ops` indexes on `project.name`, `locality.name`, and `city.name`.
+  - The `pg_trgm.word_similarity_threshold` is set to `0.5` per transaction via `SELECT set_config('pg_trgm.word_similarity_threshold', '0.5', true)` executed within the search transaction. This transaction-local setting functions reliably across connection poolers (such as Neon's PgBouncer in transaction mode) where startup options and session-level settings do not persist. `0.5` allows matching 1 typo in 5-7 letter Hindi/Indian place and project names (e.g. "Emerld" -> "Emerald", "Noida" -> "Noyda", "Gomti" -> "Gomati"), whereas PostgreSQL's default `0.6` is too strict for short word typos and fails on 5-character names with 1 transposition.
+  - Catalogue project search orders by search relevance (`ts_rank` and `similarity`) when `q` is provided and default `sort=recommended` is selected.
+  - Migration `0007_search.py` adds `search_vector` and GIN indexes with a clean upgrade → downgrade → upgrade cycle.
+  - Admin `list_projects` in `projects/service.py` adopts FTS + trigram matching alongside substring `LIKE` matching for slugs and names, and orders by relevance (exact/prefix matches first, then full-text rank, trigram similarity, and updated_at) when `q` is provided.
+- **Caching and limits:**
+  - Responses set `Cache-Control: public, max-age=60, stale-while-revalidate=300` and SHA-256 `ETag`.
+  - Weak ETag matching (RFC 9110 §13.1.2) strips `W/` prefixes before comparison, returning `304 Not Modified` on matching `If-None-Match`.
+  - Error responses (404, 429) set `Cache-Control: no-store`.
+  - Public rate limit is set to 120 requests/minute per network bucket (`public:{hash_ip(network_key(ip))}`). Network keys (/64 for IPv6, /32 for IPv4) are hashed via HMAC-SHA256 (`hash_ip`) to comply with SECURITY §8 personal data protection.
+  - 120 req/min was chosen to provide a generous budget for legitimate human visitor browsing, SPA prefetching and multi-tab exploration, while stopping scraping bots and request flooding.
+  - Internal Next.js server-side renders (SSR / ISR) and build-time static pre-renders (`next build`) pass edge verification without client IP headers; these are routed to a dedicated bucket `public:server` with a limit of 3,000 req/min (window 60s). This prevents the API from failing open (unlimited traffic) if edge headers are omitted or misconfigured, while providing high throughput for web server renders.
+- **Testimonial privacy:**
+  - Public testimonials (`PublicTestimonial`) expose only public information: `id`, `person_name`, `person_detail`, `quote`, `rating`, `photo`. Internal tracking and audit fields (`consent_date`, `source_url`, `project_id`) are stripped from public responses.
+- **Sitemap paths and deterministic timestamps:**
+  - Sitemap entries are restricted to canonical content URLs: `/`, published standard/legal pages (`kind != "landing"`, `seo.noindex = false`, and without draft placeholder text `is_draft_text = false`), published projects (`seo.noindex = false`), published posts (`seo.noindex = false`), and `/blog`.
+  - Configuration URLs (`/projects/{slug}/configurations/{config_slug}`) and city search filter URLs (`/projects?city={slug}`) are excluded from the sitemap.
+  - `lastmod` timestamps are derived deterministically from the underlying database rows (`max(updated_at)` for collection routes `/` and `/blog`, row `updated_at` for items) rather than `utcnow()`, enabling reliable HTTP 304 caching for search engine crawlers.
+- **Offer placement blocks:**
+  - An `offer_banner` block configured by placement (e.g. `placement = "home"`) returns the single highest priority active live offer matching that placement.
+- **Translations (D-014):**
+  - English default; Hindi overlay from `translations` JSON column when `locale = 'hi'` and feature flag `locale_hi` is enabled. If disabled or missing in Hindi, values fall back cleanly to English. Public responses drop the raw `translations` dictionary to avoid bypassing Hindi gating.
+- **SEO share image resolution:**
+  - Public `seo` responses resolve `og_image_id` into a `PublicMedia` object (`PublicSeo.og_image`) with delivery URL, dimensions, and format, enabling immediate rendering in meta tags.
+- **Performance:**
+  - Project detail and pages batch-load media links, FAQs, testimonials, and offers in single queries.
+  - Page grids fetch up to `limit` items directly without running count subqueries, and property detail loads summary data without loading full project detail graphs.
+
+**Consequences:** The public website in 5.2+ can render all public pages and listings with 1–2 lightweight API calls. Neon and PostgreSQL 18 support `pg_trgm` natively. Cache headers and ETags enable browser and CDN caching while protecting backend databases.
+**Verified / assumed:**
+- `pg_trgm` extension is created in migration `0001_foundation.py:25`, so migration `0007_search.py` requires no superuser privileges on Neon.
+- Query performance verified bounded via test query counters.

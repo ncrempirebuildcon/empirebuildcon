@@ -169,7 +169,7 @@ def snapshot(row: Any, skip: Iterable[str] = ()) -> dict[str, Any]:
     return {
         column.key: jsonable(getattr(row, column.key))
         for column in row.__table__.columns
-        if column.key not in skipped
+        if column.key not in skipped and getattr(column, "computed", None) is None
     }
 
 

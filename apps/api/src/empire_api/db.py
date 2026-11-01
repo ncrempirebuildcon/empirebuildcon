@@ -58,7 +58,7 @@ def created_at_column() -> Mapped[datetime]:
 def get_engine() -> Engine:
     """The process-wide engine. Tests dispose and clear it when they switch databases."""
     settings = get_settings()
-    return create_engine(
+    engine = create_engine(
         settings.database_url,
         pool_pre_ping=True,
         pool_size=settings.db_pool_size,
@@ -67,6 +67,7 @@ def get_engine() -> Engine:
         # server-side prepared statements. psycopg prepares nothing when this is None.
         connect_args={"prepare_threshold": None},
     )
+    return engine
 
 
 @lru_cache(maxsize=1)

@@ -16,7 +16,8 @@ apps/api/
 │                          0004_leads = consent texts, leads, consent records, notes, timeline,
 │                          site visits, 0005_content = pages, blocks, posts, FAQs, offers,
 │                          testimonials, redirects, 0006_settings_auth = two-factor, sign-in
-│                          challenges, the sent-mail log, consent_text.published_by)
+│                          challenges, the sent-mail log, consent_text.published_by,
+│                          0007_search = project.search_vector and pg_trgm GIN indexes)
 ├─ scripts/                make_common_passwords.py (regenerates the weak-password list)
 ├─ src/empire_api/
 │  ├─ main.py              create_app(): routers, middleware, error handlers, OpenAPI tweaks
@@ -120,6 +121,12 @@ apps/api/
 │  │  ├─ present.py        rows → responses; queries.py = what projects and the dashboard call
 │  │  ├─ routes_public.py, routes.py, routes_visits.py   HTTP only
 │  │  └─ seed.py           12 sample leads and 4 visits for `seed --sample` (D-015)
+│  ├─ public/              read-only public website endpoints (Task 5.1, D-038)
+│  │  ├─ routes.py         the 13 /api/v1/public/* endpoints
+│  │  ├─ service.py        resolution & batch loading for pages, projects, configs, sitemap
+│  │  ├─ schemas.py        public models free of staff/internal/personal fields
+│  │  ├─ visibility.py     visibility helper (published only, D-015 sample isolation, D-038 hero/cover, search)
+│  │  └─ caching.py        Cache-Control, strong SHA-256 ETag / 304, 120 req/min rate limit
 │  ├─ dashboard/           GET /admin/dashboard: counts with links, latest leads, visits, tasks
 │  ├─ integrations/        outbox drain + handlers, internal drain endpoint
 │  ├─ worker.py            empire-worker loop (paid always-on hosting)

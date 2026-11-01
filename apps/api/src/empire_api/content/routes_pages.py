@@ -5,7 +5,7 @@ HTTP only: the rules are in pages.py, page_blocks.py and posts.py. Permissions (
 §11): reading `content.read`; creating, editing, blocks and delete `content.write`; publish and
 unpublish `content.publish`. The services add `legal.publish` (legal pages), `content.publish`
 (scheduling, archiving a live page) and `seo.manage` (SEO fields) where a change needs them.
-TODO(phase-5): the public `/api/v1/public/pages/{slug}`, `/posts` and `/posts/{slug}`.
+Public page and post endpoints are in public/routes.py (Task 5.1).
 """
 
 from __future__ import annotations

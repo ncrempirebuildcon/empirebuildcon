@@ -29,7 +29,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, literal, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from empire_api.content import queries as content_queries
@@ -53,6 +53,7 @@ from empire_api.projects.common import (
 )
 from empire_api.projects.models import Project, ProjectAmenity
 from empire_api.projects.schemas import ProjectInput, ProjectUpdate
+from empire_api.public.visibility import set_search_trgm_threshold
 from empire_api.seo import redirects
 from empire_api.seo.paths import project_path
 from empire_api.timeutil import utcnow
@@ -70,7 +71,7 @@ WAS_PUBLISHED: Final = (
 NOT_A_DRAFT: Final = "Only drafts can be deleted. Restore it to draft first, or keep it archived."
 HAS_LEADS: Final = "This project has leads, so it can't be deleted. Archive it instead."
 SHOWN_IN_MESSAGE: Final = 5
-_AUDIT_SKIP: Final = ("updated_by",)
+_AUDIT_SKIP: Final = ("updated_by", "search_vector")
 
 # Everything a project row loads for the full CMS view (ProjectAdmin).
 FULL: Final = (
@@ -113,19 +114,46 @@ def load_project(db: Session, project_id: uuid.UUID) -> Project:
 def list_projects(
     db: Session, paging: PageParams, filters: ProjectFilters
 ) -> tuple[list[Project], int]:
-    """The CMS list, most recent edit first. `q` matches name or slug, ignoring case.
-
-    TODO(phase-5): full-text search (tsvector + pg_trgm, ARCHITECTURE §14) replaces the LIKE.
+    """The CMS list, most recent edit first.
+    `q` matches full-text search, trigram similarity or slug.
     """
     stmt = select(Project)
+    order_clauses: list[Any] = [Project.updated_at.desc(), Project.id.desc()]
     if filters.q and filters.q.strip():
-        pattern = like_pattern(filters.q)
+        set_search_trgm_threshold(db)
+        cleaned_q = filters.q.strip()
+        pattern = like_pattern(cleaned_q)
+        ts_query = func.plainto_tsquery("english", cleaned_q)
+        fts_match = Project.search_vector.op("@@")(ts_query)
+        trgm_match = literal(cleaned_q).op("<%")(Project.name)
         stmt = stmt.where(
             or_(
+                fts_match,
+                trgm_match,
                 func.lower(Project.name).like(pattern, escape="\\"),
                 Project.slug.like(pattern, escape="\\"),
             )
         )
+        # R3-M2: when q is given, order by relevance: exact match or prefix first,
+        # then LIKE match, then FTS rank, trigram similarity, and updated_at.
+        relevance_tier = case(
+            (func.lower(Project.slug) == cleaned_q.lower(), 1),
+            (func.lower(Project.name) == cleaned_q.lower(), 1),
+            (Project.slug.ilike(f"{cleaned_q}%"), 2),
+            (Project.name.ilike(f"{cleaned_q}%"), 2),
+            (Project.slug.like(pattern, escape="\\"), 3),
+            (func.lower(Project.name).like(pattern, escape="\\"), 3),
+            else_=4,
+        )
+        fts_rank = func.ts_rank(Project.search_vector, ts_query)
+        trgm_sim = func.similarity(Project.name, cleaned_q)
+        order_clauses = [
+            relevance_tier.asc(),
+            fts_rank.desc(),
+            trgm_sim.desc(),
+            Project.updated_at.desc(),
+            Project.id.desc(),
+        ]
     for column, value in (
         (Project.status, filters.status),
         (Project.publish_state, filters.publish_state),
@@ -143,7 +171,7 @@ def list_projects(
             selectinload(Project.locality),
             selectinload(Project.configurations),
         )
-        .order_by(Project.updated_at.desc(), Project.id.desc())
+        .order_by(*order_clauses)
         .offset(paging.offset)
         .limit(paging.per_page)
     ).all()
@@ -208,7 +236,11 @@ def update_project(db: Session, project_id: uuid.UUID, body: ProjectUpdate, acto
     dangling = project_input.drop_dangling_share_image(db, project, sent, changes)
     _check_transition(project.publish_state, target, actor)  # 2
     visibility_changed = _check_visibility(project, changes, actor)
-    merged = {column.key: getattr(project, column.key) for column in Project.__table__.columns}
+    merged = {
+        column.key: getattr(project, column.key)
+        for column in Project.__table__.columns
+        if column.computed is None and column.key != "search_vector"
+    }
     merged.update(changes)
     if target is not None:
         merged["publish_state"] = target

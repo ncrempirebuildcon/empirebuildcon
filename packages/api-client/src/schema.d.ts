@@ -2155,6 +2155,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/cities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cities with published projects */
+        get: operations["public_list_cities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/faqs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FAQs (site-wide, or for one project) */
+        get: operations["public_list_faqs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/leads": {
         parameters: {
             query?: never;
@@ -2175,6 +2209,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/pages/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Published page with blocks (incl. legal and landing pages) */
+        get: operations["public_get_page"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Blog and news */
+        get: operations["public_list_posts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/posts/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Article */
+        get: operations["public_get_post"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search projects (available first, then sold out; off-market hidden) */
+        get: operations["public_list_projects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/projects/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Project detail */
+        get: operations["public_get_project"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/projects/{slug}/configurations/{config_slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Property (configuration) detail */
+        get: operations["public_get_property"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/properties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search properties (configurations) across projects */
+        get: operations["public_list_properties"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/redirects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active redirects (read by the web app, cached) */
+        get: operations["public_list_redirects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/site": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Company details, nav, public flags, consent texts, active offers */
+        get: operations["public_site"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/site-visits": {
         parameters: {
             query?: never;
@@ -2189,6 +2376,40 @@ export interface paths {
          * @description `consent` must name the CURRENT lead-form consent text (id and version): an older one answers 409 "reload the page"; with no published text the answer is 503. `marketing_consent` is optional and, when sent, must name the current marketing text. The phone is normalised to E.164 (+91…); anything else is 422 on `phone`. The same phone and project within 24 hours is saved as a duplicate of the earlier lead and doesn't alert sales again. The day must be today or within 120 days (IST); sales confirm the time by phone.
          */
         post: operations["request_site_visit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/sitemap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All public URLs with last-modified (web app builds sitemap.xml) */
+        get: operations["public_sitemap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/testimonials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Published, sourced testimonials */
+        get: operations["public_list_testimonials"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4574,7 +4795,7 @@ export interface components {
         };
         /**
          * OfferBannerData
-         * @description One chosen offer, or the live offers of a placement (highest priority first).
+         * @description One chosen offer, or the highest-priority live offer of a placement.
          */
         OfferBannerData: {
             /** Offer Id */
@@ -5647,6 +5868,685 @@ export interface components {
              * @enum {string}
              */
             type: "property_grid";
+        };
+        /** PublicBlock */
+        PublicBlock: {
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /** Type */
+            type: string;
+        };
+        /** PublicCity */
+        PublicCity: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Project Count */
+            project_count: number;
+            /** Slug */
+            slug: string;
+            /** State */
+            state: string;
+        };
+        /** PublicCompany */
+        PublicCompany: {
+            /** Address */
+            address: string | null;
+            /** Corporate Address */
+            corporate_address: string | null;
+            /** Emails */
+            emails: string[];
+            /** Gstin */
+            gstin: string | null;
+            /** Legal Name */
+            legal_name: string | null;
+            /** Name */
+            name: string;
+            /** Office Hours */
+            office_hours: string | null;
+            /** Phones */
+            phones: string[];
+            /** Registered Address */
+            registered_address: string | null;
+            /** Tagline */
+            tagline: string | null;
+            /** Whatsapp */
+            whatsapp: string | null;
+            /** Whatsapp Message */
+            whatsapp_message: string | null;
+        };
+        /** PublicConfiguration */
+        PublicConfiguration: {
+            area: components["schemas"]["Area"];
+            /** Balconies */
+            balconies: number | null;
+            /** Bathrooms */
+            bathrooms: number | null;
+            /** Bhk */
+            bhk: number | null;
+            /**
+             * Floor Plans
+             * @description Media links with role floor_plan (image or PDF; at most one)
+             */
+            floor_plans: components["schemas"]["PublicLinkedMedia"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Sample
+             * @description Sample data — never shown in production
+             * @default false
+             */
+            is_sample: boolean;
+            /** Name */
+            name: string;
+            price: components["schemas"]["Price"];
+            /**
+             * Property Type
+             * @enum {string}
+             */
+            property_type: "apartment" | "villa" | "plot" | "penthouse" | "shop" | "office" | "other";
+            /**
+             * Sales Status
+             * @enum {string}
+             */
+            sales_status: "available" | "sold_out" | "off_market";
+            /** Slug */
+            slug: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Tower Id */
+            tower_id: string | null;
+        };
+        /** PublicConsentText */
+        PublicConsentText: {
+            /** Body */
+            body: string;
+            /** Checkbox Label */
+            checkbox_label: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Version */
+            version: number;
+        };
+        /** PublicFaq */
+        PublicFaq: {
+            /** Answer */
+            answer: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Visible
+             * @default true
+             */
+            is_visible: boolean;
+            /** Question */
+            question: string;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+        };
+        /** PublicLinkedMedia */
+        PublicLinkedMedia: {
+            /** Alt Text */
+            alt_text: string | null;
+            /** Duration S */
+            duration_s: number | null;
+            /** Format */
+            format: string | null;
+            /** Height */
+            height: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Cover */
+            is_cover: boolean;
+            /**
+             * Is Sample
+             * @default false
+             */
+            is_sample: boolean;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string | null;
+            /** Label Month */
+            label_month: string | null;
+            /** Role */
+            role: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Thumbnail Url */
+            thumbnail_url: string | null;
+            /** Url */
+            url: string;
+            /** Width */
+            width: number | null;
+        };
+        /** PublicMedia */
+        PublicMedia: {
+            /** Alt Text */
+            alt_text: string | null;
+            /** Duration S */
+            duration_s: number | null;
+            /** Format */
+            format: string | null;
+            /** Height */
+            height: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Sample
+             * @default false
+             */
+            is_sample: boolean;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string | null;
+            /** Label Month */
+            label_month: string | null;
+            /** Thumbnail Url */
+            thumbnail_url: string | null;
+            /** Url */
+            url: string;
+            /** Width */
+            width: number | null;
+        };
+        /** PublicNavItem */
+        PublicNavItem: {
+            /** Label */
+            label: string;
+            /** Path */
+            path: string;
+        };
+        /** PublicOffer */
+        PublicOffer: {
+            /** Body */
+            body: string | null;
+            /** Cta Label */
+            cta_label: string | null;
+            /** Cta Url */
+            cta_url: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            image: components["schemas"]["PublicMedia"] | null;
+            /** Placement */
+            placement: string;
+            /** Project Slug */
+            project_slug: string | null;
+            /** Terms */
+            terms: string | null;
+            /** Terms Url */
+            terms_url: string | null;
+            /** Title */
+            title: string;
+        };
+        /** PublicPage */
+        PublicPage: {
+            /** Blocks */
+            blocks: components["schemas"]["PublicBlock"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Draft Text
+             * @default false
+             */
+            is_draft_text: boolean;
+            /** Kind */
+            kind: string;
+            /** Legal Version */
+            legal_version: string | null;
+            /** Nav Order */
+            nav_order: number | null;
+            seo: components["schemas"]["PublicSeo"];
+            /**
+             * Show In Nav
+             * @default false
+             */
+            show_in_nav: boolean;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** PublicPost */
+        PublicPost: {
+            /** Author */
+            author: string | null;
+            /** Body */
+            body: string;
+            /** Category */
+            category: string | null;
+            cover: components["schemas"]["PublicMedia"] | null;
+            /** Excerpt */
+            excerpt: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Published At */
+            published_at: string | null;
+            seo: components["schemas"]["PublicSeo"];
+            /** Slug */
+            slug: string;
+            /** Tags */
+            tags: string[];
+            /** Title */
+            title: string;
+        };
+        /** PublicPostList */
+        PublicPostList: {
+            /** Items */
+            items: components["schemas"]["PublicPost"][];
+            meta: components["schemas"]["PageMeta"];
+        };
+        /** PublicProjectDetail */
+        PublicProjectDetail: {
+            /** Amenities */
+            amenities: components["schemas"]["Amenity"][];
+            brochure: components["schemas"]["PublicLinkedMedia"] | null;
+            /**
+             * Brochure Gated
+             * @default false
+             */
+            brochure_gated: boolean;
+            city: components["schemas"]["CityRef"] | null;
+            /** Configuration Labels */
+            configuration_labels: string[];
+            /** Configurations */
+            configurations: components["schemas"]["PublicConfiguration"][];
+            /** Construction Updates */
+            construction_updates: components["schemas"]["ConstructionUpdate"][];
+            cover: components["schemas"]["PublicMedia"] | null;
+            /** Description */
+            description: string | null;
+            /** Documents */
+            documents: components["schemas"]["PublicLinkedMedia"][];
+            /** Faqs */
+            faqs: components["schemas"]["PublicFaq"][];
+            /** Gallery */
+            gallery: components["schemas"]["PublicLinkedMedia"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Featured
+             * @default false
+             */
+            is_featured: boolean;
+            /**
+             * Is Sample
+             * @default false
+             */
+            is_sample: boolean;
+            land_area: components["schemas"]["Area"] | null;
+            /** Launch Date */
+            launch_date: string | null;
+            locality: components["schemas"]["LocalityRef"] | null;
+            location: components["schemas"]["Location"];
+            /** Location Advantages */
+            location_advantages: components["schemas"]["LocationAdvantage"][];
+            /** Name */
+            name: string;
+            /** Payment Plans */
+            payment_plans: components["schemas"]["PaymentPlan"][];
+            /** Possession Date */
+            possession_date: string | null;
+            price: components["schemas"]["Price"];
+            /** Project Type */
+            project_type: string;
+            /** Property Types */
+            property_types: string[];
+            rera: components["schemas"]["PublicRera"];
+            /** Sales Status */
+            sales_status: string;
+            seo: components["schemas"]["PublicSeo"];
+            /** Slug */
+            slug: string;
+            /** Specifications */
+            specifications: components["schemas"]["Specification"][];
+            /** Status */
+            status: string;
+            /** Tagline */
+            tagline: string | null;
+            /** Total Units */
+            total_units: number | null;
+            /** Towers */
+            towers: components["schemas"]["Tower"][];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Videos */
+            videos: components["schemas"]["PublicLinkedMedia"][];
+        };
+        /** PublicProjectList */
+        PublicProjectList: {
+            /** Items */
+            items: components["schemas"]["PublicProjectSummary"][];
+            meta: components["schemas"]["PageMeta"];
+        };
+        /** PublicProjectRef */
+        PublicProjectRef: {
+            city: components["schemas"]["CityRef"] | null;
+            locality: components["schemas"]["LocalityRef"] | null;
+            /** Name */
+            name: string;
+            rera: components["schemas"]["PublicRera"] | null;
+            /** Slug */
+            slug: string;
+            /** Status */
+            status: string;
+        };
+        /** PublicProjectSummary */
+        PublicProjectSummary: {
+            city: components["schemas"]["CityRef"] | null;
+            /** Configuration Labels */
+            configuration_labels: string[];
+            cover: components["schemas"]["PublicMedia"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Featured
+             * @default false
+             */
+            is_featured: boolean;
+            /**
+             * Is Sample
+             * @default false
+             */
+            is_sample: boolean;
+            locality: components["schemas"]["LocalityRef"] | null;
+            /** Name */
+            name: string;
+            /** Possession Date */
+            possession_date: string | null;
+            price: components["schemas"]["Price"];
+            /** Property Types */
+            property_types: string[];
+            rera: components["schemas"]["PublicRera"];
+            /** Sales Status */
+            sales_status: string;
+            /** Slug */
+            slug: string;
+            /** Status */
+            status: string;
+        };
+        /** PublicPropertyDetail */
+        PublicPropertyDetail: {
+            area: components["schemas"]["Area"];
+            /** Balconies */
+            balconies: number | null;
+            /** Bathrooms */
+            bathrooms: number | null;
+            /** Bhk */
+            bhk: number | null;
+            /**
+             * Floor Plans
+             * @description Media links with role floor_plan (image or PDF; at most one)
+             */
+            floor_plans: components["schemas"]["PublicLinkedMedia"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Sample
+             * @description Sample data — never shown in production
+             * @default false
+             */
+            is_sample: boolean;
+            /** Name */
+            name: string;
+            price: components["schemas"]["Price"];
+            project: components["schemas"]["PublicProjectSummary"];
+            /**
+             * Property Type
+             * @enum {string}
+             */
+            property_type: "apartment" | "villa" | "plot" | "penthouse" | "shop" | "office" | "other";
+            /**
+             * Sales Status
+             * @enum {string}
+             */
+            sales_status: "available" | "sold_out" | "off_market";
+            /** Slug */
+            slug: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Tower Id */
+            tower_id: string | null;
+        };
+        /** PublicPropertyList */
+        PublicPropertyList: {
+            /** Items */
+            items: components["schemas"]["PublicPropertySummary"][];
+            meta: components["schemas"]["PageMeta"];
+        };
+        /** PublicPropertySummary */
+        PublicPropertySummary: {
+            area: components["schemas"]["Area"];
+            /** Bhk */
+            bhk: number | null;
+            cover: components["schemas"]["PublicMedia"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is Sample
+             * @description Sample data — never shown in production
+             * @default false
+             */
+            is_sample: boolean;
+            /** Name */
+            name: string;
+            price: components["schemas"]["Price"];
+            project: components["schemas"]["PublicProjectRef"];
+            /**
+             * Property Type
+             * @enum {string}
+             */
+            property_type: "apartment" | "villa" | "plot" | "penthouse" | "shop" | "office" | "other";
+            /**
+             * Sales Status
+             * @enum {string}
+             */
+            sales_status: "available" | "sold_out" | "off_market";
+            /** Slug */
+            slug: string;
+        };
+        /** PublicRedirect */
+        PublicRedirect: {
+            /** From Path */
+            from_path: string;
+            /**
+             * Status Code
+             * @default 308
+             */
+            status_code: number;
+            /** To Path */
+            to_path: string;
+        };
+        /** PublicRegulator */
+        PublicRegulator: {
+            /**
+             * Authority
+             * @default UP-RERA
+             */
+            authority: string;
+            /**
+             * Name
+             * @default Uttar Pradesh Real Estate Regulatory Authority
+             */
+            name: string;
+            /** Promoter Number */
+            promoter_number: string | null;
+            /**
+             * State
+             * @default UP
+             */
+            state: string;
+            /**
+             * Website
+             * @default https://www.up-rera.in
+             */
+            website: string;
+        };
+        /** PublicRera */
+        PublicRera: {
+            /** Authority */
+            authority: string;
+            /** Number */
+            number: string | null;
+            qr: components["schemas"]["PublicMedia"] | null;
+            /** Url */
+            url: string | null;
+        };
+        /** PublicSeo */
+        PublicSeo: {
+            /** Canonical Path */
+            canonical_path: string | null;
+            /** Description */
+            description: string | null;
+            /**
+             * Noindex
+             * @default false
+             */
+            noindex: boolean;
+            og_image: components["schemas"]["PublicMedia"] | null;
+            /** Title */
+            title: string | null;
+        };
+        /** PublicSeoDefaults */
+        PublicSeoDefaults: {
+            /** Default Description */
+            default_description: string | null;
+            /** Default Title */
+            default_title: string | null;
+            /** Title Suffix */
+            title_suffix: string | null;
+        };
+        /** PublicSite */
+        PublicSite: {
+            company: components["schemas"]["PublicCompany"];
+            /** Consent */
+            consent: {
+                [key: string]: components["schemas"]["PublicConsentText"] | null;
+            };
+            /** Features */
+            features: {
+                [key: string]: boolean;
+            };
+            /** Locales */
+            locales: string[];
+            /** Nav */
+            nav: components["schemas"]["PublicNavItem"][];
+            /** Offers */
+            offers: components["schemas"]["PublicOffer"][];
+            regulator: components["schemas"]["PublicRegulator"];
+            seo: components["schemas"]["PublicSeoDefaults"] | null;
+            /** Social */
+            social: {
+                [key: string]: string;
+            };
+            tracking: components["schemas"]["PublicTracking"] | null;
+        };
+        /** PublicSitemapEntry */
+        PublicSitemapEntry: {
+            /** Alternates */
+            alternates: {
+                [key: string]: string;
+            };
+            /**
+             * Lastmod
+             * Format: date-time
+             */
+            lastmod: string;
+            /** Path */
+            path: string;
+        };
+        /** PublicTestimonial */
+        PublicTestimonial: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Person Detail */
+            person_detail: string | null;
+            /** Person Name */
+            person_name: string;
+            photo: components["schemas"]["PublicMedia"] | null;
+            /** Quote */
+            quote: string;
+            /** Rating */
+            rating: number | null;
+        };
+        /** PublicTracking */
+        PublicTracking: {
+            /** Ga4 Id */
+            ga4_id: string | null;
+            /** Gtm Id */
+            gtm_id: string | null;
+            /** Meta Pixel Id */
+            meta_pixel_id: string | null;
         };
         /**
          * RecoveryCodes
@@ -16674,6 +17574,121 @@ export interface operations {
             };
         };
     };
+    public_list_cities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicCity"][];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    public_list_faqs: {
+        parameters: {
+            query?: {
+                project?: string | null;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFaq"][];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     submit_lead: {
         parameters: {
             query?: never;
@@ -16743,6 +17758,565 @@ export interface operations {
             };
         };
     };
+    public_get_page: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicPage"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    public_list_posts: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+                category?: string | null;
+                tag?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicPostList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    public_get_post: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicPost"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    public_list_projects: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                locale?: string | null;
+                status?: string | null;
+                city?: string | null;
+                locality?: string | null;
+                type?: string | null;
+                bhk?: number | null;
+                /** @description Whole rupees */
+                budget_min?: number | null;
+                /** @description Whole rupees */
+                budget_max?: number | null;
+                featured?: boolean | null;
+                sort?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicProjectList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    public_get_project: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicProjectDetail"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    public_get_property: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+                config_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicPropertyDetail"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    public_list_properties: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+                city?: string | null;
+                locality?: string | null;
+                type?: string | null;
+                bhk?: number | null;
+                /** @description Whole rupees */
+                budget_min?: number | null;
+                /** @description Whole rupees */
+                budget_max?: number | null;
+                project_status?: string | null;
+                sort?: string | null;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicPropertyList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    public_list_redirects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicRedirect"][];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    public_site: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSite"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     request_site_visit: {
         parameters: {
             query?: never;
@@ -16803,6 +18377,120 @@ export interface operations {
             };
             /** @description Service unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    public_sitemap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSitemapEntry"][];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    public_list_testimonials: {
+        parameters: {
+            query?: {
+                project?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicTestimonial"][];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

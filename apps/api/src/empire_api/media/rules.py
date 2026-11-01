@@ -25,9 +25,9 @@ from empire_api.media.vocab import (
 )
 from empire_api.timeutil import today_ist
 
-# TODO(phase-5): the public project page decides how a hero image is chosen; until then the
-# gallery cover is the main image. These roles stay in the contract's enum for stability, but
-# the CMS couldn't list or detach such links, so attaching them is refused.
+# The hero/cover image decision is recorded in D-038: the pinned cover if visible and labelled,
+# otherwise the first visible labelled gallery photo. Attaching explicit hero or og_image links
+# is refused; hero comes from gallery cover and og_image comes from seo.og_image_id.
 REFUSED_ROLES: Final = {
     "hero": "The main image is the gallery cover: pin a photo as the cover instead.",
     "og_image": "Set the SEO share image (seo.og_image_id) instead of attaching one.",

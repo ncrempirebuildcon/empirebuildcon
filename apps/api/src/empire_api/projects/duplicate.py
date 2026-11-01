@@ -41,7 +41,7 @@ from empire_api.projects.models import (
 )
 from empire_api.projects.project_input import SLUG_TAKEN
 
-_NOT_COPIED: Final = frozenset({"id", "project_id", "created_at", "updated_at"})
+_NOT_COPIED: Final = frozenset({"id", "project_id", "created_at", "updated_at", "search_vector"})
 NAME_MAX: Final = 120
 SLUG_CONFLICTS: Final = {"uq_project_slug": ("slug", SLUG_TAKEN)}
 # COMPLIANCE (D-002): a copy must never carry another project's RERA registration: not the
@@ -57,7 +57,7 @@ def _copy(row: Any, **overrides: Any) -> dict[str, Any]:
     values = {
         column.key: getattr(row, column.key)
         for column in row.__table__.columns
-        if column.key not in _NOT_COPIED
+        if column.key not in _NOT_COPIED and getattr(column, "computed", None) is None
     }
     values.update(overrides)
     return values
