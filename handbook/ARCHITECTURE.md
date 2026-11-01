@@ -71,7 +71,7 @@ Full list: [api/ENDPOINTS.md](api/ENDPOINTS.md) (159 operations).
 | CMS (`/admin/**`) | Client-rendered after a server session check; never cached | Always live |
 | Lead forms, chat | Client components posting to `/api/v1/public/*` | — |
 
-The `/_internal/revalidate` route lives outside `/api/*` so it is handled by Next.js, not proxied. It requires an HMAC header (`REVALIDATE_SECRET`).
+The `/_internal/revalidate` route lives outside `/api/*` so it is handled by Next.js, not proxied. It requires an HMAC-SHA256 signature (`X-Empire-Signature`) computed over the timestamp and raw JSON body (`${timestamp}.${body}`) using `REVALIDATE_SECRET`, along with `X-Empire-Timestamp`. Signatures older than 5 minutes or previously observed are refused (D-039). An API outbox handler (`integrations/handlers.py`) sends this request on CMS publish events with automatic retries.
 
 ## 6. Data model
 
@@ -307,7 +307,7 @@ Every create, update, delete, publish, export, login and permission change write
 ## 14. Search
 
 - PostgreSQL full-text search (generated `tsvector` on project name and tagline, combined with city and locality in queries) plus `pg_trgm` for typos, and structured filters (status, city, locality, type, BHK, budget). Filters live in the URL.
-- PostgreSQL generated columns cannot reference foreign tables, so `project.search_vector` indexes `name` and `tagline` directly on the project row, while search queries combine this with tsvector expressions and `pg_trgm` word similarity operators (`<%`) on `city.name` and `locality.name`, accelerated by GIN indexes on `project(search_vector)`, `project.name`, `locality.name`, and `city.name` (migration `0007_search.py`, Task 5.1, D-038). Replaces text-match `LIKE` in public catalogue search, while admin project search pairs full-text and trigram matching with `LIKE` for slug matching.
+- PostgreSQL generated columns cannot reference foreign tables, so `project.search_vector` indexes `name` and `tagline` directly on the project row, while search queries combine this with tsvector expressions and `pg_trgm` word similarity operators (`<%`) on `city.name` and `locality.name`, accelerated by GIN indexes on `project(search_vector)`, `project.name`, `locality.name`, and `city.name` (migration `0007_search.py`, Task 5.1, D-038). Replaces text-match `LIKE` in public catalogue search, while admin project search pairs full-text and trigram matching with `LIKE` on slug and name and orders by relevance (exact match first, then prefix, then substring LIKE, then full-text rank, trigram similarity, and updated_at) when `q` is given.
 - The `vector` extension (pgvector) is enabled by the first migration wherever the server has it (Neon, CI and the Docker image do), so Phase 7 needs no database change (D-013). A bare local PostgreSQL without pgvector still works until Phase 7 (D-026).
 
 ## 15. Languages
@@ -357,7 +357,7 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 
 ## 20. Observability
 
-- Sentry for the web app and API (errors + basic performance), release-tagged from CI.
+- Sentry for the web app (`@sentry/nextjs@11.10.0`) and API (`sentry-sdk`), release-tagged from CI. The web app's `beforeSend` scrubber strips query strings, fragments, request bodies, cookies and visitor IP addresses before transmission (D-039). Setting `NEXT_PUBLIC_SENTRY_DSN` empty disables Sentry locally and in test environments.
 - Uptime checks every 5 minutes on `/` and `/api/health/live` (answers without touching the database, so the free database can sleep), alerting the owner by email. `/api/health` (with a database check) runs after each deploy.
 - Structured JSON logs (request id, user id, route, status, duration). No passwords, tokens or full phone numbers in logs (phones masked `+91 98xxxxxx10`).
 

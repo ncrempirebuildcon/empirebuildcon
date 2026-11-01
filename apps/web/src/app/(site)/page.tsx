@@ -1,12 +1,12 @@
 /**
- * Home: the "coming soon" holding page in Black & gold until the public site ships (Phase 5).
- * Same message as /holding-page (used for the domain check), restyled with the approved theme.
+ * Home: holding content inside the new public shell until 5.5 builds the full home page.
+ * Restyled with the approved Black & gold theme (D-033, D-038).
  */
 import Image from "next/image";
 
 export default function HomePage() {
   return (
-    <main className="grid min-h-dvh place-items-center px-4 py-12">
+    <section className="grid min-h-[60vh] place-items-center px-4 py-16">
       <div className="flex max-w-xl flex-col items-center gap-5 text-center">
         <Image
           src="/brand/logo-stacked-noir.svg"
@@ -28,6 +28,6 @@ export default function HomePage() {
         </p>
         <p className="text-caption text-muted">empirebuildcon.com</p>
       </div>
-    </main>
+    </section>
   );
 }

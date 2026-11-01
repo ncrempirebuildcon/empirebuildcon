@@ -14,21 +14,24 @@ Covers:
 
 from __future__ import annotations
 
+import contextlib
+import json
 from collections.abc import Iterator
 from datetime import timedelta
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
-from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from empire_api.config import Settings, get_settings
 from empire_api.db import get_engine
 from empire_api.main import create_app
 from empire_api.platform.crypto import hash_ip, network_key
+from empire_api.platform.models import RateLimitBucket
 from empire_api.platform.rate_limit import _window_start
-from empire_api.public.caching import SERVER_RATE_LIMIT
+from empire_api.public.caching import SERVER_RATE_LIMIT, cached_response
 from empire_api.timeutil import utcnow
 
 EDGE_KEY = "test-edge-key-0123456789-abcdefghijklmnopqrstuvwxyz"
@@ -86,20 +89,23 @@ def test_public_rate_limiting_ipv4_and_headers(edge_app: FastAPI) -> None:
         r = client.get("/api/v1/public/site", headers=headers)
         assert r.status_code == 200
 
-    # Exhaust the remaining bucket for this network
+    # Exhaust the remaining bucket for this network using ORM (Part B Item 5)
     now = utcnow()
     start = _window_start(now, 60)
     key = f"public:{hash_ip(network_key(test_ip))}"
-    engine = get_engine()
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                "INSERT INTO rate_limit_bucket (key, window_start, count, expires_at) "
-                "VALUES (:key, :start, :limit, :expires) "
-                "ON CONFLICT (key, window_start) DO UPDATE SET count = :limit"
-            ),
-            {"key": key, "start": start, "limit": 120, "expires": start + timedelta(seconds=120)},
-        )
+    with Session(get_engine()) as session:
+        bucket = session.get(RateLimitBucket, (key, start))
+        if not bucket:
+            bucket = RateLimitBucket(
+                key=key,
+                window_start=start,
+                count=120,
+                expires_at=start + timedelta(seconds=120),
+            )
+            session.add(bucket)
+        else:
+            bucket.count = 120
+        session.commit()
 
     # Next request should be rate-limited (429 Too Many Requests)
     res_blocked = client.get("/api/v1/public/site", headers=headers)
@@ -130,20 +136,23 @@ def test_public_rate_limiting_ipv6_64_subnet(edge_app: FastAPI) -> None:
         r = client.get("/api/v1/public/site", headers=headers1)
         assert r.status_code == 200
 
-    # Exhaust the /64 subnet bucket
+    # Exhaust the /64 subnet bucket using ORM (Part B Item 5)
     now = utcnow()
     start = _window_start(now, 60)
     key = f"public:{hash_ip(network_key(ip1))}"
-    engine = get_engine()
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                "INSERT INTO rate_limit_bucket (key, window_start, count, expires_at) "
-                "VALUES (:key, :start, :limit, :expires) "
-                "ON CONFLICT (key, window_start) DO UPDATE SET count = :limit"
-            ),
-            {"key": key, "start": start, "limit": 120, "expires": start + timedelta(seconds=120)},
-        )
+    with Session(get_engine()) as session:
+        bucket = session.get(RateLimitBucket, (key, start))
+        if not bucket:
+            bucket = RateLimitBucket(
+                key=key,
+                window_start=start,
+                count=120,
+                expires_at=start + timedelta(seconds=120),
+            )
+            session.add(bucket)
+        else:
+            bucket.count = 120
+        session.commit()
 
     # Next request from ip2 in same /64 subnet should be blocked
     res_blocked = client.get("/api/v1/public/site", headers=headers2)
@@ -164,24 +173,90 @@ def test_public_rate_limiting_edge_ssr_server_bucket(edge_app: FastAPI) -> None:
         r = client.get("/api/v1/public/site", headers=headers)
         assert r.status_code == 200
 
-    # Exhaust the server bucket in DB
+    # Exhaust the server bucket in DB using ORM (Part B Item 5)
     now = utcnow()
     start = _window_start(now, 60)
-    engine = get_engine()
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                "INSERT INTO rate_limit_bucket (key, window_start, count, expires_at) "
-                "VALUES ('public:server', :start, :limit, :expires) "
-                "ON CONFLICT (key, window_start) DO UPDATE SET count = :limit"
-            ),
-            {"start": start, "limit": SERVER_RATE_LIMIT, "expires": start + timedelta(seconds=120)},
-        )
+    with Session(get_engine()) as session:
+        bucket = session.get(RateLimitBucket, ("public:server", start))
+        if not bucket:
+            bucket = RateLimitBucket(
+                key="public:server",
+                window_start=start,
+                count=SERVER_RATE_LIMIT,
+                expires_at=start + timedelta(seconds=120),
+            )
+            session.add(bucket)
+        else:
+            bucket.count = SERVER_RATE_LIMIT
+        session.commit()
 
     # Next request to public endpoint should be blocked with 429 and no-store
     res_blocked = client.get("/api/v1/public/site", headers=headers)
     assert res_blocked.status_code == 429
     assert res_blocked.headers.get("cache-control") == "no-store"
+
+
+def test_public_rate_limiting_server_bucket_structured_warning_log(
+    edge_app: FastAPI, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Part B Item 1: Server rate bucket usage emits structured warning with no IP."""
+    client = TestClient(edge_app, base_url="https://testserver", follow_redirects=False)
+    headers = {"X-Empire-Edge-Key": EDGE_KEY}
+
+    res = client.get("/api/v1/public/site", headers=headers)
+    assert res.status_code == 200
+
+    captured = capsys.readouterr()
+    log_lines = []
+    for line in captured.out.strip().splitlines():
+        if line.strip().startswith("{") and line.strip().endswith("}"):
+            with contextlib.suppress(json.JSONDecodeError):
+                log_lines.append(json.loads(line))
+
+    warning_logs = [
+        entry for entry in log_lines if entry.get("event") == "public_rate_limit_server_bucket_used"
+    ]
+    assert len(warning_logs) > 0, f"Expected server bucket warning in logs, got: {captured.out}"
+    entry = warning_logs[0]
+    assert entry.get("level") == "warning"
+    assert entry.get("path") == "/api/v1/public/site"
+    assert entry.get("method") == "GET"
+    # INVARIANT: Structured log must not carry raw IP
+    assert "ip" not in entry
+    assert "client_ip" not in entry
+    assert "127.0.0.1" not in str(entry)
+
+
+def test_cached_response_honours_status_code_and_no_store_on_error() -> None:
+    """Part B Item 5: cached_response honours status_code and sets no-store on >= 400."""
+    req = Request({"type": "http", "method": "GET", "path": "/test", "headers": []})
+    res_200 = cached_response(req, {"ok": True}, status_code=200)
+    assert res_200.status_code == 200
+    assert "public" in res_200.headers.get("cache-control", "")
+    assert "ETag" in res_200.headers
+
+    # Error status 404
+    res_404 = cached_response(req, {"detail": "Missing"}, status_code=404)
+    assert res_404.status_code == 404
+    assert res_404.headers.get("cache-control") == "no-store"
+
+    # Error status 422
+    res_422 = cached_response(req, {"detail": "Invalid"}, status_code=422)
+    assert res_422.status_code == 422
+    assert res_422.headers.get("cache-control") == "no-store"
+
+    # Even if client sends matching If-None-Match, an error must NEVER return 304
+    req_etag = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/test",
+            "headers": [(b"if-none-match", b"*")],
+        }
+    )
+    res_err = cached_response(req_etag, {"detail": "Failed"}, status_code=500)
+    assert res_err.status_code == 500
+    assert res_err.headers.get("cache-control") == "no-store"
 
 
 def test_public_404_cache_control_no_store(client: TestClient) -> None:

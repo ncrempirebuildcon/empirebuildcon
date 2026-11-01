@@ -116,6 +116,8 @@ def test_hsts_and_hidden_docs_in_production() -> None:
         ip_hash_salt=SecretStr("p" * 48),
         data_encryption_key=SecretStr(Fernet.generate_key().decode()),
         edge_proxy_key=SecretStr("e" * 48),
+        revalidate_secret=SecretStr("r" * 48),
+        web_revalidate_url="https://example.com/_internal/revalidate",
         cloudinary_url=SecretStr("cloudinary://key:not-a-secret@demo"),
         email_api_key=SecretStr("not-a-real-resend-key"),
         email_from="alerts@example.com",

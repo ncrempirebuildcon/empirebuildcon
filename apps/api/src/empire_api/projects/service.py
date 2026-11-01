@@ -44,6 +44,7 @@ from empire_api.projects.common import (
     commit,
     conflict,
     emit,
+    escape_like,
     flush,
     like_pattern,
     lock_project,
@@ -53,7 +54,7 @@ from empire_api.projects.common import (
 )
 from empire_api.projects.models import Project, ProjectAmenity
 from empire_api.projects.schemas import ProjectInput, ProjectUpdate
-from empire_api.public.visibility import set_search_trgm_threshold
+from empire_api.search import set_search_trgm_threshold
 from empire_api.seo import redirects
 from empire_api.seo.paths import project_path
 from empire_api.timeutil import utcnow
@@ -114,7 +115,7 @@ def load_project(db: Session, project_id: uuid.UUID) -> Project:
 def list_projects(
     db: Session, paging: PageParams, filters: ProjectFilters
 ) -> tuple[list[Project], int]:
-    """The CMS list, most recent edit first.
+    """The CMS list, most recent edit first (or ordered by relevance when `q` is given).
     `q` matches full-text search, trigram similarity or slug.
     """
     stmt = select(Project)
@@ -134,13 +135,15 @@ def list_projects(
                 Project.slug.like(pattern, escape="\\"),
             )
         )
-        # R3-M2: when q is given, order by relevance: exact match or prefix first,
-        # then LIKE match, then FTS rank, trigram similarity, and updated_at.
+        # R3-M2 / Part B Item 6: when q is given, order by relevance: exact match first,
+        # then prefix match (escaped), then substring LIKE, FTS rank, trigram similarity,
+        # and updated_at / id.
+        prefix_pattern = f"{escape_like(cleaned_q.lower())}%"
         relevance_tier = case(
             (func.lower(Project.slug) == cleaned_q.lower(), 1),
             (func.lower(Project.name) == cleaned_q.lower(), 1),
-            (Project.slug.ilike(f"{cleaned_q}%"), 2),
-            (Project.name.ilike(f"{cleaned_q}%"), 2),
+            (func.lower(Project.slug).like(prefix_pattern, escape="\\"), 2),
+            (func.lower(Project.name).like(prefix_pattern, escape="\\"), 2),
             (Project.slug.like(pattern, escape="\\"), 3),
             (func.lower(Project.name).like(pattern, escape="\\"), 3),
             else_=4,

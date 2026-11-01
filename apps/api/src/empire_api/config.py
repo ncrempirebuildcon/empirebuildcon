@@ -35,6 +35,7 @@ _DEV_SECRETS = {
     "data_encryption_key": "dev-only-insecure-data-key",
     "internal_api_key": "dev-only-insecure-internal-key",
     "ip_hash_salt": "dev-only-insecure-ip-salt",
+    "revalidate_secret": "dev-only-insecure-revalidate-secret-do-not-use",
 }
 _MIN_SECRET_BYTES = 32
 _PLAIN_ADDRESS = re.compile(r"[^@\s<>\"',;]+@[^@\s<>\"',;]+\.[A-Za-z]{2,}")
@@ -60,6 +61,8 @@ class Settings(BaseSettings):
     data_encryption_key: SecretStr = SecretStr(_DEV_SECRETS["data_encryption_key"])
     internal_api_key: SecretStr = SecretStr(_DEV_SECRETS["internal_api_key"])
     ip_hash_salt: SecretStr = SecretStr(_DEV_SECRETS["ip_hash_salt"])
+    revalidate_secret: SecretStr = SecretStr(_DEV_SECRETS["revalidate_secret"])
+    web_revalidate_url: str = ""
 
     # Comma-separated. Development only: production is same-origin through the web app's proxy.
     cors_allowed_origins: str = ""
@@ -191,12 +194,20 @@ class Settings(BaseSettings):
         problems: list[str] = []
         if len(self.edge_proxy_key.get_secret_value().encode()) < _MIN_SECRET_BYTES:
             problems.append(f"EDGE_PROXY_KEY must be set (at least {_MIN_SECRET_BYTES} bytes)")
-        for name in ("session_secret", "internal_api_key", "ip_hash_salt", "data_encryption_key"):
+        for name in (
+            "session_secret",
+            "internal_api_key",
+            "ip_hash_salt",
+            "data_encryption_key",
+            "revalidate_secret",
+        ):
             value = getattr(self, name).get_secret_value()
             if value == _DEV_SECRETS[name] or value.startswith("change-me"):
                 problems.append(f"{name.upper()} is a placeholder")
             elif name != "data_encryption_key" and len(value.encode()) < _MIN_SECRET_BYTES:
                 problems.append(f"{name.upper()} must be at least {_MIN_SECRET_BYTES} bytes")
+        if self.is_production_like and not self.web_revalidate_url.strip():
+            problems.append("WEB_REVALIDATE_URL must be set")
         try:
             Fernet(self.data_encryption_key.get_secret_value().encode())
         except ValueError:

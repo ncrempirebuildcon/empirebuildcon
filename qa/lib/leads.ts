@@ -140,7 +140,11 @@ export async function requestSiteVisit(
  * `olderThanMinutes` ago are cancelled, so visits other specs of this run made, and the seeded
  * sample visits, stay as they are.
  */
-export async function cancelEarlierTestVisits(page: Page, olderThanMinutes = 20): Promise<void> {
+export async function cancelEarlierTestVisits(
+  page: Page,
+  olderThanMinutes = 20,
+  exceptLeadName?: string,
+): Promise<void> {
   const response = await apiCall(
     page,
     "GET",
@@ -156,6 +160,7 @@ export async function cancelEarlierTestVisits(page: Page, olderThanMinutes = 20)
   const cutoff = Date.now() - olderThanMinutes * 60_000;
   for (const visit of visits) {
     if (visit.is_sample || !visit.lead_name.startsWith("E2E Lead ")) continue;
+    if (exceptLeadName && visit.lead_name === exceptLeadName) continue;
     if (Date.parse(visit.created_at) >= cutoff) continue;
     const cancelled = await apiCall(page, "PATCH", `/api/v1/admin/site-visits/${visit.id}`, {
       status: "cancelled",

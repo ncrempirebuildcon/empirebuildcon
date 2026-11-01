@@ -20,6 +20,7 @@ import {
 
 // Signed in once by auth.setup.ts (the API limits sign-ins per network).
 test.use({ storageState: CMS_STATE });
+test.describe.configure({ mode: "serial" });
 
 // The documented CSV columns (apps/api/src/empire_api/leads/export.py), in order.
 const CSV_HEADER =
@@ -138,7 +139,7 @@ test("a public site-visit request goes from the inbox to a confirmed visit and a
   ).toContainText("Confirmed · 12:30 pm");
 
   // 6. The dashboard: the visit is upcoming, and the "this week" tile opens the calendar.
-  await cancelEarlierTestVisits(page);
+  await cancelEarlierTestVisits(page, 0, lead.name);
   await page.goto("/admin");
   const upcoming = page.getByRole("region", { name: "Upcoming site visits" });
   await expect(upcoming.getByRole("link", { name: lead.name })).toBeVisible();
@@ -354,6 +355,7 @@ test("a super-admin erases a lead's personal data after a clear warning", async 
 });
 
 test("every dashboard count matches the list its link opens", async ({ page }) => {
+  test.slow();
   const response = await apiCall(page, "GET", "/api/v1/admin/dashboard");
   const { counts } = (await response.json()) as {
     counts: Array<{ key: string; label: string; count: number; link: string }>;

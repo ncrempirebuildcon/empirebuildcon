@@ -25,6 +25,7 @@ export default defineConfig({
   testDir: "./specs",
   globalSetup: "./global-setup.ts",
   fullyParallel: true,
+  workers: process.env.CI ? 2 : 4,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
@@ -48,7 +49,12 @@ export default defineConfig({
     {
       command: "pnpm --filter @empire/web start",
       url: WEB_URL,
-      env: { API_ORIGIN: API_URL, SITE_URL: WEB_URL, EDGE_PROXY_KEY: env.EDGE_PROXY_KEY ?? "" },
+      env: {
+        API_ORIGIN: API_URL,
+        SITE_URL: WEB_URL,
+        EDGE_PROXY_KEY: env.EDGE_PROXY_KEY ?? "",
+        CSP_ENFORCE: "true",
+      },
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
     },
