@@ -218,7 +218,7 @@ def test_public_rate_limiting_server_bucket_structured_warning_log(
     ]
     assert len(warning_logs) > 0, f"Expected server bucket warning in logs, got: {captured.out}"
     entry = warning_logs[0]
-    assert entry.get("level") == "warning"
+    assert entry.get("level") == "info"
     assert entry.get("path") == "/api/v1/public/site"
     assert entry.get("method") == "GET"
     # INVARIANT: Structured log must not carry raw IP

@@ -7,6 +7,7 @@ import uuid
 
 import httpx
 import pytest
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from empire_api.integrations.handlers import handlers_for
@@ -20,6 +21,22 @@ from empire_api.integrations.revalidation import (
     tags_for_event,
 )
 from empire_api.platform.models import OutboxEvent
+
+
+def test_shared_signature_test_vector() -> None:
+    """N8: Exact shared test vector between Python API and TypeScript web."""
+    shared_secret = "test-secret-shared-vector-48-chars-long-example"
+    timestamp = 1793557400000
+    body = b'{"tags":["site","projects"]}'
+    expected = "1aa1e51fbe111e5f91493b9e78089e7e29e572fbacce7d4d1da1079ec9d6e6ed"
+
+    assert compute_signature(shared_secret, timestamp, body) == expected
+
+
+def test_revalidation_headers_match_m1_spec() -> None:
+    """M1: Signature headers do not use the x-empire- prefix to avoid proxy stripping."""
+    assert SIGNATURE_HEADER == "x-revalidate-signature"
+    assert TIMESTAMP_HEADER == "x-revalidate-timestamp"
 
 
 def test_revalidation_events_registered() -> None:
@@ -40,6 +57,7 @@ def test_revalidation_maps_project_events(db: Session) -> None:
     assert "project:aurum-heights" in tags
     assert "properties" in tags
     assert "site" in tags
+    assert "content" in tags
 
     # Project updated with previous slug
     event_rename = OutboxEvent(
@@ -51,9 +69,11 @@ def test_revalidation_maps_project_events(db: Session) -> None:
     tags_rename = tags_for_event(db, event_rename)
     assert "project:aurum-villas" in tags_rename
     assert "project:aurum-heights" in tags_rename
+    assert "content" in tags_rename
 
 
 def test_revalidation_maps_configuration_and_updates(db: Session) -> None:
+    # S1: configuration.changed must clear projects as well as properties & project:<slug>
     cfg_event = OutboxEvent(
         type="configuration.changed",
         aggregate_type="configuration",
@@ -61,7 +81,7 @@ def test_revalidation_maps_configuration_and_updates(db: Session) -> None:
         payload={"slug": "aurum-heights"},
     )
     tags = tags_for_event(db, cfg_event)
-    assert tags == ["project:aurum-heights", "properties"]
+    assert tags == ["content", "project:aurum-heights", "projects", "properties"]
 
     update_event = OutboxEvent(
         type="construction_update.published",
@@ -69,72 +89,41 @@ def test_revalidation_maps_configuration_and_updates(db: Session) -> None:
         aggregate_id=str(uuid.uuid4()),
         payload={"slug": "aurum-heights"},
     )
-    assert tags_for_event(db, update_event) == ["project:aurum-heights"]
+    assert tags_for_event(db, update_event) == ["content", "project:aurum-heights"]
 
 
-def test_revalidation_maps_content_and_site_events(db: Session) -> None:
-    page_event = OutboxEvent(
-        type="page.published",
-        aggregate_type="page",
-        aggregate_id=str(uuid.uuid4()),
-        payload={"slug": "about"},
-    )
-    assert tags_for_event(db, page_event) == ["page:about", "site"]
+def test_revalidation_maps_content_and_site_events_table_driven(db: Session) -> None:
+    """S1: Table-driven check of all publish and content events."""
+    cases = [
+        ("page.published", "page", {"slug": "about"}, ["content", "page:about", "site"]),
+        ("post.published", "post", {"slug": "trends"}, ["content", "post:trends", "posts"]),
+        (
+            "faq.changed",
+            "faq",
+            {"project_slug": "aurum"},
+            ["content", "faqs", "project:aurum", "site"],
+        ),
+        ("faq.changed", "faq", {}, ["content", "faqs", "site"]),
+        ("testimonial.changed", "testimonial", {}, ["content", "site", "testimonials"]),
+        ("redirect.changed", "redirect", {}, ["redirects", "site"]),
+        ("settings.updated", "settings", {}, ["content", "site"]),
+        ("flag.changed", "flag", {"flag": "locale_hi"}, ["content", "site"]),
+        (
+            "offer.started",
+            "offer",
+            {"project_slug": "aurum"},
+            ["content", "project:aurum", "site"],
+        ),
+    ]
 
-    post_event = OutboxEvent(
-        type="post.published",
-        aggregate_type="post",
-        aggregate_id=str(uuid.uuid4()),
-        payload={"slug": "market-trends-2026"},
-    )
-    assert tags_for_event(db, post_event) == ["post:market-trends-2026", "posts"]
-
-    faq_event = OutboxEvent(
-        type="faq.changed",
-        aggregate_type="faq",
-        aggregate_id=str(uuid.uuid4()),
-        payload={},
-    )
-    assert tags_for_event(db, faq_event) == ["faqs", "site"]
-
-    testimonial_event = OutboxEvent(
-        type="testimonial.changed",
-        aggregate_type="testimonial",
-        aggregate_id=str(uuid.uuid4()),
-        payload={},
-    )
-    assert tags_for_event(db, testimonial_event) == ["site", "testimonials"]
-
-    redirect_event = OutboxEvent(
-        type="redirect.changed",
-        aggregate_type="redirect",
-        aggregate_id=str(uuid.uuid4()),
-        payload={},
-    )
-    assert tags_for_event(db, redirect_event) == ["redirects", "site"]
-
-    settings_event = OutboxEvent(
-        type="settings.updated",
-        aggregate_type="settings",
-        aggregate_id="global",
-        payload={},
-    )
-    assert tags_for_event(db, settings_event) == ["site"]
-
-
-def test_revalidation_signature_computation() -> None:
-    secret = "test-secret-at-least-32-chars-long-here"
-    ts = 1700000000000
-    body = b'{"tags":["project:aurum","site"]}'
-    sig1 = compute_signature(secret, ts, body)
-    sig2 = compute_signature(secret, ts, body)
-    assert sig1 == sig2
-    assert len(sig1) == 64
-
-    # Timestamp change produces different signature
-    assert compute_signature(secret, ts + 1, body) != sig1
-    # Body change produces different signature
-    assert compute_signature(secret, ts, b'{"tags":["site"]}') != sig1
+    for event_type, agg_type, payload, expected_tags in cases:
+        event = OutboxEvent(
+            type=event_type,
+            aggregate_type=agg_type,
+            aggregate_id=str(uuid.uuid4()),
+            payload=payload,
+        )
+        assert tags_for_event(db, event) == expected_tags
 
 
 def test_revalidation_http_post_success() -> None:
@@ -184,3 +173,32 @@ def test_revalidation_retries_on_failure() -> None:
 def test_revalidation_skipped_when_no_url() -> None:
     # Must not raise when URL is empty (e.g. in dev)
     send_revalidation(["site"], url="", secret="some-secret")
+
+
+def test_revalidation_failure_is_isolated_and_does_not_block_other_handlers(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M2: A failing web revalidation call must never abort or block other handlers."""
+
+    # Mock send_revalidation to fail loudly
+    def mock_fail(*args: object, **kwargs: object) -> None:
+        raise httpx.ConnectError("Connection refused by web host")
+
+    monkeypatch.setattr("empire_api.integrations.revalidation.send_revalidation", mock_fail)
+
+    event = OutboxEvent(
+        type="media.removed",
+        aggregate_type="media",
+        aggregate_id=str(uuid.uuid4()),
+        payload={"slug": "aurum"},
+    )
+    db.add(event)
+    db.flush()
+
+    # Calling handle_revalidation must NOT raise
+    handle_revalidation(db, event)
+
+    # Instead, an isolated web.revalidate event is queued for independent retry
+    queued = db.scalars(select(OutboxEvent).where(OutboxEvent.type == "web.revalidate")).all()
+    assert len(queued) == 1
+    assert "project:aurum" in queued[0].payload.get("tags", [])

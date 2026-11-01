@@ -3,129 +3,177 @@ import {
   _clearReplayCache,
   computeSignature,
   processRevalidate,
-  revalidateHandler,
   SIGNATURE_HEADER,
   TIMESTAMP_HEADER,
+  LEGACY_SIGNATURE_HEADER,
+  LEGACY_TIMESTAMP_HEADER,
 } from "../src/lib/public/revalidate";
 
+// Mock next/cache so we can assert revalidateTag is called
+const mockRevalidateTag = vi.fn();
 vi.mock("next/cache", () => ({
-  revalidateTag: vi.fn(),
+  revalidateTag: (...args: unknown[]) => mockRevalidateTag(...args),
 }));
 
-describe("POST /_internal/revalidate", () => {
-  const secret = "test-secret-at-least-32-chars-long-here";
-  let now = Date.now();
+const SECRET = "test-secret-that-is-at-least-thirty-two-bytes-long";
 
+describe("processRevalidate", () => {
   beforeEach(() => {
     _clearReplayCache();
-    process.env.REVALIDATE_SECRET = secret;
-    now = Date.now();
+    mockRevalidateTag.mockClear();
   });
 
-  function makeRequest(
-    method: string,
-    body: unknown,
-    headers: Record<string, string> = {},
-  ): Request {
-    return new Request("http://localhost:3000/_internal/revalidate", {
-      method,
+  it("matches the Python API shared test vector (N8)", () => {
+    const sharedSecret = "test-secret-shared-vector-48-chars-long-example";
+    const timestamp = 1793557400000;
+    const body = '{"tags":["site","projects"]}';
+    const expected = "1aa1e51fbe111e5f91493b9e78089e7e29e572fbacce7d4d1da1079ec9d6e6ed";
+
+    expect(computeSignature(sharedSecret, timestamp, body)).toBe(expected);
+  });
+
+  it("accepts a valid signed POST request and calls revalidateTag for each tag", async () => {
+    const now = 1000000;
+    const body = JSON.stringify({ tags: ["site", "project:alpha"] });
+    const signature = computeSignature(SECRET, now, body);
+
+    const request = new Request("https://example.com/_internal/revalidate", {
+      method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        ...headers,
+        [SIGNATURE_HEADER]: signature,
+        [TIMESTAMP_HEADER]: String(now),
+        "content-type": "application/json",
       },
-      body: method !== "GET" ? JSON.stringify(body) : undefined,
-    });
-  }
-
-  it("revalidates successfully with a valid signature and timestamp", async () => {
-    const payload = { tags: ["site", "project:aurum"] };
-    const bodyText = JSON.stringify(payload);
-    const sig = computeSignature(secret, now, bodyText);
-
-    const req = makeRequest("POST", payload, {
-      [SIGNATURE_HEADER]: sig,
-      [TIMESTAMP_HEADER]: String(now),
+      body,
     });
 
-    const res = await revalidateHandler(req);
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json).toEqual({ revalidated: true, tags: ["site", "project:aurum"] });
+    const result = await processRevalidate(request, { secret: SECRET, now });
+    expect(result.ok).toBe(true);
+    expect(result.status).toBe(200);
+    expect(result.tags).toEqual(["site", "project:alpha"]);
+    expect(mockRevalidateTag).toHaveBeenCalledTimes(2);
+    expect(mockRevalidateTag).toHaveBeenCalledWith("site");
+    expect(mockRevalidateTag).toHaveBeenCalledWith("project:alpha");
   });
 
-  it("refuses wrong method with 405", async () => {
-    const req = makeRequest("GET", null);
-    const res = await revalidateHandler(req);
-    expect(res.status).toBe(405);
+  it("supports legacy x-empire-* header names for backwards compatibility", async () => {
+    const now = 1000000;
+    const body = JSON.stringify({ tags: ["site"] });
+    const signature = computeSignature(SECRET, now, body);
+
+    const request = new Request("https://example.com/_internal/revalidate", {
+      method: "POST",
+      headers: {
+        [LEGACY_SIGNATURE_HEADER]: signature,
+        [LEGACY_TIMESTAMP_HEADER]: String(now),
+        "content-type": "application/json",
+      },
+      body,
+    });
+
+    const result = await processRevalidate(request, { secret: SECRET, now });
+    expect(result.ok).toBe(true);
+    expect(result.status).toBe(200);
   });
 
-  it("refuses unsigned request with 401 and empty body", async () => {
-    const req = makeRequest("POST", { tags: ["site"] });
-    const res = await revalidateHandler(req);
-    expect(res.status).toBe(401);
-    const text = await res.text();
-    expect(text).toBe("");
-  });
+  it("rejects suffixed or non-hex signatures (M3)", async () => {
+    const now = 1000000;
+    const body = JSON.stringify({ tags: ["site"] });
+    const validSignature = computeSignature(SECRET, now, body);
 
-  it("refuses invalid signature with 401", async () => {
-    const req = makeRequest(
-      "POST",
-      { tags: ["site"] },
-      {
-        [SIGNATURE_HEADER]: "deadbeef".repeat(8),
+    // Suffixed with 'zz'
+    const suffixedRequest = new Request("https://example.com/_internal/revalidate", {
+      method: "POST",
+      headers: {
+        [SIGNATURE_HEADER]: `${validSignature}zz`,
         [TIMESTAMP_HEADER]: String(now),
       },
-    );
-    const res = await processRevalidate(req, { secret, now });
-    expect(res.status).toBe(401);
+      body,
+    });
+    const suffixedResult = await processRevalidate(suffixedRequest, { secret: SECRET, now });
+    expect(suffixedResult.ok).toBe(false);
+    expect(suffixedResult.status).toBe(401);
+
+    // Suffixed with an odd nibble 'a' (65 chars total)
+    const oddRequest = new Request("https://example.com/_internal/revalidate", {
+      method: "POST",
+      headers: {
+        [SIGNATURE_HEADER]: `${validSignature}a`,
+        [TIMESTAMP_HEADER]: String(now),
+      },
+      body,
+    });
+    const oddResult = await processRevalidate(oddRequest, { secret: SECRET, now });
+    expect(oddResult.ok).toBe(false);
+    expect(oddResult.status).toBe(401);
   });
 
-  it("refuses stale timestamp (> 5 minutes) with 401", async () => {
-    const payload = { tags: ["site"] };
-    const staleTime = now - 6 * 60 * 1000;
-    const sig = computeSignature(secret, staleTime, JSON.stringify(payload));
+  it("rejects replayed requests within the window", async () => {
+    const now = 1000000;
+    const body = JSON.stringify({ tags: ["site"] });
+    const signature = computeSignature(SECRET, now, body);
 
-    const req = makeRequest("POST", payload, {
-      [SIGNATURE_HEADER]: sig,
-      [TIMESTAMP_HEADER]: String(staleTime),
-    });
+    const makeReq = () =>
+      new Request("https://example.com/_internal/revalidate", {
+        method: "POST",
+        headers: {
+          [SIGNATURE_HEADER]: signature,
+          [TIMESTAMP_HEADER]: String(now),
+        },
+        body,
+      });
 
-    const res = await processRevalidate(req, { secret, now });
-    expect(res.status).toBe(401);
+    const first = await processRevalidate(makeReq(), { secret: SECRET, now });
+    expect(first.ok).toBe(true);
+
+    const replay = await processRevalidate(makeReq(), { secret: SECRET, now });
+    expect(replay.ok).toBe(false);
+    expect(replay.status).toBe(401);
   });
 
-  it("refuses replayed requests with 401", async () => {
-    const payload = { tags: ["site"] };
-    const bodyText = JSON.stringify(payload);
-    const sig = computeSignature(secret, now, bodyText);
+  it("rejects timestamps outside the 5-minute freshness window", async () => {
+    const now = 1000000;
+    const staleTime = now - 6 * 60 * 1000; // 6 minutes ago
+    const body = JSON.stringify({ tags: ["site"] });
+    const signature = computeSignature(SECRET, staleTime, body);
 
-    const req1 = makeRequest("POST", payload, {
-      [SIGNATURE_HEADER]: sig,
-      [TIMESTAMP_HEADER]: String(now),
+    const request = new Request("https://example.com/_internal/revalidate", {
+      method: "POST",
+      headers: {
+        [SIGNATURE_HEADER]: signature,
+        [TIMESTAMP_HEADER]: String(staleTime),
+      },
+      body,
     });
-    const res1 = await processRevalidate(req1, { secret, now });
-    expect(res1.status).toBe(200);
 
-    // Same signature sent a second time -> replay refused
-    const req2 = makeRequest("POST", payload, {
-      [SIGNATURE_HEADER]: sig,
-      [TIMESTAMP_HEADER]: String(now),
-    });
-    const res2 = await processRevalidate(req2, { secret, now });
-    expect(res2.status).toBe(401);
+    const result = await processRevalidate(request, { secret: SECRET, now });
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(401);
   });
 
-  it("refuses missing or empty tags with 401", async () => {
-    const payload = { tags: [] };
-    const bodyText = JSON.stringify(payload);
-    const sig = computeSignature(secret, now, bodyText);
+  it("rejects oversized request bodies exceeding 16 KB (N2)", async () => {
+    const now = 1000000;
+    const hugeBody = JSON.stringify({ tags: ["site"], filler: "x".repeat(20 * 1024) });
+    const signature = computeSignature(SECRET, now, hugeBody);
 
-    const req = makeRequest("POST", payload, {
-      [SIGNATURE_HEADER]: sig,
-      [TIMESTAMP_HEADER]: String(now),
+    const request = new Request("https://example.com/_internal/revalidate", {
+      method: "POST",
+      headers: {
+        [SIGNATURE_HEADER]: signature,
+        [TIMESTAMP_HEADER]: String(now),
+        "content-length": String(hugeBody.length),
+      },
+      body: hugeBody,
     });
 
-    const res = await processRevalidate(req, { secret, now });
-    expect(res.status).toBe(401);
+    const result = await processRevalidate(request, { secret: SECRET, now });
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(401);
+  });
+
+  it("rejects non-POST methods with 405", async () => {
+    const request = new Request("https://example.com/_internal/revalidate", { method: "GET" });
+    const result = await processRevalidate(request, { secret: SECRET });
+    expect(result.status).toBe(405);
   });
 });

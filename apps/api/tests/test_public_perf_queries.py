@@ -290,12 +290,12 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
             sort_order=11,
         )
     )
-    # 2 project grid blocks (Part B Item 3: batched by kind, no duplicate list query)
+    # 2 distinct project grid blocks (S9: distinct limits batched into single query)
     blocks.append(
         PageBlock(
             page_id=page.id,
             type="project_grid",
-            data={"limit": 4},
+            data={"limit": 2},
             sort_order=12,
         )
     )
@@ -307,12 +307,12 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
             sort_order=13,
         )
     )
-    # 2 property grid blocks (Part B Item 3: batched by kind, no duplicate list query)
+    # 2 distinct property grid blocks (S9: distinct limits batched into single query)
     blocks.append(
         PageBlock(
             page_id=page.id,
             type="property_grid",
-            data={"limit": 4},
+            data={"limit": 2},
             sort_order=14,
         )
     )

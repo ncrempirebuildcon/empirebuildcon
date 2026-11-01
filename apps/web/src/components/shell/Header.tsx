@@ -132,14 +132,6 @@ export function Header({ site, isProduction }: HeaderProps) {
             >
               Projects
             </Link>
-            <Link
-              href="/properties"
-              className={`hover:text-gold-300 transition-colors ${
-                pathname?.startsWith("/properties") ? "text-gold-300 font-bold" : ""
-              }`}
-            >
-              Properties
-            </Link>
             {customNav.map((item) => (
               <Link
                 key={item.path}
@@ -267,13 +259,6 @@ export function Header({ site, isProduction }: HeaderProps) {
               className="flex min-h-[44px] items-center text-lg font-semibold text-sand-100 hover:text-gold-300"
             >
               Projects
-            </Link>
-            <Link
-              href="/properties"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex min-h-[44px] items-center text-lg font-semibold text-sand-100 hover:text-gold-300"
-            >
-              Properties
             </Link>
             {customNav.map((item) => (
               <Link

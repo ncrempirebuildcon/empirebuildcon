@@ -5,7 +5,7 @@
  *   1. /api/v1/internal/* is never reachable through the website (the scheduler calls the API
  *      host directly with its own key) → 404 here.
  *   2. Any X-Empire-* header the visitor sent is removed, so nobody can pretend to be us.
- *   3. With EDGE_PROXY_KEY set (staging, production) we add:
+ *   3. With EDGE_PROXY_KEY set (staging, production) we add (ONLY for /api/* requests):
  *        X-Empire-Edge-Key  — the shared secret the API checks (apps/api middleware/edge_guard.py)
  *        X-Empire-Client-IP — the visitor's address as seen by the hosting platform, read from
  *                             the header named in CLIENT_IP_SOURCE_HEADER.
@@ -17,11 +17,13 @@
  *   - The API trusts X-Empire-Client-IP only because this file is the only thing that can set it.
  *     Never read the IP from the visitor's X-Forwarded-For here, and never expose EDGE_PROXY_KEY.
  *   - CSP protects against XSS and data exfiltration (SECURITY.md §4).
+ *   TODO(phase-9): confirm on Netlify staging which header carries the client IP for the proxy
+ *   (x-nf-client-connection-ip by default) and record it in handbook/RUNBOOK.md.
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { edgeHeaders } from "./lib/edge";
 
-function buildCsp(nonce?: string): string {
+function buildCsp(options: { nonce?: string; isStaticAuth?: boolean }): string {
   const isDev = process.env.NODE_ENV !== "production";
   const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN || "";
   let sentryHost = "";
@@ -33,27 +35,40 @@ function buildCsp(nonce?: string): string {
     }
   }
 
-  const scriptSrc = nonce
-    ? `script-src 'self' 'nonce-${nonce}' ${isDev ? "'unsafe-eval'" : ""}`.trim()
+  const scriptSrc = options.nonce
+    ? `script-src 'self' 'nonce-${options.nonce}' ${isDev ? "'unsafe-eval'" : ""}`.trim()
     : `script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ""}`.trim();
 
   const directives = [
     "default-src 'self'",
     scriptSrc,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' https://res.cloudinary.com data:",
+    "img-src 'self' https://res.cloudinary.com data: blob:",
     "font-src 'self'",
     `connect-src 'self' https://api.cloudinary.com ${sentryHost}`.trim(),
+    "media-src 'self' https://res.cloudinary.com blob:",
     "frame-ancestors 'none'",
     "form-action 'self'",
     "object-src 'none'",
     "base-uri 'self'",
+    "report-uri /_internal/csp-report",
   ];
 
   return directives.join("; ");
 }
 
 export function proxy(request: NextRequest) {
+  // Bypass proxy for internal routes and static auth pages (M1, SECURITY §1)
+  const pathname = request.nextUrl.pathname;
+  if (
+    pathname.startsWith("/_internal/") ||
+    pathname === "/admin/setup" ||
+    pathname === "/admin/reset" ||
+    pathname === "/admin/forgot"
+  ) {
+    return NextResponse.next();
+  }
+
   // 1. Block internal API calls
   if (request.nextUrl.pathname.startsWith("/api/v1/internal/")) {
     return NextResponse.json(
@@ -68,26 +83,23 @@ export function proxy(request: NextRequest) {
     if (name.startsWith("x-empire-")) headers.delete(name);
   }
 
-  // 3. Attach edge authentication headers
-  for (const [name, value] of Object.entries(edgeHeaders((n) => request.headers.get(n)))) {
-    headers.set(name, value);
-  }
-
-  // If this is an API call, forward with edge headers and exit
+  // 3. For /api/* calls: attach edge headers and forward (MM2, S3)
   if (request.nextUrl.pathname.startsWith("/api/")) {
+    for (const [name, value] of Object.entries(edgeHeaders((n) => request.headers.get(n)))) {
+      headers.set(name, value);
+    }
     return NextResponse.next({ request: { headers } });
   }
 
-  // 4. Generate CSP
-  // Static auth pages (setup, reset, forgot) are pre-rendered at build time so tokens
-  // never appear in server HTML (SECURITY §1); dynamic pages and CMS use per-request nonce.
+  // 4. For page requests: attach CSP (MM2, S3, S4)
   const isStaticAuth =
-    request.nextUrl.pathname === "/admin/setup" ||
-    request.nextUrl.pathname === "/admin/reset" ||
-    request.nextUrl.pathname === "/admin/forgot";
+    pathname === "/admin/setup" || pathname === "/admin/reset" || pathname === "/admin/forgot";
 
+  // Static auth pages are pre-rendered at build time so tokens never appear in server HTML (SECURITY §1);
+  // they use unsafe-inline in script-src (or report-only default) because they are static.
+  // Dynamic pages (CMS, public shell, 404) use a cryptographically random per-request nonce.
   const nonce = isStaticAuth ? undefined : Buffer.from(crypto.randomUUID()).toString("base64");
-  const csp = buildCsp(nonce);
+  const csp = buildCsp({ nonce, isStaticAuth });
   const enforce = process.env.CSP_ENFORCE === "true";
   const cspHeaderName = enforce ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only";
 
@@ -102,5 +114,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|_internal/|admin/setup|admin/reset|admin/forgot).*)",
+  ],
 };

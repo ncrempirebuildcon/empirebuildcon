@@ -1,92 +1,116 @@
 /**
- * Public website footer: on-brand, accessible and regulatory-compliant.
+ * Public website footer (Phase 5 Task 5.2, S8).
  *
- * Implements ARCHITECTURE §15, DESIGN_SYSTEM & D-038:
- *   - Displays company details, addresses, phones and emails from CMS settings.
- *   - Placeholders in [brackets] are hidden in production.
- *   - Regulatory line for UP-RERA with up-rera.in link.
- *   - Equal-weight WhatsApp contact and dialable phones.
- *   - © current year Empire and legal links (Privacy, Terms, Disclaimer).
+ * Implements ARCHITECTURE §15, DESIGN_SYSTEM, D-038 & D-039:
+ *   - Official channels notice (empirebuildcon.com and phone only).
+ *   - Mandatory UP-RERA regulator line and up-rera.in verification link.
+ *   - Social links from site settings (S8).
+ *   - Current page path in WhatsApp link via FooterWhatsApp (S8).
+ *   - WhatsApp falls back to phone number if whatsapp field is placeholder/missing (S8).
+ *   - Placeholders hidden in production.
+ *   - Legal links (Privacy, Terms, Disclaimer) and copyright year.
  */
-import Image from "next/image";
 import Link from "next/link";
-import {
-  buildTelLink,
-  buildWhatsAppLink,
-  filterPlaceholders,
-  filterValue,
-} from "@/lib/public/format";
 import type { PublicSite } from "@/lib/public/api";
+import { buildTelLink, filterPlaceholders, filterValue } from "@/lib/public/format";
+import FooterWhatsApp from "./FooterWhatsApp";
 
-export function Footer({ site, isProduction }: { site?: PublicSite; isProduction?: boolean }) {
-  const currentYear = new Date().getFullYear();
+export function Footer({
+  site,
+  isProduction = false,
+}: {
+  site?: PublicSite;
+  isProduction?: boolean;
+}) {
   const company = site?.company;
   const regulator = site?.regulator;
+  const social = site?.social || {};
+
+  const currentYear = new Date().getFullYear();
+
+  const primaryPhone = company?.phones?.[0] ? filterValue(company.phones[0], isProduction) : null;
+
+  const rawWhatsApp = company?.whatsapp ? filterValue(company.whatsapp, isProduction) : null;
+  // S8: If whatsapp is placeholder/empty, fall back to the phone number
+  const effectiveWhatsApp = rawWhatsApp || primaryPhone;
 
   const phones = filterPlaceholders(company?.phones ?? [], isProduction);
   const emails = filterPlaceholders(company?.emails ?? [], isProduction);
   const registeredAddress = filterValue(company?.registered_address, isProduction);
   const corporateAddress = filterValue(company?.corporate_address, isProduction);
   const address = filterValue(company?.address, isProduction);
-  const officeHours = filterValue(company?.office_hours, isProduction);
-
-  const primaryPhone = phones[0];
-  const whatsappHref = buildWhatsAppLink(
-    company?.whatsapp || primaryPhone,
-    company?.whatsapp_message,
-    "/",
-    isProduction,
-  );
-
   const displayAddresses = [registeredAddress, corporateAddress, address].filter(
     (a, i, arr): a is string => Boolean(a && arr.indexOf(a) === i),
   );
+  const officeHours = filterValue(company?.office_hours, isProduction);
+
+  // Filter social links (drop placeholders/empty)
+  const socialEntries = Object.entries(social)
+    .map(([platform, url]) => [platform, filterValue(url, isProduction)] as const)
+    .filter((entry): entry is [string, string] => Boolean(entry[1]));
 
   return (
     <footer
       role="contentinfo"
-      className="border-t border-gold-500/35 bg-noir-950 text-sand-300"
+      className="border-t border-gold-500/40 bg-noir-900 text-sand-300"
       data-testid="public-footer"
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-9 px-4 py-12 md:px-8 md:py-16">
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4 items-start">
-          {/* Brand Mark & Tagline */}
-          <div className="flex flex-col gap-4">
-            <Link href="/" aria-label="Empire home" className="inline-block">
-              <Image
-                src="/brand/logo-stacked-noir.svg"
-                alt={
-                  company?.name
-                    ? `${company.name} — Delivering Happiness`
-                    : "Empire — Delivering Happiness"
-                }
-                width={160}
-                height={120}
-                unoptimized
-                className="h-20 w-auto"
-              />
+      <div className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
+          {/* Brand & Mission */}
+          <div className="flex flex-col gap-3 md:col-span-1">
+            <Link
+              href="/"
+              className="font-display text-xl font-bold tracking-[0.16em] text-sand-100 uppercase hover:text-gold-300"
+            >
+              EMPIRE
             </Link>
-            {company?.tagline && <p className="text-xs text-sand-400 italic">{company.tagline}</p>}
-            {company?.legal_name && <p className="text-xs text-sand-400">{company.legal_name}</p>}
-            {company?.gstin && <p className="text-xs text-sand-400">GSTIN: {company.gstin}</p>}
+            {company?.tagline && (
+              <p className="text-xs text-sand-400 leading-relaxed">{company.tagline}</p>
+            )}
+            {company?.legal_name && (
+              <p className="text-[11px] text-sand-400/80">{company.legal_name}</p>
+            )}
+            {company?.gstin && (
+              <p className="text-[11px] text-sand-400/80">GSTIN: {company.gstin}</p>
+            )}
+
+            {/* Social links (S8) */}
+            {socialEntries.length > 0 && (
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <span className="sr-only">Social media links</span>
+                {socialEntries.map(([platform, url]) => (
+                  <a
+                    key={platform}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-gold-500/30 text-xs font-semibold text-gold-400 hover:border-gold-400 hover:text-gold-300 capitalize"
+                    aria-label={`Follow Empire on ${platform}`}
+                  >
+                    {platform.slice(0, 2).toUpperCase()}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Navigation - Projects */}
-          <nav aria-label="Projects" className="flex flex-col gap-2.5 text-sm">
+          {/* Navigation - Explore */}
+          <nav aria-label="Explore" className="flex flex-col gap-2.5 text-sm">
             <strong className="font-display text-xs font-semibold tracking-wider text-gold-400">
-              PROJECTS
+              EXPLORE
             </strong>
             <Link href="/projects" className="hover:text-gold-300">
               All projects
             </Link>
-            <Link href="/projects?status=ongoing" className="hover:text-gold-300">
-              Ongoing projects
-            </Link>
-            <Link href="/projects?status=completed" className="hover:text-gold-300">
-              Completed projects
-            </Link>
             <Link href="/properties" className="hover:text-gold-300">
-              Properties by BHK
+              Properties
+            </Link>
+            <Link href="/projects?city=lucknow" className="hover:text-gold-300">
+              Lucknow projects
+            </Link>
+            <Link href="/projects?city=noida" className="hover:text-gold-300">
+              Noida projects
             </Link>
           </nav>
 
@@ -133,27 +157,11 @@ export function Footer({ site, isProduction }: { site?: PublicSite; isProduction
                 {email}
               </a>
             ))}
-            {whatsappHref && (
-              <a
-                href={whatsappHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-palm-300 hover:text-palm-200 font-semibold"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  aria-hidden="true"
-                >
-                  <path d="M4 20l1.3-3.9A8 8 0 1 1 8 19.3L4 20z" />
-                </svg>
-                WhatsApp us
-              </a>
-            )}
+            <FooterWhatsApp
+              phone={effectiveWhatsApp}
+              template={company?.whatsapp_message}
+              isProduction={isProduction}
+            />
           </div>
         </div>
 

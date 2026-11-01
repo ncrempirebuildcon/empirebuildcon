@@ -1,11 +1,14 @@
 /**
- * Public website shell layout (Phase 5 Task 5.2).
+ * Public website shell layout (Phase 5 Task 5.2, S6, S7, N7).
  *
- * Implements ARCHITECTURE §3 & §5:
+ * Implements ARCHITECTURE §3, §5, D-038 & D-039:
  *   - Route group (site) isolates public pages from /admin.
  *   - Fetches site settings & nav from /api/v1/public/site with cache tag "site".
- *   - Renders real Header, Menu, Footer, MobileActionBar, OfferBanner, and SampleDataRibbon.
+ *   - Rethrows errors at runtime (N7); only tolerates build phase without API.
+ *   - Passes `isProduction` derived from APP_ENV to shell components (S6, S7).
+ *   - Passes `hasSampleData` to SampleDataRibbon (S7).
  *   - Main content wrapped with landmark (`#main-content`) for keyboard skip link.
+ *   - Shell padded at bottom for mobile action bar: `pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0` (S6).
  */
 import type { ReactNode } from "react";
 import Header from "@/components/shell/Header";
@@ -15,31 +18,40 @@ import OfferBanner from "@/components/shell/OfferBanner";
 import SampleDataRibbon from "@/components/shell/SampleDataRibbon";
 import { fetchPublicSite, type PublicSite } from "@/lib/public/api";
 
+export const dynamic = "force-dynamic";
+
 export default async function SiteLayout({ children }: { children: ReactNode }) {
   let site: PublicSite | undefined;
   try {
     site = await fetchPublicSite();
-  } catch {
-    // If during build without running API, proceed with undefined so build succeeds;
-    // in runtime, other errors trigger error.tsx
-    if (process.env.NEXT_PHASE !== "phase-production-build") {
-      // Allow error boundary to catch if not build time
-      // But don't crash if dev server started without API
+  } catch (err) {
+    // N7: Only tolerate missing API during the build phase; at runtime rethrow so error boundary catches
+    if (process.env.NEXT_PHASE === "phase-production-build") {
+      site = undefined;
+    } else {
+      throw err;
     }
   }
 
-  const isProd = process.env.NODE_ENV === "production" || process.env.APP_ENV === "production";
+  // S7: Determine production strictly from APP_ENV
+  const isProd = process.env.APP_ENV === "production";
+
+  // S7: Detect whether current site payload contains sample items
+  const hasSample = Boolean(
+    site?.offers?.some((o) => (o as unknown as { is_sample?: boolean }).is_sample) ||
+    (site?.company as unknown as { is_sample?: boolean })?.is_sample,
+  );
 
   return (
-    <div className="flex min-h-dvh flex-col bg-noir-900 text-body">
-      <SampleDataRibbon />
+    <div className="flex min-h-dvh flex-col bg-noir-900 text-body pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
+      <SampleDataRibbon hasSampleData={hasSample} />
       {site?.offers && <OfferBanner offers={site.offers} />}
       <Header site={site} isProduction={isProd} />
       <main id="main-content" className="flex-1">
         {children}
       </main>
       <Footer site={site} isProduction={isProd} />
-      <MobileActionBar company={site?.company} />
+      <MobileActionBar company={site?.company} isProduction={isProd} />
     </div>
   );
 }

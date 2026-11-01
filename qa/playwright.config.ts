@@ -15,17 +15,25 @@
  * WHY: PW_CHROMIUM_PATH lets a machine use a pre-installed Chromium (e.g. Claude's workspace);
  * CI installs the browser that matches @playwright/test instead.
  */
+import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 import { API_URL, WEB_URL, apiEnv } from "./lib/env";
 
 const env = apiEnv();
-const executablePath = process.env.PW_CHROMIUM_PATH;
+const defaultChrome =
+  process.platform === "win32" &&
+  existsSync("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe")
+    ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+    : undefined;
+const executablePath = process.env.PW_CHROMIUM_PATH || defaultChrome;
+
+const REVALIDATE_SECRET = "test-revalidate-secret-minimum-32-chars-long";
 
 export default defineConfig({
   testDir: "./specs",
   globalSetup: "./global-setup.ts",
   fullyParallel: true,
-  workers: process.env.CI ? 2 : 4,
+  workers: 2,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
@@ -42,7 +50,11 @@ export default defineConfig({
     {
       command: "uv --directory ../apps/api run uvicorn empire_api.main:app --port 8000",
       url: `${API_URL}/api/health/live`,
-      env,
+      env: {
+        ...env,
+        WEB_REVALIDATE_URL: `${WEB_URL}/_internal/revalidate`,
+        REVALIDATE_SECRET,
+      },
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
     },
@@ -54,6 +66,7 @@ export default defineConfig({
         SITE_URL: WEB_URL,
         EDGE_PROXY_KEY: env.EDGE_PROXY_KEY ?? "",
         CSP_ENFORCE: "true",
+        REVALIDATE_SECRET,
       },
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,

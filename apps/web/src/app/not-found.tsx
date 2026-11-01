@@ -9,6 +9,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Page not found",
   robots: { index: false, follow: false },

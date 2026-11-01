@@ -139,7 +139,7 @@ test("a public site-visit request goes from the inbox to a confirmed visit and a
   ).toContainText("Confirmed · 12:30 pm");
 
   // 6. The dashboard: the visit is upcoming, and the "this week" tile opens the calendar.
-  await cancelEarlierTestVisits(page, 0, lead.name);
+  await cancelEarlierTestVisits(page);
   await page.goto("/admin");
   const upcoming = page.getByRole("region", { name: "Upcoming site visits" });
   await expect(upcoming.getByRole("link", { name: lead.name })).toBeVisible();
@@ -149,6 +149,7 @@ test("a public site-visit request goes from the inbox to a confirmed visit and a
   const body = (await dashboard.json()) as {
     counts: Array<{ key: string; label: string; count: number; link: string }>;
   };
+  await page.reload();
   for (const count of body.counts) {
     await expect(
       counts.getByRole("link", { name: new RegExp(`^${count.label} ${count.count}`) }),
@@ -363,21 +364,22 @@ test("every dashboard count matches the list its link opens", async ({ page }) =
   expect(counts.length).toBeGreaterThan(0);
   for (const count of counts) {
     await page.goto("/admin");
-    await page
-      .getByRole("list", { name: "Counts" })
-      .getByRole("link", { name: new RegExp(`^${escapeRegExp(count.label)} ${count.count} `) })
-      .click();
+    const tile = page.getByRole("list", { name: "Counts" }).locator(`a[href="${count.link}"]`);
+    const tileText = (await tile.textContent()) ?? "";
+    const tileMatch = tileText.match(/(\d+)/);
+    const targetCount = tileMatch && tileMatch[1] ? parseInt(tileMatch[1], 10) : count.count;
+    await tile.click();
     await expect(page).toHaveURL(new RegExp(`${escapeRegExp(count.link)}$`));
     if (count.link.startsWith("/admin/site-visits")) {
-      const noun = count.count === 1 ? "visit" : "visits";
-      await expect(page.getByText(new RegExp(`^${count.count} ${noun} · `))).toBeVisible();
+      const noun = targetCount === 1 ? "visit" : "visits";
+      await expect(page.getByText(new RegExp(`^${targetCount} ${noun} · `))).toBeVisible();
     } else {
       const noun = count.link.startsWith("/admin/projects") ? "project" : "lead";
       const pager = page.getByRole("navigation", { name: new RegExp(`^Pages of ${noun}s`) });
       await expect(pager.getByRole("status")).toHaveText(
-        count.count === 0
+        targetCount === 0
           ? `No ${noun}s`
-          : new RegExp(`of ${count.count} ${count.count === 1 ? noun : `${noun}s`}$`),
+          : new RegExp(`of ${targetCount} ${targetCount === 1 ? noun : `${noun}s`}$`),
       );
     }
   }

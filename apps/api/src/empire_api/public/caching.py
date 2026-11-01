@@ -64,7 +64,7 @@ def check_public_rate_limit(request: Request) -> None:
     if is_edge and not has_client_header:
         key = "public:server"
         limit = SERVER_RATE_LIMIT
-        log.warning(
+        log.info(
             "public_rate_limit_server_bucket_used",
             path=request.url.path,
             method=request.method,

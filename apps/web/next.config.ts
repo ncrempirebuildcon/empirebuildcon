@@ -12,6 +12,7 @@
  * project (Current Investor). The API itself never redirects either; a CI test checks both.
  */
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const apiOrigin = process.env.API_ORIGIN ?? "http://localhost:8000";
 
@@ -66,4 +67,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  telemetry: false,
+});

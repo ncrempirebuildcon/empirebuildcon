@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from empire_api.content.schedule import schedule_tick
 from empire_api.db import get_engine, get_sessionmaker, rows_affected
+from empire_api.integrations import handlers as integration_handlers
 from empire_api.integrations.handlers import PermanentDeliveryError, handlers_for
 from empire_api.leads.erasure import anonymise_inactive
 from empire_api.logs import get_logger
@@ -55,7 +56,7 @@ _CLEANUP_SETTING = "system.cleanup"
 
 log = get_logger(__name__)
 # Modules whose outbox handlers register on import (handlers.on); listed so they always load.
-HANDLER_MODULES = (media_handlers, mail_handlers)
+HANDLER_MODULES = (media_handlers, mail_handlers, integration_handlers)
 
 
 @dataclass(frozen=True)

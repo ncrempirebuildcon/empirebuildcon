@@ -52,7 +52,11 @@ def on(event_type: str) -> Callable[[Handler], Handler]:
 
 
 def handlers_for(event_type: str) -> list[Handler]:
-    return [*_registry.get(WILDCARD, []), *_registry.get(event_type, [])]
+    all_handlers = [*_registry.get(WILDCARD, []), *_registry.get(event_type, [])]
+    # Ensure revalidation runs after domain handlers (e.g. media destruction) (M2)
+    domain_handlers = [h for h in all_handlers if h is not handle_revalidation]
+    reval_handlers = [h for h in all_handlers if h is handle_revalidation]
+    return [*domain_handlers, *reval_handlers]
 
 
 @on(WILDCARD)

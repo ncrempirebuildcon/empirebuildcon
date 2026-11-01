@@ -1,11 +1,20 @@
 /**
- * Sentry data scrubber (SECURITY §8, Phase 5 Task 5.2).
+ * Sentry data scrubber (SECURITY §8, Phase 5 Task 5.2, M5).
  *
  * Implements:
  *   - Drops query strings and fragments from every URL (prevents leaking lead ?q= numbers, tokens).
- *   - Removes request bodies, cookies, and visitor IP addresses.
- *   - Strips URLs in breadcrumbs.
+ *   - Deletes `request.query_string`, `request.env`, and `event.user` entirely.
+ *   - Uses a strict allowlist for request headers, sanitizing `referer` and stripping secrets/PII.
+ *   - Provides `beforeSend`, `beforeSendTransaction`, and `beforeBreadcrumb` scrubbers.
  */
+
+const ALLOWED_HEADERS = new Set([
+  "accept",
+  "accept-language",
+  "content-type",
+  "referer",
+  "user-agent",
+]);
 
 export function sanitizeUrl(rawUrl?: string | null): string | undefined {
   if (!rawUrl) return undefined;
@@ -21,77 +30,163 @@ export function sanitizeUrl(rawUrl?: string | null): string | undefined {
   }
 }
 
-export interface SentryEventLike {
-  request?: {
+export function sanitizeHeaders(
+  headers?: Record<string, string>,
+): Record<string, string> | undefined {
+  if (!headers) return undefined;
+  const sanitized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    const lower = key.toLowerCase();
+    if (ALLOWED_HEADERS.has(lower)) {
+      if (lower === "referer") {
+        sanitized[key] = sanitizeUrl(value) ?? "";
+      } else {
+        sanitized[key] = value;
+      }
+    }
+  }
+  return sanitized;
+}
+
+export function sanitizeTextUrls(text?: string | null): string | undefined {
+  if (!text) return text ?? undefined;
+  // Replace query strings and fragments in text containing URLs
+  return text.replace(/https?:\/\/[^\s?#]+(\?[^\s#]*)?(#[^\s]*)?/gi, (match) => {
+    return sanitizeUrl(match) ?? match;
+  });
+}
+
+export interface SentryBreadcrumbLike {
+  data?: {
     url?: string;
-    data?: unknown;
-    cookies?: unknown;
-    headers?: Record<string, string>;
-  };
-  user?: {
-    ip_address?: string;
+    to?: string;
+    from?: string;
     [key: string]: unknown;
   };
-  breadcrumbs?: Array<{
-    data?: {
-      url?: string;
-      to?: string;
-      from?: string;
-      [key: string]: unknown;
-    };
-    [key: string]: unknown;
-  }>;
+  message?: string;
   [key: string]: unknown;
 }
 
-export function beforeSendScrubber<T extends SentryEventLike>(event: T): T {
+export interface SentryEventLike {
+  request?: {
+    url?: string;
+    query_string?: unknown;
+    data?: unknown;
+    cookies?: unknown;
+    env?: unknown;
+    headers?: Record<string, string>;
+    [key: string]: unknown;
+  };
+  user?: unknown;
+  spans?: Array<{
+    data?: Record<string, unknown>;
+    [key: string]: unknown;
+  }>;
+  breadcrumbs?: SentryBreadcrumbLike[];
+  [key: string]: unknown;
+}
+
+/**
+ * Scrubber for Sentry error and message events (beforeSend).
+ */
+export function beforeSendScrubber<T = unknown>(event: T): T {
   if (!event) return event;
+  const ev = event as unknown as SentryEventLike;
 
-  // Drop IP address
-  if (event.user && "ip_address" in event.user) {
-    delete event.user.ip_address;
+  // 1. Delete user object entirely (no visitor or staff IP / identity in errors)
+  delete ev.user;
+
+  // 2. Scrub request details
+  if (ev.request) {
+    if (ev.request.url) {
+      ev.request.url = sanitizeUrl(ev.request.url);
+    }
+    delete ev.request.query_string;
+    delete ev.request.data;
+    delete ev.request.cookies;
+    delete ev.request.env;
+
+    if (ev.request.headers) {
+      ev.request.headers = sanitizeHeaders(ev.request.headers);
+    }
   }
 
-  // Scrub request details
-  if (event.request) {
-    if (event.request.url) {
-      event.request.url = sanitizeUrl(event.request.url);
+  // 3. Scrub breadcrumbs
+  if (Array.isArray(ev.breadcrumbs)) {
+    for (const b of ev.breadcrumbs) {
+      beforeBreadcrumbScrubber(b);
     }
-    delete event.request.data;
-    delete event.request.cookies;
+  }
 
-    if (event.request.headers) {
-      const sanitizedHeaders: Record<string, string> = {};
-      for (const [key, value] of Object.entries(event.request.headers)) {
-        const lower = key.toLowerCase();
-        if (
-          lower === "cookie" ||
-          lower === "x-empire-client-ip" ||
-          lower === "x-forwarded-for" ||
-          lower === "authorization"
-        ) {
-          continue;
+  return event;
+}
+
+/**
+ * Scrubber for Sentry performance / transaction events (beforeSendTransaction).
+ */
+export function beforeSendTransactionScrubber<T = unknown>(event: T): T {
+  if (!event) return event;
+  const ev = event as unknown as SentryEventLike;
+
+  delete ev.user;
+
+  if (ev.request) {
+    if (ev.request.url) {
+      ev.request.url = sanitizeUrl(ev.request.url);
+    }
+    delete ev.request.query_string;
+    delete ev.request.data;
+    delete ev.request.cookies;
+    delete ev.request.env;
+
+    if (ev.request.headers) {
+      ev.request.headers = sanitizeHeaders(ev.request.headers);
+    }
+  }
+
+  // Scrub spans data
+  if (Array.isArray(ev.spans)) {
+    for (const span of ev.spans) {
+      if (span.data) {
+        for (const [key, val] of Object.entries(span.data)) {
+          if (typeof val === "string") {
+            const lowerKey = key.toLowerCase();
+            if (lowerKey.includes("query")) {
+              span.data[key] = "";
+            } else if (
+              lowerKey.includes("url") ||
+              lowerKey.includes("path") ||
+              lowerKey.includes("target")
+            ) {
+              span.data[key] = sanitizeUrl(val);
+            }
+          }
         }
-        sanitizedHeaders[key] = value;
-      }
-      event.request.headers = sanitizedHeaders;
-    }
-  }
-
-  // Scrub breadcrumb URLs
-  if (Array.isArray(event.breadcrumbs)) {
-    for (const b of event.breadcrumbs) {
-      if (b.data?.url) {
-        b.data.url = sanitizeUrl(b.data.url);
-      }
-      if (b.data?.to) {
-        b.data.to = sanitizeUrl(b.data.to);
-      }
-      if (b.data?.from) {
-        b.data.from = sanitizeUrl(b.data.from);
       }
     }
   }
 
   return event;
+}
+
+/**
+ * Scrubber for Sentry breadcrumbs (beforeBreadcrumb).
+ */
+export function beforeBreadcrumbScrubber<T = unknown>(breadcrumb: T): T {
+  if (!breadcrumb) return breadcrumb;
+  const b = breadcrumb as unknown as SentryBreadcrumbLike;
+
+  if (b.data) {
+    for (const key of ["url", "to", "from"]) {
+      if (typeof b.data[key] === "string") {
+        b.data[key] = sanitizeUrl(b.data[key] as string);
+      }
+    }
+  }
+
+  if (typeof b.message === "string") {
+    b.message = sanitizeTextUrls(b.message);
+  }
+
+  return breadcrumb;
 }
