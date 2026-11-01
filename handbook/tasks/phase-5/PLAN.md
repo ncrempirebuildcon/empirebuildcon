@@ -24,6 +24,11 @@
 - WCAG 2.1 AA, no sideways scroll at 390 px, colour never the only signal.
 - No third-party scripts, trackers or fonts from other hosts until Phase 6's consent banner; fonts are self-hosted.
 
+## Phase 9 checks collected during Phase 5
+
+- Confirm which header carries the visitor's IP on the web host (`CLIENT_IP_SOURCE_HEADER`, `TODO(phase-9)` in `apps/web/src/proxy.ts`); if it is wrong, every public request lands in the API's shared `public:server` bucket (D-038), which the API logs.
+- Switch the Content-Security-Policy from report-only to enforced after a week without violations on staging (5.2).
+
 ## Owner inputs (needed before go-live, not to start)
 
 Until these arrive the site uses `[placeholders]` and SAMPLE data that never goes live:
