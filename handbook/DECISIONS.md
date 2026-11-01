@@ -637,7 +637,7 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 - **Gate:** a merge needs a green CI and the manager's "Merge" verdict. The owner can always overrule.
 **Verified / assumed:** Antigravity reads a root `AGENTS.md` (since IDE 1.20.5, per a third-party guide dated 5 Aug 2026; Google's own docs weren't checked), so the agent rules stay in `AGENTS.md`. Each rules file is limited to 12,000 characters; `AGENTS.md` is about 3,600.
 
-## D-038 · Public API read-only endpoints, caching and search (Proposed, 2026-10-30)
+## D-038 · Public API read-only endpoints, caching and search (Accepted, 2026-11-01)
 
 **Context:** Task 5.1 builds the 13 read-only public endpoints under `/api/v1/public/*` needed by the public website. They must return only published, non-off-market data in shapes made for the site, without leaking staff fields, drafts, private notes, or sample data in production.
 
