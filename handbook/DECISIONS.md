@@ -800,5 +800,6 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 **Consequences:**
 - The browser suite makes 3 real public submissions per run (plus 1 in `leads.spec.ts`), within the API's 5 per 10 minutes. One retried submitting test on CI still fits (5); two would get a 429. Locally, the 15 minutes between full runs (the sign-in limit) covers this too.
 - The error states use mocked answers.
+- "Every dashboard count matches its list" moved to the "serial" Playwright project (`dashboard-counts.serial.spec.ts`). The new specs change project and lead counts in parallel, so the exact comparison was racing them.
 **Verified / assumed:** none beyond the API's own rules (leads/intake.py, phone.py).
 
