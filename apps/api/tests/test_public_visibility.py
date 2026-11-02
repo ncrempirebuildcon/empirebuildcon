@@ -13,7 +13,7 @@ Covers:
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -25,7 +25,7 @@ from empire_api.config import get_settings
 from empire_api.content.models import Faq, Offer, Page, PageBlock, Post
 from empire_api.content.models import Testimonial as DbTestimonial
 from empire_api.media.models import Media, MediaLink
-from empire_api.projects.models import City, Configuration, Locality, Project
+from empire_api.projects.models import City, Configuration, ConstructionUpdate, Locality, Project
 from empire_api.public.visibility import resolve_cover_image, sanitize_placeholders
 from empire_api.seo.models import Redirect
 
@@ -712,3 +712,305 @@ def test_sample_items_inside_grids_omitted_in_production(
     assert p_sample.slug not in p_slugs_prod
     assert c_real.slug in c_slugs_prod
     assert c_sample.slug not in c_slugs_prod
+
+
+def test_sample_media_filtering_across_remaining_slots(
+    db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Part B Item 2: Verify sample media is excluded in production across all media slots:
+    - project gallery
+    - video
+    - document
+    - QR
+    - brochure
+    - floor plans
+    - update photos
+    - testimonial photos
+    - offer images
+    """
+    proj = _seed_project(db, f"slots-proj-{uuid.uuid4().hex[:4]}")
+    proj.brochure_gated = False
+
+    def _make_media(
+        title: str,
+        is_sample: bool,
+        kind: str = "image",
+        label: str | None = "artist_impression",
+    ) -> Media:
+        res_type = "raw" if kind == "document" else kind
+        eff_label = None if kind == "document" else label
+        month = date(2026, 10, 1) if eff_label in ("progress_photo", "actual_photo") else None
+        return Media(
+            kind=kind,
+            store="cloudinary",
+            resource_type=res_type,
+            public_id=f"media-{uuid.uuid4().hex[:6]}",
+            title=title,
+            alt_text=f"{title} Alt",
+            label=eff_label,
+            label_month=month,
+            version=1,
+            format="jpg" if kind == "image" else "mp4" if kind == "video" else "pdf",
+            bytes=1024,
+            width=1200 if kind == "image" else None,
+            height=800 if kind == "image" else None,
+            is_sample=is_sample,
+        )
+
+    # 1. Media items (sample + real controls where applicable)
+    m_real_gallery = _make_media("Real Gallery", is_sample=False)
+    m_sample_gallery = _make_media("Sample Gallery", is_sample=True)
+    m_sample_video = _make_media("Sample Video", is_sample=True, kind="video")
+    m_sample_doc = _make_media("Sample Document", is_sample=True, kind="document")
+    m_sample_qr = _make_media("Sample QR", is_sample=True, label="actual_photo")
+    m_sample_brochure = _make_media("Sample Brochure", is_sample=True, kind="document")
+    m_sample_floor_plan = _make_media("Sample Floor Plan", is_sample=True)
+    m_sample_update_photo = _make_media(
+        "Sample Update Photo", is_sample=True, label="progress_photo"
+    )
+    m_sample_testimonial_photo = _make_media(
+        "Sample Testimonial Photo", is_sample=True, label="actual_photo"
+    )
+    m_sample_offer_img = _make_media("Sample Offer Image", is_sample=True)
+
+    db.add_all(
+        [
+            m_real_gallery,
+            m_sample_gallery,
+            m_sample_video,
+            m_sample_doc,
+            m_sample_qr,
+            m_sample_brochure,
+            m_sample_floor_plan,
+            m_sample_update_photo,
+            m_sample_testimonial_photo,
+            m_sample_offer_img,
+        ]
+    )
+    db.flush()
+
+    # 2. Links to Project
+    link_real_gal = MediaLink(
+        media_id=m_real_gallery.id,
+        project_id=proj.id,
+        role="gallery",
+        is_cover=True,
+        is_visible=True,
+        sort_order=1,
+    )
+    link_sample_gal = MediaLink(
+        media_id=m_sample_gallery.id,
+        project_id=proj.id,
+        role="gallery",
+        is_cover=False,
+        is_visible=True,
+        sort_order=2,
+    )
+    link_sample_vid = MediaLink(
+        media_id=m_sample_video.id,
+        project_id=proj.id,
+        role="video",
+        is_visible=True,
+        sort_order=3,
+    )
+    link_sample_doc = MediaLink(
+        media_id=m_sample_doc.id,
+        project_id=proj.id,
+        role="document",
+        is_visible=True,
+        sort_order=4,
+    )
+    link_sample_qr = MediaLink(
+        media_id=m_sample_qr.id,
+        project_id=proj.id,
+        role="rera_qr",
+        is_visible=True,
+        sort_order=5,
+    )
+    link_sample_broch = MediaLink(
+        media_id=m_sample_brochure.id,
+        project_id=proj.id,
+        role="brochure",
+        is_visible=True,
+        sort_order=6,
+    )
+    db.add_all(
+        [
+            link_real_gal,
+            link_sample_gal,
+            link_sample_vid,
+            link_sample_doc,
+            link_sample_qr,
+            link_sample_broch,
+        ]
+    )
+
+    # 3. Configuration with Floor Plan
+    cfg = Configuration(
+        project_id=proj.id,
+        slug=f"slots-cfg-{uuid.uuid4().hex[:4]}",
+        name="Slots 3BHK",
+        property_type="apartment",
+        sales_status="available",
+        price_min_inr=5_000_000,
+        price_max_inr=5_000_000,
+        is_sample=False,
+    )
+    db.add(cfg)
+    db.flush()
+    link_fp = MediaLink(
+        media_id=m_sample_floor_plan.id,
+        configuration_id=cfg.id,
+        role="floor_plan",
+        is_visible=True,
+    )
+    db.add(link_fp)
+
+    # 4. Construction Update with Photo
+    update = ConstructionUpdate(
+        project_id=proj.id,
+        title="Foundation Complete",
+        update_date=datetime.now(UTC).date(),
+        publish_state="published",
+        sort_order=1,
+    )
+    db.add(update)
+    db.flush()
+    link_up = MediaLink(
+        media_id=m_sample_update_photo.id,
+        construction_update_id=update.id,
+        role="gallery",
+        is_visible=True,
+    )
+    db.add(link_up)
+
+    # 5. Testimonial with Photo
+    t = DbTestimonial(
+        person_name="Sample User",
+        person_detail="Owner",
+        quote="Great home and honest dealings.",
+        source="Google Reviews",
+        rating=5,
+        is_visible=True,
+        consent_date=datetime.now(UTC).date(),
+        photo_media_id=m_sample_testimonial_photo.id,
+    )
+    db.add(t)
+
+    # 6. Offer with Image
+    offer = Offer(
+        title="Sample Media Offer",
+        placement="home",
+        is_active=True,
+        image_media_id=m_sample_offer_img.id,
+        is_sample=False,
+    )
+    db.add(offer)
+    db.commit()
+
+    # --- IN DEV: All sample media slots appear ---
+    res_proj_dev = client.get(f"/api/v1/public/projects/{proj.slug}").json()
+    gal_ids_dev = [m["id"] for m in res_proj_dev["gallery"]]
+    vid_ids_dev = [m["id"] for m in res_proj_dev["videos"]]
+    doc_ids_dev = [m["id"] for m in res_proj_dev["documents"]]
+    assert str(m_sample_gallery.id) in gal_ids_dev
+    assert str(m_sample_video.id) in vid_ids_dev
+    assert str(m_sample_doc.id) in doc_ids_dev
+    assert res_proj_dev["rera"]["qr"] is not None
+    assert res_proj_dev["rera"]["qr"]["id"] == str(m_sample_qr.id)
+    assert res_proj_dev["brochure"] is not None
+    assert res_proj_dev["brochure"]["id"] == str(m_sample_brochure.id)
+    assert len(res_proj_dev["construction_updates"][0]["photos"]) > 0
+    assert res_proj_dev["construction_updates"][0]["photos"][0]["id"] == str(
+        m_sample_update_photo.id
+    )
+
+    res_cfg_dev = client.get(
+        f"/api/v1/public/projects/{proj.slug}/configurations/{cfg.slug}"
+    ).json()
+    assert len(res_cfg_dev["floor_plans"]) > 0
+    assert res_cfg_dev["floor_plans"][0]["id"] == str(m_sample_floor_plan.id)
+
+    res_site_dev = client.get("/api/v1/public/site").json()
+    o_match_dev = next(item for item in res_site_dev["offers"] if item["id"] == str(offer.id))
+    assert o_match_dev["image"] is not None
+    assert o_match_dev["image"]["id"] == str(m_sample_offer_img.id)
+
+    res_test_dev = client.get("/api/v1/public/testimonials").json()
+    t_match_dev = next(item for item in res_test_dev if item["id"] == str(t.id))
+    assert t_match_dev["photo"] is not None
+    assert t_match_dev["photo"]["id"] == str(m_sample_testimonial_photo.id)
+
+    # --- IN PROD: Every sample media slot is sanitized to None / empty list ---
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+
+    res_proj_prod = client.get(f"/api/v1/public/projects/{proj.slug}").json()
+    gal_ids_prod = [m["id"] for m in res_proj_prod["gallery"]]
+    vid_ids_prod = [m["id"] for m in res_proj_prod["videos"]]
+    doc_ids_prod = [m["id"] for m in res_proj_prod["documents"]]
+    assert str(m_real_gallery.id) in gal_ids_prod
+    assert str(m_sample_gallery.id) not in gal_ids_prod
+    assert str(m_sample_video.id) not in vid_ids_prod
+    assert str(m_sample_doc.id) not in doc_ids_prod
+    assert res_proj_prod["rera"]["qr"] is None
+    assert res_proj_prod["brochure"] is None
+    assert len(res_proj_prod["construction_updates"][0]["photos"]) == 0
+
+    res_cfg_prod = client.get(
+        f"/api/v1/public/projects/{proj.slug}/configurations/{cfg.slug}"
+    ).json()
+    assert len(res_cfg_prod["floor_plans"]) == 0
+
+    res_site_prod = client.get("/api/v1/public/site").json()
+    o_match_prod = next(item for item in res_site_prod["offers"] if item["id"] == str(offer.id))
+    assert o_match_prod["image"] is None
+
+    res_test_prod = client.get("/api/v1/public/testimonials").json()
+    t_match_prod = next(item for item in res_test_prod if item["id"] == str(t.id))
+    assert t_match_prod["photo"] is None
+
+
+def test_public_site_has_sample_and_offer_dates(
+    db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """S-N4 / Item 6: PublicSite exposes has_sample and PublicOffer exposes starts_at/ends_at."""
+    monkeypatch.setattr(get_settings(), "app_env", "development")
+    now = datetime.now(UTC)
+
+    real_proj = _seed_project(db, f"real-site-proj-{uuid.uuid4().hex[:4]}", is_sample=False)
+    starts = now - timedelta(days=1)
+    ends = now + timedelta(days=10)
+    offer = Offer(
+        title="Festive Offer",
+        placement="banner",
+        is_active=True,
+        project_id=real_proj.id,
+        starts_at=starts,
+        ends_at=ends,
+        is_sample=False,
+    )
+    db.add(offer)
+    db.commit()
+
+    res_dev = client.get("/api/v1/public/site").json()
+    matched = next(o for o in res_dev["offers"] if o["id"] == str(offer.id))
+    assert matched["starts_at"] is not None
+    assert matched["ends_at"] is not None
+    assert datetime.fromisoformat(matched["starts_at"]) == starts
+    assert datetime.fromisoformat(matched["ends_at"]) == ends
+
+    # Add published sample project -> has_sample is True in dev
+    _seed_project(
+        db,
+        f"sample-site-proj-{uuid.uuid4().hex[:4]}",
+        is_sample=True,
+        publish_state="published",
+    )
+    db.commit()
+    res_dev_sample = client.get("/api/v1/public/site").json()
+    assert res_dev_sample["has_sample"] is True
+
+    # In production -> has_sample is ALWAYS False
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+    res_prod = client.get("/api/v1/public/site").json()
+    assert res_prod["has_sample"] is False

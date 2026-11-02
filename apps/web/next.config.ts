@@ -12,6 +12,7 @@
  * project (Current Investor). The API itself never redirects either; a CI test checks both.
  */
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const apiOrigin = process.env.API_ORIGIN ?? "http://localhost:8000";
 
@@ -23,8 +24,7 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { key: "X-Frame-Options", value: "DENY" },
-  // TODO(phase-5): nonce-based Content-Security-Policy set in the Next.js proxy (proxy.ts),
-  // report-only on staging for one week first (SECURITY.md §4).
+  // Nonce-based Content-Security-Policy is set per request in src/proxy.ts (SECURITY.md §4).
 ];
 
 const nextConfig: NextConfig = {
@@ -67,4 +67,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  telemetry: false,
+});

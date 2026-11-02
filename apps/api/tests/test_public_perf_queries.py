@@ -290,22 +290,38 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
             sort_order=11,
         )
     )
-    # 1 project grid block
+    # 2 distinct project grid blocks (S9: distinct limits batched into single query)
+    blocks.append(
+        PageBlock(
+            page_id=page.id,
+            type="project_grid",
+            data={"limit": 2},
+            sort_order=12,
+        )
+    )
     blocks.append(
         PageBlock(
             page_id=page.id,
             type="project_grid",
             data={"limit": 4},
-            sort_order=12,
+            sort_order=13,
         )
     )
-    # 1 property grid block
+    # 2 distinct property grid blocks (S9: distinct limits batched into single query)
+    blocks.append(
+        PageBlock(
+            page_id=page.id,
+            type="property_grid",
+            data={"limit": 2},
+            sort_order=14,
+        )
+    )
     blocks.append(
         PageBlock(
             page_id=page.id,
             type="property_grid",
             data={"limit": 4},
-            sort_order=13,
+            sort_order=15,
         )
     )
     # 1 placement offer_banner block
@@ -314,7 +330,7 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
             page_id=page.id,
             type="offer_banner",
             data={"placement": "home"},
-            sort_order=14,
+            sort_order=16,
         )
     )
     db.add_all(blocks)
@@ -325,7 +341,17 @@ def test_multi_block_page_query_count_bounded(db: Session, client: TestClient) -
         res = client.get(f"/api/v1/public/pages/{page.slug}")
         assert res.status_code == 200
 
-    # Ensure query count is strictly bounded (R3-S2: grids + offer placement + project FAQs)
+    # Ensure grids return actual items (N7) and query count is strictly bounded
+    body = res.json()
+    proj_blocks = [b for b in body["blocks"] if b["type"] == "project_grid"]
+    prop_blocks = [b for b in body["blocks"] if b["type"] == "property_grid"]
+    assert len(proj_blocks) == 2
+    assert len(proj_blocks[0]["data"]["projects"]) > 0
+    assert len(proj_blocks[1]["data"]["projects"]) > 0
+    assert len(prop_blocks) == 2
+    assert len(prop_blocks[0]["data"]["properties"]) > 0
+    assert len(prop_blocks[1]["data"]["properties"]) > 0
+
     msg = f"Expected <= 15 queries for multi-block page, got {len(queries)}"
     assert len(queries) <= 15, msg
 

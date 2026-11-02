@@ -2,11 +2,13 @@
 
 The Empire public website and the CMS user interface (Next.js 16 App Router, TypeScript, Tailwind CSS 4).
 
-## What is here (Phase 3, Phase 4 parts 1–5)
+## What is here (Phase 3, Phase 4 parts 1–5, Phase 5 tasks 5.1–5.2)
 
 | Route | What |
 |---|---|
-| `/` | Black & gold "coming soon" holding page (`noindex`) |
+| `/(site)/*` | Public website shell (board NoirComponents, NoirHome, NoirMobileHome): Header (navigation from `/public/site`, CTA, keyboard-accessible menu drawer with focus trap), Footer (RERA registration disclaimer, official channels, UP-RERA link, legal links), sticky MobileActionBar (`md:hidden`, Call, WhatsApp with `{page}` replacement, Enquire), dismissible OfferBanner, and SampleDataRibbon |
+| `/` | Public home page shell (`app/(site)/page.tsx`) |
+| `/_internal/revalidate` | Signed Next.js cache tag invalidator: accepts `{ "tags": [...] }`, verified via HMAC-SHA256 signature and timestamp with `REVALIDATE_SECRET`, 5-minute replay window cache (D-039) |
 | `/admin/login` | Staff sign-in (board NoirCmsLogin): email + password (generic error, lockout message, Show/Hide), "Forgot password?", then for accounts with two-factor the **Two-factor check** step (6-digit code with `autocomplete="one-time-code"`, "Use a recovery code", Back), or, when the `admin_2fa` flag makes it required, the forced **set-up** (QR code with the typed key as its alternative, a code to confirm, recovery codes shown once with Copy, Download as text and "I've saved them"). `?done=setup|reset` confirms a used link |
 | `/admin/forgot` | Ask for a reset link: always the same message, whatever the email |
 | `/admin/setup#token=`, `/admin/reset#token=` | Choose a password from an emailed link (12+ characters, the API's policy messages at the field, Show/Hide). The token is in the URL fragment, which browsers never send to a server (`?token=` from older emails still works); it leaves the address bar on load wherever it was, the pages send `Referrer-Policy: no-referrer` and load nothing from other sites; success goes to sign-in with a message |

@@ -23,6 +23,8 @@ const defaults: Record<string, () => string> = {
   IP_HASH_SALT: () => generated(48),
   // The web proxy and the API share this key, exactly as in production (apps/web/src/proxy.ts).
   EDGE_PROXY_KEY: () => generated(48),
+  REVALIDATE_SECRET: () => "test-revalidate-secret-minimum-32-chars-long",
+  WEB_REVALIDATE_URL: () => `${WEB_URL}/_internal/revalidate`,
   // WHY explicit: the media journeys must never reach Cloudinary. The fake store keeps files on
   // disk and offers a Cloudinary-shaped upload endpoint, so the browser flow runs unchanged
   // (apps/api README "Media store"). The API's default in test is fake as well.

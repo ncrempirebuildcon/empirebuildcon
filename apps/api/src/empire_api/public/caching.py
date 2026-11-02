@@ -16,8 +16,11 @@ from fastapi import Request, Response
 from pydantic import BaseModel
 
 from empire_api.errors import ApiProblem
+from empire_api.logs import get_logger
 from empire_api.platform.crypto import client_ip, hash_ip, network_key
 from empire_api.platform.rate_limit import hit
+
+log = get_logger("empire_api.public.rate_limit")
 
 PUBLIC_CACHE_CONTROL: Final = "public, max-age=60, stale-while-revalidate=300"
 PUBLIC_RATE_LIMIT: Final = 120  # requests per minute per visitor network
@@ -61,6 +64,11 @@ def check_public_rate_limit(request: Request) -> None:
     if is_edge and not has_client_header:
         key = "public:server"
         limit = SERVER_RATE_LIMIT
+        log.info(
+            "public_rate_limit_server_bucket_used",
+            path=request.url.path,
+            method=request.method,
+        )
     else:
         ip = client_ip(request)
         net = network_key(ip)
@@ -96,8 +104,19 @@ def cached_response(
         body_dict = data
 
     body_bytes = json.dumps(body_dict, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    etag = make_etag(body_bytes)
 
+    # Error responses (status_code >= 400) must never be cached or match 304 (Part B Item 5)
+    if status_code >= 400:
+        return Response(
+            content=body_bytes,
+            status_code=status_code,
+            media_type="application/json",
+            headers={
+                "Cache-Control": "no-store",
+            },
+        )
+
+    etag = make_etag(body_bytes)
     cache_control = PUBLIC_CACHE_CONTROL
 
     if matches_etag(request.headers.get("if-none-match"), etag):

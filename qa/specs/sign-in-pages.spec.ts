@@ -40,6 +40,23 @@ test("sign-in links to the forgot-password page, which is accessible", async ({ 
   await expectClean(page, "/admin/forgot with an error");
 });
 
+test("static auth pages (/admin/setup, /admin/reset, /admin/forgot) return strict CSP directives (R2-M3)", async ({
+  page,
+}) => {
+  for (const path of ["/admin/setup", "/admin/reset", "/admin/forgot"]) {
+    const response = await page.goto(path);
+    const csp =
+      response?.headers()["content-security-policy"] ||
+      response?.headers()["content-security-policy-report-only"] ||
+      "";
+    expect(csp, `${path} must carry a CSP header`).toBeTruthy();
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("base-uri 'self'");
+    expect(csp).toContain("form-action 'self'");
+  }
+});
+
 // The emailed links carry the token in the fragment (never sent to a server); links sent
 // before that change carry it in the query, which still works (review L10). Setup is tried with
 // the fragment, reset with the query.
@@ -52,8 +69,12 @@ for (const [kind, place] of [
   }) => {
     const token = fakeToken();
     const response = await page.goto(`/admin/${kind}${place}token=${token}`);
-    // SECURITY: no Referer header from this page, and the token isn't in the server's HTML.
+    // SECURITY: no Referer header from this page, CSP header present, and the token isn't in the server's HTML.
     expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
+    expect(
+      response?.headers()["content-security-policy"] ||
+        response?.headers()["content-security-policy-report-only"],
+    ).toBeTruthy();
     expect(await response?.text()).not.toContain(token);
     if (place === "#") expect(response?.url()).not.toContain(token);
     await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");

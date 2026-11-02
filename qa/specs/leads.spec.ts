@@ -20,6 +20,9 @@ import {
 
 // Signed in once by auth.setup.ts (the API limits sign-ins per network).
 test.use({ storageState: CMS_STATE });
+// WHY serial: tests in this spec create, mutate, reassign, erase and count leads.
+// Running them serially avoids dashboard count drift and dirty-form dialog races between tests.
+test.describe.configure({ mode: "serial" });
 
 // The documented CSV columns (apps/api/src/empire_api/leads/export.py), in order.
 const CSV_HEADER =
@@ -144,13 +147,16 @@ test("a public site-visit request goes from the inbox to a confirmed visit and a
   await expect(upcoming.getByRole("link", { name: lead.name })).toBeVisible();
   const counts = page.getByRole("list", { name: "Counts" });
   await expect(counts.getByRole("link")).not.toHaveCount(0);
+  await page.reload();
   const dashboard = await apiCall(page, "GET", "/api/v1/admin/dashboard");
   const body = (await dashboard.json()) as {
     counts: Array<{ key: string; label: string; count: number; link: string }>;
   };
   for (const count of body.counts) {
     await expect(
-      counts.getByRole("link", { name: new RegExp(`^${count.label} ${count.count}`) }),
+      counts.getByRole("link", {
+        name: new RegExp(`^${escapeRegExp(count.label)} ${count.count}`),
+      }),
     ).toHaveAttribute("href", count.link);
   }
   const newLeads = body.counts.find((count) => count.key === "leads.new");

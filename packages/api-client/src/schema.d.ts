@@ -6103,6 +6103,8 @@ export interface components {
             cta_label: string | null;
             /** Cta Url */
             cta_url: string | null;
+            /** Ends At */
+            ends_at: string | null;
             /**
              * Id
              * Format: uuid
@@ -6113,6 +6115,8 @@ export interface components {
             placement: string;
             /** Project Slug */
             project_slug: string | null;
+            /** Starts At */
+            starts_at: string | null;
             /** Terms */
             terms: string | null;
             /** Terms Url */
@@ -6494,6 +6498,11 @@ export interface components {
             features: {
                 [key: string]: boolean;
             };
+            /**
+             * Has Sample
+             * @default false
+             */
+            has_sample: boolean;
             /** Locales */
             locales: string[];
             /** Nav */

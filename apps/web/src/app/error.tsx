@@ -1,29 +1,36 @@
 "use client";
 /**
- * Friendly error state for any page segment (DESIGN_SYSTEM §8 "States": error + Try again).
- * Next.js 16 passes `retry()`, which re-fetches and re-renders the segment.
- * TODO(phase-5): report errors to Sentry (@sentry/nextjs) instead of the console.
- * SECURITY: when that happens, strip the query string from reported URLs and breadcrumbs: the
- * lead inbox's `?q=` can hold a mobile number (SECURITY.md §8, "logs never contain phone
- * numbers"). Nothing in the web app logs or reports addresses today.
+ * Segment error state (DESIGN_SYSTEM §8 "States": error + Try again).
+ *
+ * Implements:
+ *   - Captures error via Sentry (@sentry/nextjs), which scrubs URLs and personal data.
+ *   - Next.js 16 `retry()` re-fetches and re-renders the segment.
  */
 import { useEffect } from "react";
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@empire/ui";
 
 export default function ErrorPage({ error, retry }: { error: unknown; retry: () => void }) {
   useEffect(() => {
-    console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
-    <main className="grid min-h-dvh place-items-center px-4 py-12">
+    <main className="grid min-h-[70vh] place-items-center px-4 py-16">
       <div role="alert" className="flex max-w-lg flex-col items-center gap-4 text-center">
-        <h1 className="font-display text-h3 font-semibold">Something went wrong</h1>
-        <p>We couldn&apos;t load this page. Please try again in a moment.</p>
-        <div className="flex flex-wrap justify-center gap-3">
+        <h1 className="font-display text-2xl md:text-3xl font-semibold text-sand-100">
+          Something went wrong
+        </h1>
+        <p className="text-sand-300 text-sm md:text-base">
+          We couldn&apos;t load this page. Please try again in a moment.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3 pt-2">
           <Button onClick={() => retry()}>Try again</Button>
-          <Link href="/" className="inline-flex min-h-11 items-center px-2 font-bold">
+          <Link
+            href="/"
+            className="inline-flex min-h-[44px] items-center rounded-full border border-gold-500 px-5 text-sm font-bold text-gold-300 hover:bg-gold-500/10"
+          >
             Home page
           </Link>
         </div>

@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from empire_api.db import get_engine
 from empire_api.pagination import PageParams
 from empire_api.projects.models import City, Locality, Project
 from empire_api.public.service import list_public_projects
@@ -162,22 +163,26 @@ def test_trgm_threshold_set_per_transaction_for_search(db: Session, client: Test
     db.add(p)
     db.commit()
 
+    conn = get_engine().connect()
     try:
-        # 1. Explicitly set session-level threshold to 0.6 and commit
-        db.execute(text("SET pg_trgm.word_similarity_threshold = 0.6"))
-        db.commit()
+        # 1. Explicitly set connection-level threshold to 0.6 and commit (Part B Item 6)
+        conn.execute(text("SET pg_trgm.word_similarity_threshold = 0.6"))
+        conn.commit()
 
-        # 2. Call search service directly with this db session (where session is 0.6)
-        res = list_public_projects(db, PageParams(page=1, per_page=10), q="Emerld")
-        matched_slugs = [item.slug for item in res.items]
-        assert p.slug in matched_slugs, f"Expected {p.slug} in {matched_slugs}"
+        # 2. Call search service with a session pinned to this exact connection
+        with Session(bind=conn) as search_session:
+            res = list_public_projects(search_session, PageParams(page=1, per_page=10), q="Emerld")
+            matched_slugs = [item.slug for item in res.items]
+            assert p.slug in matched_slugs, f"Expected {p.slug} in {matched_slugs}"
 
-        # 3. Verify that session setting was not altered outside local search transaction
-        # Once search transaction ends (rollback or commit), session-level 0.6 is restored
-        db.rollback()
-        current_val = db.execute(text("SHOW pg_trgm.word_similarity_threshold")).scalar()
+            # Rollback search transaction to end transaction-local set_config
+            search_session.rollback()
+
+        # 3. Verify that connection setting was not altered outside local search transaction
+        current_val = conn.execute(text("SHOW pg_trgm.word_similarity_threshold")).scalar()
         assert current_val == "0.6"
     finally:
-        # Reset session threshold for clean pool state
-        db.execute(text("RESET pg_trgm.word_similarity_threshold"))
-        db.commit()
+        # Reset connection threshold for clean pool state
+        conn.execute(text("RESET pg_trgm.word_similarity_threshold"))
+        conn.commit()
+        conn.close()

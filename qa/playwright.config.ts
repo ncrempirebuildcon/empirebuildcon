@@ -15,16 +15,27 @@
  * WHY: PW_CHROMIUM_PATH lets a machine use a pre-installed Chromium (e.g. Claude's workspace);
  * CI installs the browser that matches @playwright/test instead.
  */
+import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 import { API_URL, WEB_URL, apiEnv } from "./lib/env";
 
 const env = apiEnv();
-const executablePath = process.env.PW_CHROMIUM_PATH;
+// WHY: On Windows developer machines without playwright-installed headless-shell, fallback to installed Chrome.
+// CI and Linux environments use PW_CHROMIUM_PATH or Playwright-managed Chromium.
+const defaultChrome =
+  process.platform === "win32" &&
+  existsSync("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe")
+    ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+    : undefined;
+const executablePath = process.env.PW_CHROMIUM_PATH || defaultChrome;
 
 export default defineConfig({
   testDir: "./specs",
   globalSetup: "./global-setup.ts",
   fullyParallel: true,
+  // WHY workers: 2: Matches CI (2 vCPUs) and avoids Windows socket exhaustion (ECONNRESET -4077)
+  // on a single-process uvicorn server when > 2 parallel browser contexts hammer loopback HTTP.
+  workers: process.env.CI ? 2 : 2,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
@@ -41,14 +52,24 @@ export default defineConfig({
     {
       command: "uv --directory ../apps/api run uvicorn empire_api.main:app --port 8000",
       url: `${API_URL}/api/health/live`,
-      env,
+      env: {
+        ...env,
+        WEB_REVALIDATE_URL: `${WEB_URL}/_internal/revalidate`,
+        REVALIDATE_SECRET: env.REVALIDATE_SECRET ?? "test-revalidate-secret-minimum-32-chars-long",
+      },
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
     },
     {
       command: "pnpm --filter @empire/web start",
       url: WEB_URL,
-      env: { API_ORIGIN: API_URL, SITE_URL: WEB_URL, EDGE_PROXY_KEY: env.EDGE_PROXY_KEY ?? "" },
+      env: {
+        API_ORIGIN: API_URL,
+        SITE_URL: WEB_URL,
+        EDGE_PROXY_KEY: env.EDGE_PROXY_KEY ?? "",
+        CSP_ENFORCE: "true",
+        REVALIDATE_SECRET: env.REVALIDATE_SECRET ?? "test-revalidate-secret-minimum-32-chars-long",
+      },
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
     },

@@ -369,9 +369,22 @@ def test_admin_project_search_exact_match_beats_loose_matches(owner: SignedIn) -
     items = body["items"]
 
     # Target Alpha must be item 0 on page 1, beating all 30 newer loose matches
+    assert body["meta"]["total"] == 31
     assert len(items) > 0
     assert items[0]["id"] == target["id"]
     assert items[0]["slug"] == "target-alpha"
+
+
+def test_admin_project_search_prefix_tier_escapes_like_wildcards(owner: SignedIn) -> None:
+    """Part B Item 6 / N3: Prefix tier escapes wildcards (e.g. _) instead of any char."""
+    p_special = create_project(owner, name="Special_Tower Alpha", slug="special-under-alpha")
+    create_project(owner, name="SpecialxTower Beta", slug="special-x-beta")
+
+    body = ok(owner.client.get(f"{PROJECTS}?q=Special_&per_page=10"))
+    items = body["items"]
+    # Special_Tower Alpha matches prefix tier (tier 2), whereas SpecialxTower Beta is not prefix
+    assert len(items) > 0
+    assert items[0]["id"] == p_special["id"]
 
 
 def test_list_rejects_bad_filters(owner: SignedIn) -> None:

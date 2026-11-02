@@ -1,0 +1,104 @@
+"use client";
+/**
+ * Sticky mobile action bar: Call, WhatsApp and Enquire (phones only) (Phase 5 Task 5.2, S6).
+ *
+ * Implements DESIGN_SYSTEM & D-038:
+ *   - Phones only (hidden on md and above).
+ *   - Renders each button only when its valid number exists (S6).
+ *   - Renders nothing when neither phone nor WhatsApp is configured (S6).
+ *   - Passes `isProduction` from the server layout (S6).
+ *   - Replaces `{page}` in WhatsApp template with visitor's current path.
+ */
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { buildTelLink, buildWhatsAppLink, filterValue } from "@/lib/public/format";
+import type { PublicSite } from "@/lib/public/api";
+
+export function MobileActionBar({
+  company,
+  isProduction = false,
+}: {
+  company?: PublicSite["company"];
+  isProduction?: boolean;
+}) {
+  const pathname = usePathname() || "/";
+
+  const rawPhone = company?.phones?.[0] ? filterValue(company.phones[0], isProduction) : null;
+  const rawWhatsApp = company?.whatsapp ? filterValue(company.whatsapp, isProduction) : null;
+  const effectiveWhatsApp = rawWhatsApp || rawPhone;
+  const rawTemplate = company?.whatsapp_message;
+
+  const telHref = buildTelLink(rawPhone, isProduction);
+  const whatsappHref = buildWhatsAppLink(effectiveWhatsApp, rawTemplate, pathname, isProduction);
+
+  // S6: If neither phone nor WhatsApp is available, render nothing
+  if (!telHref && !whatsappHref) {
+    return null;
+  }
+
+  const colClass = telHref && whatsappHref ? "grid-cols-3" : "grid-cols-2";
+
+  return (
+    <>
+      <div className="h-[calc(64px+env(safe-area-inset-bottom))] md:hidden" aria-hidden="true" />
+      <nav
+        aria-label="Quick contact"
+        className={`fixed bottom-0 left-0 right-0 z-40 grid ${colClass} gap-2 border-t border-gold-500/40 bg-noir-800/95 px-3 py-2 backdrop-blur-md md:hidden`}
+        data-testid="mobile-action-bar"
+      >
+        {telHref && (
+          <a
+            href={telHref}
+            className="flex min-h-[44px] flex-col items-center justify-center gap-1 text-xs font-bold text-sand-100 hover:text-gold-300"
+            aria-label="Call Empire"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#E2B65A"
+              strokeWidth="1.7"
+              aria-hidden="true"
+            >
+              <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" />
+            </svg>
+            Call
+          </a>
+        )}
+
+        {whatsappHref && (
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-h-[44px] flex-col items-center justify-center gap-1 text-xs font-bold text-palm-300 hover:text-palm-200"
+            aria-label="Contact Empire on WhatsApp"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#B6D9A6"
+              strokeWidth="1.7"
+              aria-hidden="true"
+            >
+              <path d="M4 20l1.3-3.9A8 8 0 1 1 8 19.3L4 20z" />
+            </svg>
+            WhatsApp
+          </a>
+        )}
+
+        <Link
+          href="/contact#visit"
+          className="flex min-h-[44px] items-center justify-center rounded-full bg-gold-500 text-sm font-extrabold text-noir-900 shadow-md hover:bg-gold-400"
+        >
+          Enquire
+        </Link>
+      </nav>
+    </>
+  );
+}
+
+export default MobileActionBar;

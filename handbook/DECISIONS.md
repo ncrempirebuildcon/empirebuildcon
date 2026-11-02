@@ -660,7 +660,7 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - The `pg_trgm.word_similarity_threshold` is set to `0.5` per transaction via `SELECT set_config('pg_trgm.word_similarity_threshold', '0.5', true)` executed within the search transaction. This transaction-local setting functions reliably across connection poolers (such as Neon's PgBouncer in transaction mode) where startup options and session-level settings do not persist. `0.5` allows matching 1 typo in 5-7 letter Hindi/Indian place and project names (e.g. "Emerld" -> "Emerald", "Noida" -> "Noyda", "Gomti" -> "Gomati"), whereas PostgreSQL's default `0.6` is too strict for short word typos and fails on 5-character names with 1 transposition.
   - Catalogue project search orders by search relevance (`ts_rank` and `similarity`) when `q` is provided and default `sort=recommended` is selected.
   - Migration `0007_search.py` adds `search_vector` and GIN indexes with a clean upgrade → downgrade → upgrade cycle.
-  - Admin `list_projects` in `projects/service.py` adopts FTS + trigram matching alongside substring `LIKE` matching for slugs and names, and orders by relevance (exact/prefix matches first, then full-text rank, trigram similarity, and updated_at) when `q` is provided.
+  - Admin `list_projects` in `projects/service.py` adopts FTS + trigram matching alongside substring `LIKE` matching for slugs and names, and orders by relevance (exact match first, then prefix, then substring LIKE, then full-text rank, trigram similarity, updated_at and id) when `q` is provided.
 - **Caching and limits:**
   - Responses set `Cache-Control: public, max-age=60, stale-while-revalidate=300` and SHA-256 `ETag`.
   - Weak ETag matching (RFC 9110 §13.1.2) strips `W/` prefixes before comparison, returning `304 Not Modified` on matching `If-None-Match`.
@@ -688,3 +688,50 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 **Verified / assumed:**
 - `pg_trgm` extension is created in migration `0001_foundation.py:25`, so migration `0007_search.py` requires no superuser privileges on Neon.
 - Query performance verified bounded via test query counters.
+
+---
+
+## D-039 · Website shell, server-side data layer, revalidation, CSP and observability (Proposed, 2026-11-01)
+
+**Context:** Task 5.2 establishes the public shell for the Empire website, wired to the 5.1 public read-only API. It requires a dedicated public route group layout, server-side data fetching with Next.js cache tags, an end-to-end signed cache revalidation pipeline, brand-compliant shell components, a Cloudinary media loader, nonce-based CSP, privacy-preserving Sentry error tracking, and Noir-styled 404/error pages.
+
+**Decision:**
+- **Public route group:**
+  - `app/(site)/` wraps all public pages with `layout.tsx` (Header, Footer, MobileActionBar, OfferBanner, SampleDataRibbon) and `page.tsx` for the home page.
+  - The admin CMS routes (`app/admin/`) and edge proxy behavior (`src/proxy.ts` for `/api/*`) remain untouched in their own layout and contract.
+- **Server-side data layer (`lib/public/api.ts`):**
+  - Typed server-only wrapper over `@empire/api-client` sending edge authentication headers (`X-Empire-Edge-Key` only; server render requests use the API's server rate limit bucket without visitor IP).
+  - Next.js tag-based caching with 1-hour safety revalidate fallback: tags include `content`, `site`, `project:<slug>`, `projects`, `properties`, `page:<slug>`, `posts`, `post:<slug>`, `faqs`, `testimonials`, `redirects`.
+  - 404 responses from the API invoke Next.js `notFound()`; other API failures trigger the error boundary rather than displaying invented or partial data.
+- **Signed revalidation protocol (end-to-end):**
+  - **Web receiver (`POST /_internal/revalidate`):** Accepts a JSON body `{ "tags": [...] }` and headers `X-Revalidate-Signature` (hex HMAC-SHA256 over `${timestampMs}.${rawBody}` using `REVALIDATE_SECRET`) and `X-Revalidate-Timestamp` (Unix timestamp in integer milliseconds). Validates 64-character hex format (`/^[0-9a-f]{64}$/i`), constant-time signature match, enforces a 5-minute freshness window against current server time, tracks verified signatures in an in-memory sliding cache to refuse replays, and calls `revalidateTag(tag, { expire: 0 })`. (The in-memory replay cache is per-instance; an external store like Redis can be added in Phase 9 if multi-instance web containers require cluster-wide replay deduplication). Stale, invalid, suffixed or unsigned requests answer 401 with no details.
+  - **API sender (`integrations/revalidation.py`):** Outbox handler maps domain events (`project.*`, `configuration.changed`, `construction_update.published`, `media.*`, `page.*`, `post.*`, `faq.changed`, `testimonial.changed`, `offer.*`, `settings.updated`, `flag.changed`, `redirect.changed`, `consent_text.published`) to corresponding cache tags. Signs the payload with `REVALIDATE_SECRET` and sends to `WEB_REVALIDATE_URL`.
+  - **Outbox isolation (M2):** Revalidation runs in the outbox drain with error isolation so temporary web unavailability never blocks domain handlers (such as Cloudinary asset destruction for `media.removed`). Failed revalidations emit a dedicated `web.revalidate` event to handle retries independently.
+- **Shell components & Design System:**
+  - Follows design boards (`NoirComponents`, `NoirHome`, `NoirMobileHome`, `Noir404`).
+  - **Header:** Logo from `brand/`, navigation items from `/public/site` (`show_in_nav`, in order, plus Projects), "Book a site visit" CTA linking to `/contact`, skip link (`#main-content`), and accessible mobile drawer with keyboard focus trap, Escape to close, and focus restoration.
+  - **Footer:** RERA registration disclaimer, UP-RERA portal link (`up-rera.in`), official channels notice (`empirebuildcon.com`), social links with minimum 44 px tap targets, legal navigation (Privacy, Terms, Disclaimer), and copyright year.
+  - **Mobile action bar:** Sticky on phone viewports (`md:hidden`), equal-weight Call and WhatsApp actions, WhatsApp `{page}` replacement with current path, and Enquire CTA.
+  - **Offer banner:** Displays first active banner offer from `/public/site` for the placement; dismissible for the browser session via `sessionStorage`. Shows date validity line when `starts_at` and `ends_at` are provided.
+  - **Sample data ribbon:** Amber warning banner displayed when viewing sample data (`has_sample: true` on public site) in non-production environments.
+  - **Placeholders & missing data:** Values enclosed in `[brackets]` are hidden in production (`APP_ENV = 'production'`).
+- **Media delivery:**
+  - Cloudinary custom loader in `lib/cloudinary-loader.ts` generates `c_limit,f_auto,q_auto,w_<width>` transformations for Cloudinary URLs while leaving external/local images untouched.
+  - `PublicImage` component wraps `next/image` with honest labels (`artist_impression`, `actual_photo`, `progress_photo`) and mandatory alt text.
+- **Content Security Policy (CSP):**
+  - Set per request in `src/proxy.ts` (matching pages while leaving `/api/*` proxy intact; edge authentication headers are added strictly to `/api/*` requests).
+  - Report-only by default (`Content-Security-Policy-Report-Only`), enforced with `CSP_ENFORCE=true`.
+  - Directives: `default-src 'self'`, `script-src 'self' 'nonce-<nonce>'` (plus `'unsafe-eval'` in development), `style-src 'self' 'unsafe-inline'`, `img-src 'self' https://res.cloudinary.com data: blob:`, `font-src 'self'`, `connect-src 'self' https://api.cloudinary.com <sentry-host>`, `media-src 'self' https://res.cloudinary.com blob:`, `frame-ancestors 'none'`, `form-action 'self'`, `object-src 'none'`, `base-uri 'self'`, `report-uri /_internal/csp-report`.
+  - Dynamic pages receive a per-request nonce-based CSP (`script-src 'self' 'nonce-<nonce>'`). The static auth pages (`/admin/setup`, `/admin/reset`, `/admin/forgot`) receive `'unsafe-inline'` script-src so they can remain pre-rendered without runtime server HTML serialization of `?token=` parameters in the RSC flight payload.
+- **Sentry error tracking:**
+  - `@sentry/nextjs@11.10.0` initialized via `instrumentation.ts` and `instrumentation-client.ts`, wired with `withSentryConfig` in `next.config.ts`, active when `SENTRY_DSN` or `NEXT_PUBLIC_SENTRY_DSN` is configured.
+  - Default SDK data collection disabled via `dataCollection: { userInfo: false, cookies: false, httpHeaders: false, httpBodies: [], urlQueryParams: false, databaseQueryData: false }`.
+  - Privacy scrubber (`lib/sentry-scrubber.ts`) strips query strings and fragments from URLs, request bodies, cookies, visitor IP addresses, header allowlist, and scrubs root span attributes in `contexts.trace.data` and child span attributes.
+- **404 & error boundaries:**
+  - `app/not-found.tsx` matching `Noir404` with quick links to Projects, Properties, Contact, and Home, retaining `robots: noindex`.
+  - `app/error.tsx` catching client/server runtime errors, logging to Sentry, and providing on-brand recovery.
+
+**Consequences:** The public website shell is fully functional, styled according to the brand design boards, and tightly integrated with the public API and outbox invalidation system. The public site and audited CMS screens operate under an enforced CSP with zero console violations.
+**Verified / assumed:**
+- `@sentry/nextjs@11.10.0` verified on npm as of 1 Nov 2026.
+- End-to-end cache invalidation verified in Playwright browser tests (`qa/specs/public-shell.spec.ts:184`) with live outbox drain reflection.
