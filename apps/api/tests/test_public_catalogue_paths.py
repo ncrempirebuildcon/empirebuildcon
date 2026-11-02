@@ -142,3 +142,36 @@ def test_budget_filter_matches_a_price_with_one_end(db: Session, client: TestCli
     assert slugs(f"/api/v1/public/projects?city={city.slug}&budget_max=7500000") == {
         up_to_only.slug
     }
+
+
+def test_project_price_on_request_hides_every_home_price(db: Session, client: TestClient) -> None:
+    """COMPLIANCE (D-041): "price on request" on the project hides its homes' figures too, even
+    when staff left prices on them, on every public answer and in the budget filter."""
+    t = _tag()
+    city = City(name=f"POR City {t}", slug=f"por-city-{t}", state="Uttar Pradesh")
+    db.add(city)
+    db.flush()
+    project = _project(db, city, price_on_request=True, price_min_inr=7_800_000)
+    _configuration(db, project, "priced-home", price_min_inr=7_800_000, price_max_inr=8_000_000)
+    db.commit()
+
+    def assert_hidden(price: dict[str, object]) -> None:
+        assert price["on_request"] is True
+        assert price["display"] == "Price on request"
+        assert price["min_inr"] is None and price["max_inr"] is None
+
+    detail = client.get(f"/api/v1/public/projects/{project.slug}").json()
+    assert_hidden(detail["price"])
+    assert_hidden(detail["configurations"][0]["price"])
+
+    prop = client.get(f"/api/v1/public/projects/{project.slug}/configurations/priced-home").json()
+    assert_hidden(prop["price"])
+
+    listed = client.get(f"/api/v1/public/properties?city={city.slug}").json()["items"]
+    assert len(listed) == 1
+    assert_hidden(listed[0]["price"])
+
+    in_band = client.get(
+        f"/api/v1/public/properties?city={city.slug}&budget_min=7500000&budget_max=15000000"
+    ).json()["items"]
+    assert in_band == []

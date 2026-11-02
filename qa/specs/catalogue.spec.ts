@@ -1,8 +1,8 @@
 /**
  * Public catalogue journeys (task 5.3): the projects list with filters in the URL (also without
  * JavaScript), the project page with its RERA block and honest prices, the property page, city
- * pages, the map on tap, 404s for hidden projects, axe, the enforced CSP, 390 px, and a CMS
- * change reaching the project page after revalidation (with a negative control).
+ * pages, the map on tap, 404s for hidden projects, axe, the enforced CSP and 390 px. The
+ * revalidation journey is in catalogue-revalidation.serial.spec.ts (it needs no parallel drains).
  *
  * Data: projects are made through the CMS API as the signed-in super-admin (no extra sign-ins),
  * named "E2E Catalogue …" (qa/lib/catalogue.ts).
@@ -10,8 +10,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import { apiCall, CMS_STATE } from "../lib/auth";
-import { catalogueProject } from "../lib/catalogue";
-import { API_URL, apiEnv } from "../lib/env";
+import { catalogueProject, drainOutbox } from "../lib/catalogue";
 
 test.use({ storageState: CMS_STATE });
 
@@ -41,14 +40,6 @@ async function noSidewaysScroll(page: Page): Promise<void> {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow, "no sideways scroll").toBeLessThanOrEqual(0);
-}
-
-async function drainOutbox(page: Page): Promise<void> {
-  const internalKey = apiEnv().INTERNAL_API_KEY ?? "dev-internal-key-32-chars-minimum-ok";
-  const res = await page.request.post(`${API_URL}/api/v1/internal/outbox/drain`, {
-    headers: { "X-Internal-Key": internalKey },
-  });
-  expect(res.status()).toBe(200);
 }
 
 test("the projects list finds a project by search and shows its RERA number and price note", async ({
@@ -152,6 +143,14 @@ test("the project page shows the RERA block, carpet area first and the price not
   await expect(rows.first().getByTestId("area")).toHaveText("720 sq ft · 66.9 sq m (carpet)");
   await expect(rows.nth(1)).toContainText("Sold out");
 
+  // Floor plans of the home types are on the project page too, linking to their pages.
+  const plans = page.getByTestId("floor-plans");
+  await expect(plans.getByRole("img", { name: `${project.name} 2 BHK floor plan` })).toBeVisible();
+  await expect(plans.getByRole("link", { name: "2 BHK (test)" })).toHaveAttribute(
+    "href",
+    `/projects/${project.slug}/${project.configSlugs[0]}`,
+  );
+
   // Description is formatted text, never HTML.
   await expect(page.locator("#overview strong", { hasText: "sample" })).toBeVisible();
   expect(await seriousAxe(page)).toEqual([]);
@@ -175,7 +174,7 @@ test("the project page shows the RERA block, carpet area first and the price not
   expect(csp).toEqual([]);
 });
 
-test("price on request hides every number", async ({ page }) => {
+test("price on request on the project hides every number, its homes' too", async ({ page }) => {
   const project = await catalogueProject(page, { priceOnRequest: true });
   await page.goto(`/projects/${project.slug}`);
   const main = page.locator("#main-content");
@@ -291,33 +290,4 @@ test("the properties list shows homes with carpet area first and the project's R
   await expect(card.getByTestId("area")).toHaveText("720 sq ft · 66.9 sq m (carpet)");
   await expect(card.getByTestId("rera-line")).toContainText(project.rera);
   expect(await seriousAxe(page)).toEqual([]);
-});
-
-test("a CMS change reaches the project page after revalidation", async ({ browser, page }) => {
-  const project = await catalogueProject(page);
-  const visitorContext = await browser.newContext();
-  const visitor = await visitorContext.newPage();
-  await visitor.goto(`/projects/${project.slug}`);
-  await expect(visitor.getByText("Garden homes for the test suite")).toBeVisible();
-
-  const tagline = `Revalidated ${Date.now()}`;
-  const patched = await apiCall(page, "PATCH", `/api/v1/admin/projects/${project.id}`, { tagline });
-  expect(patched.status()).toBe(200);
-
-  // WHY no "before the drain" check: other specs drain the outbox while this one runs (two
-  // workers), so the page may update before any such check could read it; it would be flaky.
-  // What this proves is the part that broke before (cache entries without tags, so a
-  // revalidation cleared nothing): once the outbox is drained, the cached page shows the new
-  // tagline. test/public-api-cache.test.ts proves the reads are cached with their tags.
-  await drainOutbox(page);
-  await expect
-    .poll(
-      async () => {
-        await visitor.reload();
-        return visitor.getByText(tagline).count();
-      },
-      { intervals: [500, 1000, 2000], timeout: 15_000 },
-    )
-    .toBe(1);
-  await visitorContext.close();
 });

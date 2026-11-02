@@ -35,6 +35,9 @@ export function towerNumbers(rera: Rera, towers: Tower[] = []): { name: string; 
     .map((t) => ({ name: t.name, number: t.rera_number as string }));
 }
 
+/** The regulator block to show when the API sends none: authority and portal, no number. */
+export const UNKNOWN_RERA: Rera = { authority: "UP-RERA", number: null, url: null, qr: null };
+
 export function ReraBlock({
   rera,
   towers = [],
@@ -53,19 +56,21 @@ export function ReraBlock({
 
   if (variant === "line") {
     return (
-      <p className="text-small text-muted" data-testid="rera-line">
-        <span className="font-semibold text-body">{rera.authority}</span>{" "}
-        <span className="tabular-nums">{rera.number ?? "number on the project page"}</span> ·{" "}
+      <div className="flex flex-col text-small text-muted" data-testid="rera-line">
+        <p>
+          <span className="font-semibold text-body">{rera.authority}</span>{" "}
+          <span className="tabular-nums">{rera.number ?? "number on the project page"}</span>
+        </p>
         <a
           href={portal}
           target="_blank"
           rel="noopener noreferrer"
-          className="underline underline-offset-2"
+          className="inline-flex min-h-11 items-center self-start underline underline-offset-2"
           aria-label={`Verify ${projectName} on ${host} (opens in a new tab)`}
         >
-          Verify
+          Verify on {host}
         </a>
-      </p>
+      </div>
     );
   }
 

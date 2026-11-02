@@ -12,7 +12,7 @@ import type { components } from "@empire/api-client";
 import { PublicImage } from "@/components/media/PublicImage";
 import { bhkLabel, formatMonthYear, projectPath, propertyPath } from "@/lib/public/catalogue";
 import { PROPERTY_TYPE } from "@/lib/labels";
-import { ReraBlock } from "./ReraBlock";
+import { ReraBlock, UNKNOWN_RERA } from "./ReraBlock";
 import { AreaText, PriceText, ProjectStatusChip, SampleChip, SoldOutChip } from "./Facts";
 
 type ProjectSummary = components["schemas"]["PublicProjectSummary"];
@@ -142,13 +142,12 @@ export function PropertyCard({ property }: { property: PropertySummary }) {
           </Fact>
         </dl>
         <PriceText price={property.price} />
-        {property.project.rera ? (
-          <ReraBlock
-            rera={property.project.rera}
-            projectName={property.project.name}
-            variant="line"
-          />
-        ) : null}
+        {/* COMPLIANCE: every card shows the regulator line, even if the API sent no RERA block. */}
+        <ReraBlock
+          rera={property.project.rera ?? UNKNOWN_RERA}
+          projectName={property.project.name}
+          variant="line"
+        />
         <Link
           href={href}
           className="mt-auto inline-flex min-h-11 items-center font-semibold"

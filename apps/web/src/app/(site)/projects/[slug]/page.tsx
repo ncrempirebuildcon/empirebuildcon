@@ -27,6 +27,7 @@ import {
   ConfigurationsTable,
   Documents,
   Faqs,
+  FloorPlans,
   Gallery,
   LocationAdvantages,
   PaymentPlans,
@@ -164,10 +165,7 @@ export default async function ProjectPage({ params }: Params) {
             <dt className="text-caption font-semibold tracking-[0.08em] text-gold-400 uppercase">
               Possession
             </dt>
-            <dd className="text-body">
-              {possession}
-              <span className="block text-caption text-muted">date registered with RERA</span>
-            </dd>
+            <dd className="text-body">{possession}</dd>
           </div>
         ) : null}
         {project.towers.length > 0 ? (
@@ -218,6 +216,7 @@ export default async function ProjectPage({ params }: Params) {
                 projectSlug={project.slug}
                 configurations={project.configurations}
               />
+              <FloorPlans projectSlug={project.slug} configurations={project.configurations} />
             </Section>
           ) : null}
 

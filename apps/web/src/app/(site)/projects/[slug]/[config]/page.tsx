@@ -14,8 +14,8 @@ import { Breadcrumbs } from "@/components/catalogue/ListControls";
 import { ReraBlock } from "@/components/catalogue/ReraBlock";
 import {
   AreaText,
+  areaLabel,
   PriceText,
-  priceText,
   ProjectStatusChip,
   SampleChip,
   SoldOutChip,
@@ -89,16 +89,15 @@ export default async function PropertyPage({ params }: Params) {
       >
         <div className="flex flex-col gap-1">
           <dt className="text-caption font-semibold tracking-[0.08em] text-gold-400 uppercase">
-            Carpet area
+            {areaLabel(property.area.basis)}
           </dt>
           <dd>
             <AreaText area={property.area} />
-            <span className="block text-caption text-muted">as per RERA</span>
           </dd>
         </div>
         <div className="flex flex-col gap-1">
           <dt className="text-caption font-semibold tracking-[0.08em] text-gold-400 uppercase">
-            Price from
+            Price
           </dt>
           <dd>
             <PriceText price={property.price} size="lg" />
@@ -109,10 +108,7 @@ export default async function PropertyPage({ params }: Params) {
             <dt className="text-caption font-semibold tracking-[0.08em] text-gold-400 uppercase">
               Possession
             </dt>
-            <dd className="text-body">
-              {possession}
-              <span className="block text-caption text-muted">date registered with RERA</span>
-            </dd>
+            <dd className="text-body">{possession}</dd>
           </div>
         ) : null}
         <div className="flex flex-col gap-1">
@@ -154,8 +150,7 @@ export default async function PropertyPage({ params }: Params) {
                 </a>
               )}
               <p className="text-caption text-muted">
-                Floor plans are indicative and not to scale. Carpet area is as registered with{" "}
-                {project.rera.authority}.
+                Floor plans are indicative and not to scale.
               </p>
             </Section>
           ) : null}
@@ -177,7 +172,7 @@ export default async function PropertyPage({ params }: Params) {
                     <span className="text-small">
                       <AreaText area={c.area} />
                     </span>
-                    <span className="text-small font-bold text-gold-300">{priceText(c.price)}</span>
+                    <PriceText price={c.price} />
                     {c.sales_status === "sold_out" ? (
                       <span>
                         <SoldOutChip salesStatus="sold_out" />
@@ -190,8 +185,8 @@ export default async function PropertyPage({ params }: Params) {
           ) : null}
 
           <p className="text-caption text-muted">
-            Prices are starting base prices and may vary by floor and view as shown in the cost
-            sheet. This page is not an offer and makes no promise of returns.
+            Prices exclude GST, stamp duty and registration. This page is not an offer and makes no
+            promise of returns.
           </p>
         </div>
 
@@ -213,9 +208,8 @@ export default async function PropertyPage({ params }: Params) {
             ) : (
               <>
                 <h2 className="font-display text-h3 font-semibold">Ask about this home</h2>
-                <p className="text-small text-body">
-                  {title} · {priceText(property.price)}
-                </p>
+                <p className="text-small text-body">{title}</p>
+                <PriceText price={property.price} />
                 <Link
                   href={enquire}
                   className="inline-flex min-h-11 items-center justify-center rounded-pill bg-gold-500 px-5 font-extrabold text-noir-900 hover:bg-gold-400 hover:text-noir-900"

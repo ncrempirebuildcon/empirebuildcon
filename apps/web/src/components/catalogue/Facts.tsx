@@ -48,6 +48,18 @@ export function PriceText({ price, size = "md" }: { price: Price; size?: "md" | 
   );
 }
 
+const AREA_LABEL: Record<string, string> = {
+  carpet: "Carpet area",
+  builtup: "Built-up area",
+  super_builtup: "Super built-up area",
+  plot: "Plot area",
+};
+
+/** The heading for an area figure, from its basis: a plot is never called "carpet area". */
+export function areaLabel(basis: string | null | undefined): string {
+  return AREA_LABEL[basis ?? ""] ?? "Area";
+}
+
 export function AreaText({ area }: { area: Area }) {
   if (!area.display) return <span className="text-muted">Area on request</span>;
   return (

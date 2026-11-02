@@ -16,8 +16,19 @@ import {
   propertyQuery,
   PROPERTY_SORTS,
 } from "../src/lib/public/catalogue";
-import { PRICE_NOTE, priceNote, priceText, PriceText } from "../src/components/catalogue/Facts";
-import { portalHost, ReraBlock, towerNumbers } from "../src/components/catalogue/ReraBlock";
+import {
+  areaLabel,
+  PRICE_NOTE,
+  priceNote,
+  priceText,
+  PriceText,
+} from "../src/components/catalogue/Facts";
+import {
+  portalHost,
+  ReraBlock,
+  towerNumbers,
+  UNKNOWN_RERA,
+} from "../src/components/catalogue/ReraBlock";
 
 type Price = components["schemas"]["Price"];
 type Rera = components["schemas"]["PublicRera"];
@@ -249,5 +260,24 @@ describe("ReraBlock (COMPLIANCE)", () => {
     expect(portalHost("https://www.up-rera.in/projects")).toBe("up-rera.in");
     expect(portalHost(null)).toBe("up-rera.in");
     expect(portalHost("not a url")).toBe("up-rera.in");
+  });
+});
+
+describe("area labels and the RERA line", () => {
+  it("names the area by its basis, never calling a plot carpet area", () => {
+    expect(areaLabel("carpet")).toBe("Carpet area");
+    expect(areaLabel("plot")).toBe("Plot area");
+    expect(areaLabel("super_builtup")).toBe("Super built-up area");
+    expect(areaLabel(undefined)).toBe("Area");
+  });
+
+  it("keeps the portal link on a card even without a RERA block from the API", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ReraBlock, { rera: UNKNOWN_RERA, projectName: "Aurum", variant: "line" }),
+    );
+    expect(html).toContain("UP-RERA");
+    expect(html).toContain('href="https://www.up-rera.in"');
+    expect(html).toContain("Verify on up-rera.in");
+    expect(html).toContain("min-h-11");
   });
 });

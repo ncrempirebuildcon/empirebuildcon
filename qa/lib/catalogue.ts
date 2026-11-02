@@ -8,6 +8,7 @@
  */
 import { expect, type Page } from "@playwright/test";
 import { apiCall, apiUpload, runId } from "./auth";
+import { API_URL, apiEnv } from "./env";
 import { samplePhoto, sampleQr } from "./files";
 
 export interface CatalogueProject {
@@ -33,7 +34,11 @@ async function sampleCityId(page: Page): Promise<string> {
  */
 export async function catalogueProject(
   page: Page,
-  options: { priceOnRequest?: boolean; publish?: boolean } = {},
+  options: {
+    /** On the project only: its homes keep their figures, which the site must still hide. */
+    priceOnRequest?: boolean;
+    publish?: boolean;
+  } = {},
 ): Promise<CatalogueProject> {
   const id = runId();
   const name = `E2E Catalogue ${id}`;
@@ -75,13 +80,22 @@ export async function catalogueProject(
       property_type: "apartment",
       bhk,
       area: { min_sqm: sqm, max_sqm: sqm, basis: "carpet", display_unit: "sqft" },
-      price: options.priceOnRequest
-        ? { on_request: true, min_inr: priceMin }
-        : { min_inr: priceMin },
+      price: { min_inr: priceMin },
       sales_status: status,
     });
     expect(res.status(), await res.text()).toBe(201);
-    configSlugs.push(((await res.json()) as { slug: string }).slug);
+    const cfg = (await res.json()) as { id: string; slug: string };
+    configSlugs.push(cfg.slug);
+    if (bhk === 2) {
+      const plan = await apiUpload(page, "/api/v1/admin/media/images", {
+        file: samplePhoto(`SAMPLE-${id}-plan.png`, 30),
+        title: `${name} 2 BHK plan`,
+        alt_text: `${name} 2 BHK floor plan`,
+        attach_to: `configuration:${cfg.id}`,
+        role: "floor_plan",
+      });
+      expect(plan.status(), await plan.text()).toBe(201);
+    }
   }
 
   const qr = await apiUpload(page, "/api/v1/admin/media/images", {
@@ -106,4 +120,13 @@ export async function catalogueProject(
     expect(published.status(), await published.text()).toBe(200);
   }
   return { id: project.id, slug: project.slug, name, rera, configSlugs };
+}
+
+/** Delivers the outbox now (as the scheduler does), through the API host with the internal key. */
+export async function drainOutbox(page: Page): Promise<void> {
+  const internalKey = apiEnv().INTERNAL_API_KEY ?? "dev-internal-key-32-chars-minimum-ok";
+  const res = await page.request.post(`${API_URL}/api/v1/internal/outbox/drain`, {
+    headers: { "X-Internal-Key": internalKey },
+  });
+  expect(res.status()).toBe(200);
 }

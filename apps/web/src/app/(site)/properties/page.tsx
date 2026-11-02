@@ -52,6 +52,7 @@ export default async function PropertiesPage({
         showSearch={false}
       />
       <ResultCount total={meta.total} noun={["home", "homes"]} />
+      {items.length > 0 ? <h2 className="sr-only">Homes</h2> : null}
       {items.length > 0 ? (
         <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((p) => (
@@ -63,7 +64,11 @@ export default async function PropertiesPage({
       ) : (
         <div className="flex flex-col items-start gap-3 rounded-card border border-line bg-noir-800 p-6">
           <h2 className="font-display text-h3 font-semibold">
-            {hasFilters(filters) ? "No homes match these filters" : "No homes to show yet"}
+            {meta.total > 0
+              ? "This page is past the end of the list"
+              : hasFilters(filters)
+                ? "No homes match these filters"
+                : "No homes to show yet"}
           </h2>
           <p className="text-body">
             Try another budget or BHK, or tell us what you are looking for and we&apos;ll call you
@@ -88,10 +93,7 @@ export default async function PropertiesPage({
         pages={meta.pages}
         noun="homes"
       />
-      <p className="text-caption text-muted">
-        Carpet area as registered with UP-RERA. Prices are starting base prices and exclude GST,
-        stamp duty and registration.
-      </p>
+      <p className="text-caption text-muted">Prices exclude GST, stamp duty and registration.</p>
     </div>
   );
 }

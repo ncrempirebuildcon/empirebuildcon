@@ -46,7 +46,20 @@ export default defineConfig({
   },
   projects: [
     { name: "setup", testMatch: /.*\.setup\.ts/, use: { ...devices["Desktop Chrome"] } },
-    { name: "chromium", use: { ...devices["Desktop Chrome"] }, dependencies: ["setup"] },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+      testIgnore: /\.serial\.spec\.ts$/,
+    },
+    // WHY a separate project: these specs need the outbox to themselves (no other spec draining
+    // it), so they run after "chromium" has finished (task 5.3).
+    {
+      name: "serial",
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["chromium"],
+      testMatch: /\.serial\.spec\.ts$/,
+    },
   ],
   webServer: [
     {

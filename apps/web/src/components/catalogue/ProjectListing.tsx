@@ -24,7 +24,9 @@ export async function ProjectListing({
   /** On a city page the city is fixed by the address, so the form has no city field. */
   lockCity?: string;
 }) {
-  const query = projectQuery({ ...filters, city: lockCity ?? filters.city });
+  // On a city page the address fixes the city; a stray ?city= is ignored everywhere.
+  const shown = lockCity ? { ...filters, city: undefined } : filters;
+  const query = projectQuery({ ...shown, city: lockCity ?? shown.city });
   const [list, cities] = await Promise.all([fetchPublicProjects(query), fetchPublicCities()]);
   const { items, meta } = list;
 
@@ -32,12 +34,13 @@ export async function ProjectListing({
     <div className="flex flex-col gap-6">
       <FilterForm
         action={path}
-        filters={filters}
+        filters={shown}
         cities={cities}
         sorts={PROJECT_SORTS}
         showCity={!lockCity}
       />
       <ResultCount total={meta.total} noun={["project", "projects"]} />
+      {items.length > 0 ? <h2 className="sr-only">Projects</h2> : null}
       {items.length > 0 ? (
         <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((p) => (
@@ -49,15 +52,19 @@ export async function ProjectListing({
       ) : (
         <div className="flex flex-col items-start gap-3 rounded-card border border-line bg-noir-800 p-6">
           <h2 className="font-display text-h3 font-semibold">
-            {hasFilters(filters) ? "No projects match these filters" : "No projects to show yet"}
+            {meta.total > 0
+              ? "This page is past the end of the list"
+              : hasFilters(shown)
+                ? "No projects match these filters"
+                : "No projects to show yet"}
           </h2>
           <p className="text-body">
-            {hasFilters(filters)
+            {hasFilters(shown)
               ? "Try another city or budget, or tell us what you need and we'll call you when something fits."
               : "New projects appear here as soon as they are registered and published."}
           </p>
           <div className="flex flex-wrap gap-4">
-            {hasFilters(filters) ? (
+            {hasFilters(shown) ? (
               <Link href={path} className="inline-flex min-h-11 items-center font-semibold">
                 Clear filters
               </Link>
@@ -68,10 +75,10 @@ export async function ProjectListing({
           </div>
         </div>
       )}
-      <Pager path={path} filters={filters} page={meta.page} pages={meta.pages} noun="projects" />
+      <Pager path={path} filters={shown} page={meta.page} pages={meta.pages} noun="projects" />
       <p className="text-caption text-muted">
-        Prices are starting base prices and exclude GST, stamp duty and registration. Images are
-        labelled for what they are: artist&apos;s impression, actual photo or progress photo.
+        Prices exclude GST, stamp duty and registration. Images are labelled for what they are:
+        artist&apos;s impression, actual photo or progress photo.
       </p>
     </div>
   );

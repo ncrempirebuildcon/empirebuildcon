@@ -178,7 +178,13 @@ def _build_public_seo(
     )
 
 
-def _public_price(row: Any) -> Price:
+def _public_price(row: Any, *, project_on_request: bool = False) -> Price:
+    """The public price of a project or configuration.
+
+    COMPLIANCE: when the project asks for "price on request", its configurations do too, even
+    if staff left figures on them, so no figure for that project reaches the site (task 5.3,
+    D-041). The budget filter and the price sorts follow the same rule.
+    """
     base = price_of(row)
     std_note = "excludes GST, stamp duty and registration"
     if base.note and std_note not in base.note:
@@ -186,7 +192,7 @@ def _public_price(row: Any) -> Price:
     else:
         note = base.note or std_note
 
-    if base.on_request:
+    if base.on_request or project_on_request:
         return Price(
             on_request=True,
             min_inr=None,
@@ -563,6 +569,7 @@ def _build_configurations(
     *,
     is_hi: bool,
     prod: bool,
+    project_on_request: bool = False,
 ) -> list[schemas.PublicConfiguration]:
     active = [c for c in configs if c.sales_status != "off_market"]
     if prod:
@@ -587,7 +594,7 @@ def _build_configurations(
                 bathrooms=c.bathrooms,
                 balconies=c.balconies,
                 area=area_of(c.area_min_sqm, c.area_max_sqm, c.area_basis, c.area_display_unit),
-                price=_public_price(c),
+                price=_public_price(c, project_on_request=project_on_request),
                 sales_status=c.sales_status,
                 floor_plans=fp_links,
                 sort_order=c.sort_order,
@@ -723,7 +730,13 @@ def get_public_project(
         elif link.construction_update_id:
             update_links[link.construction_update_id].append(link)
 
-    configurations = _build_configurations(p.configurations, config_links, is_hi=is_hi, prod=prod)
+    configurations = _build_configurations(
+        p.configurations,
+        config_links,
+        is_hi=is_hi,
+        prod=prod,
+        project_on_request=bool(p.price_on_request),
+    )
     summary = _build_public_summary(p, project_links, qr_media, p.configurations, is_hi=is_hi)
     towers = _build_towers(p.towers, p.construction_updates)
     construction_updates = _build_updates(p.construction_updates, update_links, prod=prod)
@@ -876,12 +889,13 @@ def _apply_property_filters(
     if project_status:
         stmt = stmt.where(Project.status == project_status)
     # WHY coalesce: "From ₹ 78 L" (no upper end) is one figure for the budget filter (5.3 fix).
+    hidden = Configuration.price_on_request.is_(True) | Project.price_on_request.is_(True)
     eff_min = case(
-        (Configuration.price_on_request.is_(True), None),
+        (hidden, None),
         else_=func.coalesce(Configuration.price_min_inr, Configuration.price_max_inr),
     )
     eff_max = case(
-        (Configuration.price_on_request.is_(True), None),
+        (hidden, None),
         else_=func.coalesce(Configuration.price_max_inr, Configuration.price_min_inr),
     )
 
@@ -897,12 +911,13 @@ def _property_order_clauses(sort: str | None) -> list[Any]:
         case((Configuration.sales_status == "available", 0), else_=1),
     ]
     # WHY coalesce: "From ₹ 78 L" (no upper end) is one figure for the budget filter (5.3 fix).
+    hidden = Configuration.price_on_request.is_(True) | Project.price_on_request.is_(True)
     eff_min = case(
-        (Configuration.price_on_request.is_(True), None),
+        (hidden, None),
         else_=func.coalesce(Configuration.price_min_inr, Configuration.price_max_inr),
     )
     eff_max = case(
-        (Configuration.price_on_request.is_(True), None),
+        (hidden, None),
         else_=func.coalesce(Configuration.price_max_inr, Configuration.price_min_inr),
     )
 
@@ -1054,7 +1069,7 @@ def list_public_properties(
                 property_type=c.property_type,
                 bhk=float(c.bhk) if c.bhk is not None else None,
                 area=area_of(c.area_min_sqm, c.area_max_sqm, c.area_basis, c.area_display_unit),
-                price=_public_price(c),
+                price=_public_price(c, project_on_request=bool(p.price_on_request)),
                 sales_status=c.sales_status,
                 cover=_media_schema(cover_media, prod=prod) if cover_media else None,
                 project=proj_ref,
@@ -1143,7 +1158,7 @@ def get_public_property(
         bathrooms=c.bathrooms,
         balconies=c.balconies,
         area=area_of(c.area_min_sqm, c.area_max_sqm, c.area_basis, c.area_display_unit),
-        price=_public_price(c),
+        price=_public_price(c, project_on_request=bool(p.price_on_request)),
         sales_status=c.sales_status,
         floor_plans=fp_links,
         sort_order=c.sort_order,
@@ -1731,7 +1746,7 @@ def _batch_load_grid_blocks(
                         area=area_of(
                             c.area_min_sqm, c.area_max_sqm, c.area_basis, c.area_display_unit
                         ),
-                        price=_public_price(c),
+                        price=_public_price(c, project_on_request=bool(p.price_on_request)),
                         sales_status=c.sales_status,
                         cover=_media_schema(fp_m, prod=prod) if fp_m else None,
                         project=proj_ref,

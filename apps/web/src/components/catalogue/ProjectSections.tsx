@@ -59,7 +59,7 @@ export function ConfigurationsTable({
         <caption className="sr-only">Home types, carpet area, price and availability</caption>
         <thead className="bg-noir-800">
           <tr>
-            {["Home type", "Carpet area", "Price from", "Availability"].map((h) => (
+            {["Home type", "Area", "Price", "Availability"].map((h) => (
               <th
                 key={h}
                 scope="col"
@@ -101,6 +101,72 @@ export function ConfigurationsTable({
       <p className="border-t border-line px-4 py-3 text-caption text-muted">
         Prices: {priceNote(rows[0]?.price ?? { on_request: false, display: "" })}.
       </p>
+    </div>
+  );
+}
+
+/**
+ * One floor plan per home type that has one, on an ivory tile (DESIGN_SYSTEM §7), each linking
+ * to its property page. A PDF plan is a download link.
+ */
+export function FloorPlans({
+  projectSlug,
+  configurations,
+}: {
+  projectSlug: string;
+  configurations: Configuration[];
+}) {
+  const withPlans = [...configurations]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .filter((c) => c.floor_plans.length > 0);
+  if (withPlans.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      <h3 className="font-display text-h3 font-semibold">Floor plans</h3>
+      <ul
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        data-testid="floor-plans"
+      >
+        {withPlans.map((c) => {
+          const plan = c.floor_plans[0] as LinkedMedia;
+          const title = configurationTitle(c);
+          return (
+            <li key={c.id} className="flex flex-col gap-2">
+              {plan.kind === "image" ? (
+                <div className="rounded-tile bg-ivory-tile p-2">
+                  <PublicImage
+                    src={plan.url}
+                    alt={plan.alt_text || `${title} floor plan`}
+                    label={plan.label}
+                    isSample={plan.is_sample}
+                    width={plan.width ?? 800}
+                    height={plan.height ?? 600}
+                    sizes="(max-width: 640px) 100vw, 33vw"
+                    containerClassName="block w-full"
+                    className="aspect-[4/3] w-full object-contain"
+                  />
+                </div>
+              ) : (
+                <a
+                  href={plan.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center font-semibold"
+                >
+                  {title} floor plan (PDF)<span className="sr-only"> (opens in a new tab)</span>
+                </a>
+              )}
+              <Link
+                href={propertyPath(projectSlug, c.slug)}
+                className="inline-flex min-h-11 items-center font-semibold"
+              >
+                {title}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="text-caption text-muted">Floor plans are indicative and not to scale.</p>
     </div>
   );
 }
