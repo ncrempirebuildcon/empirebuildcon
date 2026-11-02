@@ -43,7 +43,8 @@ function buildCsp(options: { nonce?: string }): string {
     "default-src 'self'",
     scriptSrc,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' https://res.cloudinary.com data: blob:",
+    // OpenStreetMap tiles for the project map (task 5.3, D-041; the map loads only on tap).
+    "img-src 'self' https://res.cloudinary.com data: blob: https://tile.openstreetmap.org",
     "font-src 'self'",
     `connect-src 'self' https://api.cloudinary.com ${sentryHost}`.trim(),
     "media-src 'self' https://res.cloudinary.com blob:",

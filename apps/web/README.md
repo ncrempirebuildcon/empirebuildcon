@@ -2,12 +2,17 @@
 
 The Empire public website and the CMS user interface (Next.js 16 App Router, TypeScript, Tailwind CSS 4).
 
-## What is here (Phase 3, Phase 4 parts 1–5, Phase 5 tasks 5.1–5.2)
+## What is here (Phase 3, Phase 4 parts 1–5, Phase 5 tasks 5.1–5.3)
 
 | Route | What |
 |---|---|
 | `/(site)/*` | Public website shell (board NoirComponents, NoirHome, NoirMobileHome): Header (navigation from `/public/site`, CTA, keyboard-accessible menu drawer with focus trap), Footer (RERA registration disclaimer, official channels, UP-RERA link, legal links), sticky MobileActionBar (`md:hidden`, Call, WhatsApp with `{page}` replacement, Enquire), dismissible OfferBanner, and SampleDataRibbon |
 | `/` | Public home page shell (`app/(site)/page.tsx`) |
+| `/projects` | Projects list (board NoirProjects, task 5.3): search, city, status, type, BHK, budget band and sort as URL parameters (`?q=&status=&city=&locality=&type=&bhk=&budget=under-75l|75l-1.5cr|above-1.5cr&sort=&page=`), a plain GET form that works without JavaScript; cards with honest image label, status chips, price with the tax note, possession and the RERA number with "Verify"; honest empty state; paging |
+| `/projects/<slug>` | Project page (boards NoirProject, NoirMobileProject): hero, key facts, RERA block (QR on an ivory tile, number per tower or phase, up-rera.in), in-page navigation, overview (formatted text), home types table (carpet area first, both units), gallery and videos with labels, amenities and specifications, location with directions and the map on tap (Leaflet + OpenStreetMap), construction progress (tower bars, dated updates), payment plans, documents and brochure, FAQs, and Enquire / Book a site visit (to the contact page until 5.4). Off-market, draft or unknown → 404 |
+| `/projects/<slug>/<config-slug>` | Property (home type) page (boards NoirProperty, NoirMobileProperty): area, price, possession, availability, the project's RERA block, floor plan on an ivory tile (or the PDF), the project's other homes (available first); a sold-out home says so and takes no enquiries |
+| `/properties` | Every home type across projects (board NoirProperties): the same filters as projects, without text search, plus "Carpet area: largest first" |
+| `/cities/<slug>` | One city's projects; a city with no listed project is a 404 |
 | `/_internal/revalidate` | Signed Next.js cache tag invalidator: accepts `{ "tags": [...] }`, verified via HMAC-SHA256 signature and timestamp with `REVALIDATE_SECRET`, 5-minute replay window cache (D-039) |
 | `/admin/login` | Staff sign-in (board NoirCmsLogin): email + password (generic error, lockout message, Show/Hide), "Forgot password?", then for accounts with two-factor the **Two-factor check** step (6-digit code with `autocomplete="one-time-code"`, "Use a recovery code", Back), or, when the `admin_2fa` flag makes it required, the forced **set-up** (QR code with the typed key as its alternative, a code to confirm, recovery codes shown once with Copy, Download as text and "I've saved them"). `?done=setup|reset` confirms a used link |
 | `/admin/forgot` | Ask for a reset link: always the same message, whatever the email |
@@ -37,7 +42,7 @@ The Empire public website and the CMS user interface (Next.js 16 App Router, Typ
 | 404 / error | Black & gold not-found page and a "Try again" error state |
 | `/robots.txt` | Disallows everything until go-live (`TODO(phase-9)`) |
 
-The public pages (including the rendering of pages, posts and blocks) arrive in Phase 5. Designs are on the design canvas; see `handbook/README.md#designs`.
+The rest of the public pages (page-builder pages, blog, lead forms) arrive in later Phase 5 tasks. Designs are on the design canvas; see `handbook/README.md#designs`.
 
 ### How the CMS screens work
 

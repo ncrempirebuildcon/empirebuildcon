@@ -215,8 +215,16 @@ def _apply_order_by(
         order_clauses.append(func.similarity(Project.name, cleaned_q).desc())
 
     # S5: Treat price_on_request projects as NULL price so hidden numbers cannot be bisected
-    eff_min = case((Project.price_on_request.is_(True), None), else_=Project.price_min_inr)
-    eff_max = case((Project.price_on_request.is_(True), None), else_=Project.price_max_inr)
+    # WHY coalesce: a price with one end ("From ₹ 78 L") is a single figure for the budget
+    # filter, so it still matches a band that contains it (task 5.3 fix).
+    eff_min = case(
+        (Project.price_on_request.is_(True), None),
+        else_=func.coalesce(Project.price_min_inr, Project.price_max_inr),
+    )
+    eff_max = case(
+        (Project.price_on_request.is_(True), None),
+        else_=func.coalesce(Project.price_max_inr, Project.price_min_inr),
+    )
 
     if sort_type == "price_asc":
         order_clauses.append(eff_min.asc().nulls_last())
@@ -274,8 +282,16 @@ def apply_project_filters(
 
     # S5: Treat price_on_request as NULL price.
     # Bisection protection: NULL price never matches budget bounds.
-    eff_min = case((Project.price_on_request.is_(True), None), else_=Project.price_min_inr)
-    eff_max = case((Project.price_on_request.is_(True), None), else_=Project.price_max_inr)
+    # WHY coalesce: a price with one end ("From ₹ 78 L") is a single figure for the budget
+    # filter, so it still matches a band that contains it (task 5.3 fix).
+    eff_min = case(
+        (Project.price_on_request.is_(True), None),
+        else_=func.coalesce(Project.price_min_inr, Project.price_max_inr),
+    )
+    eff_max = case(
+        (Project.price_on_request.is_(True), None),
+        else_=func.coalesce(Project.price_max_inr, Project.price_min_inr),
+    )
 
     if budget_min is not None:
         stmt = stmt.where(eff_max.is_not(None) & (eff_max >= budget_min))
