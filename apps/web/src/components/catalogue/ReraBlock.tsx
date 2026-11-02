@@ -66,9 +66,11 @@ export function ReraBlock({
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex min-h-11 items-center self-start underline underline-offset-2"
-          aria-label={`Verify ${projectName} on ${host} (opens in a new tab)`}
         >
           Verify on {host}
+          {/* WHY after the visible words: the accessible name must start with what is shown
+              (WCAG 2.5.3, label in name), so voice control can say "Verify on up-rera.in". */}
+          <span className="sr-only"> for {projectName} (opens in a new tab)</span>
         </a>
       </div>
     );

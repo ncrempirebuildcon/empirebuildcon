@@ -56,7 +56,7 @@ export function ConfigurationsTable({
   return (
     <div className="overflow-x-auto rounded-card border border-line">
       <table className="w-full min-w-[560px] text-left text-small">
-        <caption className="sr-only">Home types, carpet area, price and availability</caption>
+        <caption className="sr-only">Home types, area, price and availability</caption>
         <thead className="bg-noir-800">
           <tr>
             {["Home type", "Area", "Price", "Availability"].map((h) => (
@@ -223,9 +223,8 @@ export function Videos({ items, projectName }: { items: LinkedMedia[]; projectNa
 function labelText(label: string): string {
   const map: Record<string, string> = {
     artist_impression: "Artist's impression",
-    actual_photo: "Actual footage",
-    sample_flat: "Sample flat",
-    progress_photo: "Progress footage",
+    actual_photo: "Actual video",
+    progress_photo: "Progress video",
   };
   return map[label] ?? label.replace(/_/g, " ");
 }

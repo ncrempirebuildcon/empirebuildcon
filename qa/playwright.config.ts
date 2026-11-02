@@ -59,6 +59,8 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["chromium"],
       testMatch: /\.serial\.spec\.ts$/,
+      // One at a time, so two serial specs never drain the outbox under each other.
+      workers: 1,
     },
   ],
   webServer: [

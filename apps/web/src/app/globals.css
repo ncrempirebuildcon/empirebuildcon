@@ -80,21 +80,23 @@
   .star-rule::after {
     transform: scaleX(-1);
   }
+}
 
-  /* Project map (task 5.3): the dark style from the boards, made from OpenStreetMap's standard
-     tiles with a filter, so no second tile provider is needed. Labels stay readable. */
-  .empire-map .leaflet-tile-pane {
-    filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
-  }
-  /* 44 px zoom buttons (DESIGN_SYSTEM §1: every touch target at least 44 px). */
-  .empire-map .leaflet-control-zoom a {
-    width: 44px;
-    height: 44px;
-    line-height: 44px;
-    font-size: 22px;
-  }
-  .empire-map.leaflet-container {
-    background-color: var(--color-noir-800);
-    font-family: var(--font-sans);
-  }
+/* Project map (task 5.3). WHY outside @layer: Leaflet's own stylesheet is not in a layer, and
+   unlayered rules win over layered ones whatever their specificity, so these must be unlayered
+   too to override it. */
+.empire-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+}
+/* 44 px zoom buttons (DESIGN_SYSTEM §1: every touch target at least 44 px). Three classes, so
+   this beats Leaflet's `.leaflet-touch .leaflet-bar a`, which loads later. */
+.empire-map.leaflet-container .leaflet-control-zoom a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  font-size: 22px;
+}
+.empire-map.leaflet-container {
+  background-color: var(--color-noir-800);
+  font-family: var(--font-sans);
 }

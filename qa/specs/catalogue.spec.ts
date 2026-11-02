@@ -66,7 +66,7 @@ test("the projects list finds a project by search and shows its RERA number and 
     "excludes GST, stamp duty and registration",
   );
   await expect(card.getByText("Artist's impression")).toBeVisible();
-  await expect(card.getByRole("link", { name: /^Verify .* on up-rera\.in/ })).toHaveAttribute(
+  await expect(card.getByRole("link", { name: /^Verify on up-rera\.in for / })).toHaveAttribute(
     "href",
     "https://www.up-rera.in",
   );
@@ -251,6 +251,11 @@ test("the map loads only on tap, with the pin's pop-up and OpenStreetMap attribu
   await expect(map.locator(".leaflet-popup-content")).toContainText(project.name);
   await expect(map.locator(".leaflet-popup-content")).toContainText(`UP-RERA ${project.rera}`);
   await expect(map.getByRole("link", { name: "OpenStreetMap" })).toBeVisible();
+  // Zoom buttons are 44 px touch targets, not Leaflet's 30 px.
+  const zoomIn = map.getByRole("button", { name: "Zoom in" });
+  const box = await zoomIn.boundingBox();
+  expect(box?.width).toBeGreaterThanOrEqual(44);
+  expect(box?.height).toBeGreaterThanOrEqual(44);
   await expect.poll(() => tileRequests.length).toBeGreaterThan(0);
   expect(csp).toEqual([]);
 });

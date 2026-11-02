@@ -73,13 +73,15 @@ def test_sitemap_lists_configurations_and_cities(db: Session, client: TestClient
     t = _tag()
     city = City(name=f"Paths City {t}", slug=f"paths-city-{t}", state="Uttar Pradesh")
     empty_city = City(name=f"Empty City {t}", slug=f"empty-city-{t}", state="Uttar Pradesh")
-    db.add_all([city, empty_city])
+    noindex_city = City(name=f"Noindex City {t}", slug=f"noindex-city-{t}", state="Uttar Pradesh")
+    db.add_all([city, empty_city, noindex_city])
     db.flush()
 
     listed = _project(db, city)
     _configuration(db, listed, "two-bhk")
     _configuration(db, listed, "gone", sales_status="off_market")
     hidden = _project(db, city, seo={"noindex": True})
+    _project(db, noindex_city, seo={"noindex": True})
     _configuration(db, hidden, "hidden-home")
     draft = _project(db, empty_city, publish_state="draft")
     _configuration(db, draft, "draft-home")
@@ -93,6 +95,7 @@ def test_sitemap_lists_configurations_and_cities(db: Session, client: TestClient
     assert property_path(draft.slug, "draft-home") not in paths  # draft project
     assert city_path(city.slug) in paths
     assert city_path(empty_city.slug) not in paths  # no listed project
+    assert city_path(noindex_city.slug) not in paths  # its only project is noindex
 
 
 def test_sitemap_leaves_out_sample_configurations_in_production(
