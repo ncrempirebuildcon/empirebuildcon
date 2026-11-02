@@ -17,7 +17,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { CMS_STATE, apiCall, runId } from "../lib/auth";
-import { API_URL, WEB_URL, apiEnv } from "../lib/env";
+import { API_URL, apiEnv } from "../lib/env";
 
 interface SeededPost {
   id: string;
@@ -331,10 +331,7 @@ test.describe("Public Blog (Task 5.5b)", () => {
     expect(articleOverflow).toBe(false);
   });
 
-  test("revalidation reflects CMS post title update", async ({
-    browser,
-    request,
-  }) => {
+  test("revalidation reflects CMS post title update", async ({ browser, request }) => {
     // 1. Initial article page load
     const publicContext = await browser.newContext();
     const publicPage = await publicContext.newPage();
