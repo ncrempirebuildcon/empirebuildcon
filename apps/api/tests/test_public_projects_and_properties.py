@@ -366,6 +366,32 @@ def test_gated_brochure_hidden_from_public_detail(db: Session, client: TestClien
     assert res_open["brochure"]["id"] == str(brochure_media.id)
     assert "url" in res_open["brochure"]
 
+    # Gated but no brochure to give (none attached, or hidden): the site must not offer the form,
+    # so `brochure_gated` is false (task 5.4, D-043).
+    p_empty = Project(
+        slug=f"gated-empty-{uuid.uuid4().hex[:4]}",
+        name="Gated Without Brochure",
+        project_type="residential",
+        status="ongoing",
+        sales_status="available",
+        publish_state="published",
+        city_id=city.id,
+        locality_id=locality.id,
+        rera_number="UPRERAGATED2",
+        brochure_gated=True,
+    )
+    db.add(p_empty)
+    db.flush()
+    db.add(
+        MediaLink(
+            media_id=brochure_media.id, project_id=p_empty.id, role="brochure", is_visible=False
+        )
+    )
+    db.commit()
+    res_empty = client.get(f"/api/v1/public/projects/{p_empty.slug}").json()
+    assert res_empty["brochure_gated"] is False
+    assert res_empty["brochure"] is None
+
 
 def test_off_market_and_sample_configurations_excluded_from_labels(
     db: Session, client: TestClient
