@@ -11,7 +11,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import { apiCall, CMS_STATE } from "../lib/auth";
 import { attachBrochure, catalogueProject } from "../lib/catalogue";
-import { currentConsent, testMobile } from "../lib/leads";
+import { currentConsent, istDate, testMobile } from "../lib/leads";
 
 test.use({ storageState: CMS_STATE });
 
@@ -128,8 +128,11 @@ test("a site visit from the contact page records marketing consent when ticked",
   await expect(form.getByLabel("Project")).toHaveValue(project.slug);
   expect(await seriousAxe(visitor)).toEqual([]);
 
-  await form.getByLabel("Your name").fill(`E2E Visit ${Date.now()}`);
+  await form.getByLabel("Your name").fill(`E2E Lead Visit ${Date.now()}`);
   await form.getByLabel("Mobile number").fill(testMobile());
+  // WHY 100 days ahead: the dashboard's "Upcoming site visits" shows the next five open visits,
+  // and leads.spec.ts looks for its own visit there. A far-off day never pushes it out.
+  await form.getByLabel("Preferred day").fill(istDate(100));
   await form.getByLabel("Time of day").selectOption("evening");
   await form.getByTestId("consent-required").check();
   await form.getByTestId("consent-marketing").check();
