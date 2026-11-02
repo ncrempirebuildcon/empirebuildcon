@@ -66,8 +66,10 @@ test("an enquiry from a project page records the consent version and attribution
   const visitor = await visitorContext.newPage();
   const csp = watchCsp(visitor);
 
-  // The visitor lands from an ad, then reads the project page.
-  await visitor.goto(`/projects/${project.slug}?utm_source=e2e&utm_campaign=forms&gclid=E2E-CLICK`);
+  // The visitor lands on the home page from an ad, then opens the project page: the tags of the
+  // landing address must still go with the lead (first touch for the tab).
+  await visitor.goto("/?utm_source=e2e&utm_campaign=forms&gclid=E2E-CLICK");
+  await visitor.goto(`/projects/${project.slug}?utm_source=later`);
   const form = visitor.getByTestId("lead-form-enquiry");
   await expect(form).toBeVisible();
   const required = form.getByTestId("consent-required");
@@ -82,9 +84,16 @@ test("an enquiry from a project page records the consent version and attribution
   await form.getByLabel("Your name").fill(name);
   await form.getByLabel("Mobile number").fill(testMobile());
 
-  // Without the required box nothing is sent, and the form says why.
+  // Without the required box nothing is sent, however the form is sent (button or Enter key).
+  let posted = 0;
+  visitor.on("request", (r) => {
+    if (r.url().includes("/api/v1/public/leads")) posted += 1;
+  });
   await form.getByRole("button", { name: "Request a call back" }).click();
   await expect(form.getByTestId("lead-message")).toContainText("Please tick the required box");
+  await form.getByLabel("Your name").press("Enter");
+  await expect(form.getByTestId("lead-message")).toContainText("Please tick the required box");
+  expect(posted).toBe(0);
 
   await required.check();
   await form.getByRole("button", { name: "Request a call back" }).click();
@@ -130,8 +139,9 @@ test("a site visit from the contact page records marketing consent when ticked",
   const reference = (await success.locator(".tabular-nums").textContent())?.trim() ?? "";
 
   const lead = await leadByReference(page, reference);
+  const marketing = await currentConsent(page, "marketing");
   expect(lead.source).toBe("site_visit");
-  expect(lead.marketing_consent).not.toBeNull();
+  expect(lead.marketing_consent?.consent_text_id).toBe(marketing.id);
   expect(lead.page_url).toBe("/contact");
   await visitorContext.close();
 });

@@ -782,14 +782,14 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - A server action would have sent every lead from the web server, putting all visitors in one bucket. So the form needs JavaScript.
   - Without JavaScript the page shows call and WhatsApp links.
 - **Consent:**
-  - The required and the marketing boxes are separate and never pre-ticked.
+  - The required and the marketing boxes are separate and never pre-ticked. The required box is checked where the request body is built, so no way of sending the form (button, Enter key) can skip it.
   - The labels come from the current texts in `/public/site`, and the full required text can be opened in place.
   - Marketing consent is sent only when ticked.
   - With no current lead-form text the form isn't drawn.
   - A 409 asks the visitor to reload, keeping what they typed.
 - **Phone:** Indian numbers only, as the API requires (D-034). The hint sends visitors outside India to WhatsApp or email. The boards' country-code picker waits for the API change for NRI leads.
 - **Attribution:**
-  - UTM tags and click IDs are kept from the landing address in session storage: first touch for the tab, only the known keys, capped at the API's lengths, no cookie.
+  - UTM tags and click IDs are kept from the landing address in session storage, captured on every page view by `AttributionCapture` in the site layout: first touch for the tab, only the known keys, capped at the API's lengths, no cookie.
   - `page_url` is the path only, and the referrer is sent without its query, because both could carry personal data.
 - **Placement:**
   - project page: the enquiry in the sidebar, then the site visit (`#visit`) and, when gated, the brochure (`#brochure`);
@@ -798,7 +798,7 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - The CMS's "contact" page blocks join it in 5.5a.
 - **API change:** `brochure_gated` in the project answer is true only when a brochure is actually shown on the site, so the site never offers a form that would end in a 404. The address stays withheld until the form is sent.
 **Consequences:**
-- The browser suite makes 3 real public submissions per run (plus 1 in `leads.spec.ts`), within the API's 5 per 10 minutes.
+- The browser suite makes 3 real public submissions per run (plus 1 in `leads.spec.ts`), within the API's 5 per 10 minutes. One retried submitting test on CI still fits (5); two would get a 429. Locally, the 15 minutes between full runs (the sign-in limit) covers this too.
 - The error states use mocked answers.
 **Verified / assumed:** none beyond the API's own rules (leads/intake.py, phone.py).
 

@@ -4,6 +4,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { LeadForm } from "../src/components/leads/LeadForm";
 import {
   attributionFromSearch,
+  captureAttribution,
+  checkBeforeSend,
   cleanReferrer,
   ENDPOINT,
   leadBody,
@@ -146,19 +148,28 @@ describe("outcomeFor", () => {
     });
   });
 
-  it("puts field errors under their fields and the rest at the top", () => {
-    const o = outcomeFor(422, {
-      title: "Invalid",
-      errors: [
-        { field: "body.phone", message: "Enter a 10-digit Indian number." },
-        { field: "consent", message: "x" },
-      ],
-    });
+  it("puts field errors under the fields on screen, and others at the top in the API's words", () => {
+    const shown = new Set(["name", "phone"]);
+    const o = outcomeFor(
+      422,
+      {
+        title: "Invalid",
+        errors: [{ field: "body.phone", message: "Enter a 10-digit Indian number." }],
+      },
+      shown,
+    );
     expect(o).toEqual({
       kind: "fields",
       fields: { phone: "Enter a 10-digit Indian number." },
       message: "Please check the highlighted fields.",
     });
+    // A project page has no project field: the API's message goes to the top, not "highlighted".
+    const gone = outcomeFor(
+      422,
+      { errors: [{ field: "project_slug", message: "We couldn't find this project." }] },
+      shown,
+    );
+    expect(gone).toEqual({ kind: "fields", fields: {}, message: "We couldn't find this project." });
     expect(outcomeFor(422, { detail: "Something else." })).toMatchObject({
       kind: "fields",
       message: "Something else.",
@@ -173,6 +184,59 @@ describe("outcomeFor", () => {
     expect(outcomeFor(500, null).message).toMatch(/couldn't send/);
     expect(outcomeFor(201, {}).kind).toBe("error"); // a 201 without a reference isn't trusted
     expect(OFFLINE_MESSAGE).toMatch(/offline/);
+  });
+});
+
+describe("checks before sending", () => {
+  it("asks for a name, a number, a project where there is a choice and a visit day", () => {
+    expect(checkBeforeSend("enquiry", { name: "Asha", phone: "98765 43210" }, false)).toEqual({});
+    expect(checkBeforeSend("visit", { name: " A ", phone: " ", preferredDate: "" }, true)).toEqual({
+      name: "Please enter your name.",
+      phone: "Please enter your mobile number.",
+      project_slug: "Please choose a project.",
+      preferred_date: "Please choose a day for the visit.",
+    });
+  });
+});
+
+describe("captureAttribution (first touch across pages)", () => {
+  function memoryStorage(): Storage {
+    const data = new Map<string, string>();
+    return {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+      removeItem: (k: string) => void data.delete(k),
+      clear: () => data.clear(),
+      key: () => null,
+      length: 0,
+    } as Storage;
+  }
+
+  it("keeps the landing page's tags for a form sent from a later page", () => {
+    const storage = memoryStorage();
+    captureAttribution("?utm_source=google&gclid=G1", storage); // the landing page
+    captureAttribution("", storage); // a later page without tags
+    const atForm = captureAttribution("?utm_source=facebook", storage); // tags later on
+    expect(atForm).toEqual({ utm: { source: "google" }, click_ids: { gclid: "G1" } });
+  });
+
+  it("works when storage is blocked, and stores nothing without tags", () => {
+    const throwing = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+    } as unknown as Storage;
+    expect(captureAttribution("?utm_medium=cpc", throwing).utm).toEqual({ medium: "cpc" });
+    const storage = memoryStorage();
+    captureAttribution("?q=1", storage);
+    expect(storage.getItem("empire.attribution")).toBeNull();
+  });
+
+  it("collapses a doubled slash in the page path", () => {
+    expect(pagePath("//foo/bar")).toBe("/foo/bar");
   });
 });
 

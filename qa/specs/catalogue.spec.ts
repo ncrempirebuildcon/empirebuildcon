@@ -165,12 +165,15 @@ test("the project page shows the RERA block, carpet area first and the price not
     "720 sq ft · 66.9 sq m (carpet)",
   );
   await expect(page.getByTestId("lead-form-enquiry")).toBeVisible();
+  await expect(page.getByTestId("lead-form-enquiry")).not.toContainText("(Required) (Required)");
   expect(await seriousAxe(page)).toEqual([]);
 
   // The sold-out home says so and takes no enquiries.
   await page.goto(`/projects/${project.slug}/${project.configSlugs[1]}`);
   await expect(page.getByRole("heading", { name: "Every 3 BHK (test) is booked" })).toBeVisible();
+  // No enquiry panel at all: neither the form nor its pre-hydration fallback.
   await expect(page.getByTestId("lead-form-enquiry")).toHaveCount(0);
+  await expect(page.getByTestId("lead-fallback")).toHaveCount(0);
   expect(csp).toEqual([]);
 });
 

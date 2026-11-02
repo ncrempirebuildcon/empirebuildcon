@@ -28,11 +28,10 @@ import {
 } from "react";
 import { Button, Checkbox, Select, Textarea, TextField } from "@empire/ui";
 import {
-  ATTRIBUTION_KEY,
-  attributionFromSearch,
+  captureAttribution,
+  checkBeforeSend,
   ENDPOINT,
   leadBody,
-  mergeAttribution,
   OFFLINE_MESSAGE,
   type Outcome,
   outcomeFor,
@@ -71,25 +70,16 @@ const SLOTS: { value: VisitSlot; label: string }[] = [
   { value: "evening", label: "Evening (4 pm – 7 pm)" },
 ];
 
-function noSubscribe(): () => void {
-  return () => {};
+function safeSessionStorage(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
 }
 
-/** Reads, merges and keeps the first-touch attribution for this tab (lib/public/leads.ts). */
-function sessionAttribution() {
-  let stored: string | null = null;
-  try {
-    stored = window.sessionStorage.getItem(ATTRIBUTION_KEY);
-  } catch {
-    // Storage blocked (private mode, settings): send what this page's address carries.
-  }
-  const merged = mergeAttribution(stored, attributionFromSearch(window.location.search));
-  try {
-    window.sessionStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(merged));
-  } catch {
-    // Not stored; nothing else depends on it.
-  }
-  return merged;
+function noSubscribe(): () => void {
+  return () => {};
 }
 
 export function LeadForm(props: LeadFormProps) {
@@ -117,6 +107,14 @@ export function LeadForm(props: LeadFormProps) {
   const range = visitDateRange();
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const fieldErrors = outcome?.kind === "fields" ? outcome.fields : {};
+  // The API field names this form draws (lib/public/leads.ts outcomeFor).
+  const shownFields = new Set([
+    "name",
+    "phone",
+    ...(intent === "enquiry" ? ["email", "message"] : []),
+    ...(intent === "visit" ? ["preferred_date", "preferred_slot"] : []),
+    ...(projectChoices && projectChoices.length > 0 ? ["project_slug"] : []),
+  ]);
 
   if (!consent) {
     // COMPLIANCE: no current lead-form text → no form (the API would refuse it with 503).
@@ -139,6 +137,35 @@ export function LeadForm(props: LeadFormProps) {
     if (busy || !consent) return;
     const form = new FormData(event.currentTarget);
     const text = (name: string) => String(form.get(name) ?? "");
+    // COMPLIANCE: the required box is checked here, where the body is built, whatever sent the
+    // form (button, Enter key, requestSubmit). Without it nothing is sent.
+    if (form.get("consent") !== "on") {
+      setOutcome({
+        kind: "error",
+        message: "Please tick the required box so we may contact you about this.",
+      });
+      requestAnimationFrame(() => statusRef.current?.focus());
+      return;
+    }
+    const before = checkBeforeSend(
+      intent,
+      {
+        name: text("name"),
+        phone: text("phone"),
+        projectSlug: projectSlug || null,
+        preferredDate: text("preferred_date"),
+      },
+      intent === "visit" && Boolean(projectChoices?.length),
+    );
+    if (Object.keys(before).length > 0) {
+      setOutcome({
+        kind: "fields",
+        fields: before,
+        message: "Please check the highlighted fields.",
+      });
+      requestAnimationFrame(() => statusRef.current?.focus());
+      return;
+    }
     setBusy(true);
     setOutcome(null);
     const body = leadBody(
@@ -155,12 +182,12 @@ export function LeadForm(props: LeadFormProps) {
         consent,
         marketing,
         marketingTicked: form.get("marketing") === "on",
-        website: text("website"),
+        website: text("cf_ref"),
       },
       {
         pathname: window.location.pathname,
         referrer: document.referrer,
-        attribution: sessionAttribution(),
+        attribution: captureAttribution(window.location.search, safeSessionStorage()),
       },
     );
     let next: Outcome;
@@ -177,7 +204,7 @@ export function LeadForm(props: LeadFormProps) {
       } catch {
         data = null;
       }
-      next = outcomeFor(response.status, data);
+      next = outcomeFor(response.status, data, shownFields);
     } catch {
       next = { kind: "error", message: OFFLINE_MESSAGE };
     }
@@ -310,11 +337,12 @@ export function LeadForm(props: LeadFormProps) {
             </>
           ) : null}
 
-          {/* SECURITY: the honeypot. Bots fill every field; people never see this one. */}
+          {/* SECURITY: the honeypot (sent as the API's `website`). Bots fill every field; people
+              never see this one, and its name means nothing to browser autofill. */}
           <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
             <label>
-              Website
-              <input type="text" name="website" tabIndex={-1} autoComplete="off" defaultValue="" />
+              Leave this empty
+              <input type="text" name="cf_ref" tabIndex={-1} autoComplete="off" defaultValue="" />
             </label>
           </div>
 
@@ -323,11 +351,7 @@ export function LeadForm(props: LeadFormProps) {
             <Checkbox
               name="consent"
               required
-              label={
-                <>
-                  {consent.checkbox_label} <span className="text-muted">(Required)</span>
-                </>
-              }
+              label={consent.checkbox_label}
               data-testid="consent-required"
             />
             <details className="text-small text-muted">
@@ -352,8 +376,7 @@ export function LeadForm(props: LeadFormProps) {
           <div
             ref={statusRef}
             tabIndex={-1}
-            role={outcome ? "alert" : undefined}
-            aria-live="polite"
+            role="alert"
             className={
               outcome
                 ? "rounded-tile border border-danger bg-danger-bg p-3 text-small text-danger-on-bg"
@@ -373,23 +396,7 @@ export function LeadForm(props: LeadFormProps) {
             ) : null}
           </div>
 
-          <Button
-            type="submit"
-            loading={busy}
-            onClick={(e) => {
-              // The required box: say why nothing happened instead of sending a refusal.
-              const form = e.currentTarget.form;
-              const box = form?.elements.namedItem("consent") as HTMLInputElement | null;
-              if (box && !box.checked) {
-                e.preventDefault();
-                setOutcome({
-                  kind: "error",
-                  message: "Please tick the required box so we may contact you about this.",
-                });
-                box.focus();
-              }
-            }}
-          >
+          <Button type="submit" loading={busy}>
             {submitLabel}
           </Button>
           <p className="text-caption text-muted">

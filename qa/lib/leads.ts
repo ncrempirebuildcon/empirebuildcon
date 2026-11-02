@@ -45,13 +45,16 @@ export function testMobile(): string {
   return `${digits.slice(0, 5)} ${digits.slice(5)}`;
 }
 
-/** The current lead-form consent text, read the way the website will read it. */
-export async function currentConsent(page: Page): Promise<ConsentRef> {
-  const response = await apiCall(page, "GET", "/api/v1/admin/consent-texts?kind=lead_form");
+/** The current consent text of a kind (the lead form's by default), as the website reads it. */
+export async function currentConsent(
+  page: Page,
+  kind: "lead_form" | "marketing" = "lead_form",
+): Promise<ConsentRef> {
+  const response = await apiCall(page, "GET", `/api/v1/admin/consent-texts?kind=${kind}`);
   expect(response.status()).toBe(200);
   const texts = (await response.json()) as Array<ConsentRef & { is_current: boolean }>;
   const current = texts.find((text) => text.is_current);
-  expect(current, "a current lead-form consent text (seeded in dev/test)").toBeTruthy();
+  expect(current, `a current ${kind} consent text (seeded in dev/test)`).toBeTruthy();
   return current as ConsentRef;
 }
 

@@ -106,7 +106,30 @@ export function cleanReferrer(referrer: string | null | undefined): string | nul
 
 /** The path of the page the form is on, without query or fragment. */
 export function pagePath(pathname: string): string {
-  return pathname.startsWith("/") ? pathname.slice(0, 1000) : "/";
+  // "//foo" would read as another host to the API's address check; one slash is our path.
+  return pathname.startsWith("/") ? pathname.replace(/^\/+/, "/").slice(0, 1000) : "/";
+}
+
+/**
+ * Keeps this landing's tags for the tab (first touch). Called on every page view by
+ * `AttributionCapture` in the site layout, and again just before a form is sent.
+ */
+export function captureAttribution(search: string, storage: Storage | null): Attribution {
+  let stored: string | null = null;
+  try {
+    stored = storage?.getItem(ATTRIBUTION_KEY) ?? null;
+  } catch {
+    // Storage blocked (private mode, settings): use what this address carries.
+  }
+  const merged = mergeAttribution(stored, attributionFromSearch(search));
+  try {
+    if (Object.keys(merged.utm).length || Object.keys(merged.click_ids).length) {
+      storage?.setItem(ATTRIBUTION_KEY, JSON.stringify(merged));
+    }
+  } catch {
+    // Not stored; nothing else depends on it.
+  }
+  return merged;
 }
 
 const SOURCE: Record<LeadIntent, "project_form" | "contact_form" | "site_visit" | "brochure"> = {
@@ -171,18 +194,16 @@ interface ProblemLike {
   errors?: { field?: string; message?: string }[];
 }
 
-/** API field names the form shows its own messages for; anything else goes to the top. */
-const FORM_FIELDS = new Set([
-  "name",
-  "phone",
-  "email",
-  "message",
-  "project_slug",
-  "preferred_date",
-  "preferred_slot",
-]);
-
-export function outcomeFor(status: number, body: unknown): Outcome {
+/**
+ * `shownFields`: the API field names this form draws, so a field error is put under its field;
+ * an error about a field that isn't on screen (e.g. `project_slug` on a project page) is shown
+ * at the top with the API's own words instead of "check the highlighted fields".
+ */
+export function outcomeFor(
+  status: number,
+  body: unknown,
+  shownFields: ReadonlySet<string> = new Set(),
+): Outcome {
   const data = (body && typeof body === "object" ? body : {}) as ProblemLike & {
     reference?: string;
     message?: string;
@@ -205,17 +226,23 @@ export function outcomeFor(status: number, body: unknown): Outcome {
   }
   if (status === 422) {
     const fields: Record<string, string> = {};
+    let elsewhere: string | undefined;
     for (const e of data.errors ?? []) {
       const field = (e.field ?? "").split(".").pop() ?? "";
-      if (FORM_FIELDS.has(field) && e.message && !fields[field]) fields[field] = e.message;
+      if (shownFields.has(field) && e.message) {
+        if (!fields[field]) fields[field] = e.message;
+      } else if (!elsewhere && e.message) {
+        elsewhere = e.message;
+      }
     }
     return {
       kind: "fields",
       fields,
       message:
-        Object.keys(fields).length > 0
+        elsewhere ??
+        (Object.keys(fields).length > 0
           ? "Please check the highlighted fields."
-          : (data.detail ?? "Please check your details and try again."),
+          : (data.detail ?? "Please check your details and try again.")),
     };
   }
   if (status === 429) {
@@ -237,6 +264,25 @@ export function outcomeFor(status: number, body: unknown): Outcome {
     kind: "error",
     message: "We couldn't send this. Please try again, or call or WhatsApp us.",
   };
+}
+
+/**
+ * Checks done before sending, with plain messages (the API's own would be technical for some
+ * fields). Returns field → message; empty means the form may be sent.
+ */
+export function checkBeforeSend(
+  intent: LeadIntent,
+  values: { name: string; phone: string; projectSlug?: string | null; preferredDate?: string },
+  needsProject: boolean,
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (values.name.trim().length < 2) errors.name = "Please enter your name.";
+  if (!values.phone.trim()) errors.phone = "Please enter your mobile number.";
+  if (needsProject && !values.projectSlug) errors.project_slug = "Please choose a project.";
+  if (intent === "visit" && !values.preferredDate) {
+    errors.preferred_date = "Please choose a day for the visit.";
+  }
+  return errors;
 }
 
 /** The message when the request never reached us (offline, DNS, timeout). */
