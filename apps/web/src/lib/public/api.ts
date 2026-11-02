@@ -16,6 +16,7 @@ import { EDGE_KEY_HEADER } from "@/lib/edge";
 
 const API_ORIGIN = process.env.API_ORIGIN ?? "http://localhost:8000";
 const SAFETY_REVALIDATE_SECONDS = 3600; // 1 hour safety net fallback
+const FETCH_TIMEOUT_MS = 5000;
 
 export type PublicSite = components["schemas"]["PublicSite"];
 export type PublicOffer = components["schemas"]["PublicOffer"];
@@ -42,15 +43,36 @@ function getClient() {
   return createApiClient({
     baseUrl: API_ORIGIN,
     headers: getEdgeHeaders(),
-    timeoutMs: 5000,
+    // No client timeout: every read passes its own fetch (cachedFetch), which sets the signal.
   });
+}
+
+/**
+ * The fetch every public read goes through: Next.js data cache with our tags and the 1-hour
+ * safety net (ARCHITECTURE §5).
+ *
+ * WHY a per-request `fetch`: the tags used to go in as `next` options on the call. openapi-fetch
+ * copies them onto its Request, but the client's timeout wrapper then called
+ * `fetch(request, { signal })`, and Next.js rebuilds a Request when it gets one with an init,
+ * which loses the copied `next` (only standard Request fields survive). The data was cached for
+ * a year with no tags, so /_internal/revalidate could not clear it. Passing `next`, `cache` and
+ * the timeout signal in the init of a fetch we control keeps them (Next reads `init.next`).
+ * Tested in test/public-api-cache.test.ts.
+ */
+export function cachedFetch(tags: string[]): typeof fetch {
+  return (input, init) =>
+    fetch(input, {
+      ...init,
+      cache: "force-cache",
+      next: { tags, revalidate: SAFETY_REVALIDATE_SECONDS },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
 }
 
 export async function fetchPublicSite(): Promise<PublicSite> {
   const client = getClient();
   const res = await client.GET("/api/v1/public/site", {
-    cache: "force-cache",
-    next: { tags: ["site", "content"], revalidate: SAFETY_REVALIDATE_SECONDS },
+    fetch: cachedFetch(["site", "content"]),
   });
   if (res.response.status === 404) notFound();
   return unwrap(res);
@@ -62,8 +84,7 @@ export async function fetchPublicProjects(
   const client = getClient();
   const res = await client.GET("/api/v1/public/projects", {
     params: { query },
-    cache: "force-cache",
-    next: { tags: ["projects", "content"], revalidate: SAFETY_REVALIDATE_SECONDS },
+    fetch: cachedFetch(["projects", "content"]),
   });
   if (res.response.status === 404) notFound();
   return unwrap(res);
@@ -73,11 +94,7 @@ export async function fetchPublicProject(slug: string): Promise<PublicProjectDet
   const client = getClient();
   const res = await client.GET("/api/v1/public/projects/{slug}", {
     params: { path: { slug } },
-    cache: "force-cache",
-    next: {
-      tags: ["projects", `project:${slug}`, "content"],
-      revalidate: SAFETY_REVALIDATE_SECONDS,
-    },
+    fetch: cachedFetch(["projects", `project:${slug}`, "content"]),
   });
   if (res.response.status === 404) notFound();
   return unwrap(res);
@@ -89,8 +106,7 @@ export async function fetchPublicProperties(
   const client = getClient();
   const res = await client.GET("/api/v1/public/properties", {
     params: { query },
-    cache: "force-cache",
-    next: { tags: ["properties", "content"], revalidate: SAFETY_REVALIDATE_SECONDS },
+    fetch: cachedFetch(["properties", "content"]),
   });
   if (res.response.status === 404) notFound();
   return unwrap(res);
@@ -100,8 +116,7 @@ export async function fetchPublicPage(slug: string): Promise<PublicPage> {
   const client = getClient();
   const res = await client.GET("/api/v1/public/pages/{slug}", {
     params: { path: { slug } },
-    cache: "force-cache",
-    next: { tags: [`page:${slug}`, "content"], revalidate: SAFETY_REVALIDATE_SECONDS },
+    fetch: cachedFetch([`page:${slug}`, "content"]),
   });
   if (res.response.status === 404) notFound();
   return unwrap(res);
@@ -113,8 +128,7 @@ export async function fetchPublicPosts(
   const client = getClient();
   const res = await client.GET("/api/v1/public/posts", {
     params: { query },
-    cache: "force-cache",
-    next: { tags: ["posts", "content"], revalidate: SAFETY_REVALIDATE_SECONDS },
+    fetch: cachedFetch(["posts", "content"]),
   });
   if (res.response.status === 404) notFound();
   return unwrap(res);
@@ -124,11 +138,7 @@ export async function fetchPublicPost(slug: string): Promise<PublicPostDetail> {
   const client = getClient();
   const res = await client.GET("/api/v1/public/posts/{slug}", {
     params: { path: { slug } },
-    cache: "force-cache",
-    next: {
-      tags: ["posts", `post:${slug}`, "content"],
-      revalidate: SAFETY_REVALIDATE_SECONDS,
-    },
+    fetch: cachedFetch(["posts", `post:${slug}`, "content"]),
   });
   if (res.response.status === 404) notFound();
   return unwrap(res);
@@ -140,8 +150,7 @@ export async function fetchPublicFaqs(
   const client = getClient();
   const res = await client.GET("/api/v1/public/faqs", {
     params: { query },
-    cache: "force-cache",
-    next: { tags: ["faqs", "content"], revalidate: SAFETY_REVALIDATE_SECONDS },
+    fetch: cachedFetch(["faqs", "content"]),
   });
   if (res.response.status === 404) notFound();
   return unwrap(res);
@@ -153,8 +162,7 @@ export async function fetchPublicTestimonials(
   const client = getClient();
   const res = await client.GET("/api/v1/public/testimonials", {
     params: { query },
-    cache: "force-cache",
-    next: { tags: ["testimonials", "content"], revalidate: SAFETY_REVALIDATE_SECONDS },
+    fetch: cachedFetch(["testimonials", "content"]),
   });
   if (res.response.status === 404) notFound();
   return unwrap(res);
@@ -163,8 +171,7 @@ export async function fetchPublicTestimonials(
 export async function fetchPublicRedirects(): Promise<PublicRedirect[]> {
   const client = getClient();
   const res = await client.GET("/api/v1/public/redirects", {
-    cache: "force-cache",
-    next: { tags: ["redirects", "site"], revalidate: SAFETY_REVALIDATE_SECONDS },
+    fetch: cachedFetch(["redirects", "site"]),
   });
   if (res.response.status === 404) notFound();
   return unwrap(res);
