@@ -691,7 +691,7 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 
 ---
 
-## D-039 · Website shell, server-side data layer, revalidation, CSP and observability (Proposed, 2026-11-01)
+## D-039 · Website shell, server-side data layer, revalidation, CSP and observability (Accepted, 2026-11-02)
 
 **Context:** Task 5.2 establishes the public shell for the Empire website, wired to the 5.1 public read-only API. It requires a dedicated public route group layout, server-side data fetching with Next.js cache tags, an end-to-end signed cache revalidation pipeline, brand-compliant shell components, a Cloudinary media loader, nonce-based CSP, privacy-preserving Sentry error tracking, and Noir-styled 404/error pages.
 
@@ -735,3 +735,14 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 **Verified / assumed:**
 - `@sentry/nextjs@11.10.0` verified on npm as of 1 Nov 2026.
 - End-to-end cache invalidation verified in Playwright browser tests (`qa/specs/public-shell.spec.ts:184`) with live outbox drain reflection.
+
+## D-040 · From task 5.3: two build tracks in parallel (Accepted, 2026-11-02)
+
+**Context:** With one developer agent working serially, Phase 5 moved slowly: each task took several review rounds, and nothing else could move while it was open. On 2 Nov 2026 the owner asked Claude to build tasks as well, in parallel with the developer agent, keeping the complex tasks for itself and giving the agent work that neither track waits on.
+**Decision:**
+- **Two tracks.** Track A (Claude) builds the critical path: 5.3 projects and properties, 5.4 lead forms, 5.5a page-builder pages (home, About, Contact, legal, landing pages), then the rest of SEO and the performance pass. Track B (the developer agent) builds work with no dependency on Track A: 5.5b blog, then the standalone pieces listed in [tasks/phase-5/PLAN.md](tasks/phase-5/PLAN.md). Neither track waits for the other to merge.
+- **Ownership, to avoid conflicts.** Each task doc lists the folders it may change. Track B doesn't change `apps/api`, the API contract, migrations, `proxy.ts`, `lib/edge.ts` or the shell components unless its task doc says so. Track A owns those.
+- **Decision numbers** are reserved in the plan per task, so two open branches never take the same `D-0xx`.
+- **Merging:** whichever branch merges second rebases on the new `main` (or merges `main` into the branch) and re-runs the checks before the final review.
+- **Claude's own branches** follow the same workflow as the agent's: task doc, branch, every check in WORKFLOW §4, the full pytest suite twice and `pnpm e2e` twice. An independent reviewer that didn't write the code reads the diff, so the work isn't graded by its author. Claude still has no GitHub access (D-029): it hands the branch to the owner's folder as a git bundle, and the owner pushes it and opens the PR. Only the owner merges.
+**Verified / assumed:** none; this is a process decision by the owner.
