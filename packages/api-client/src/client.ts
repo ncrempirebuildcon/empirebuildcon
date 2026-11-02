@@ -59,6 +59,11 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   });
 }
 
+/**
+ * WARNING: calling `fetch(request, init)` makes Next.js rebuild the Request, which drops any
+ * `next` cache options openapi-fetch copied onto it. Server reads that use Next.js cache tags
+ * pass their own `fetch` per request instead (apps/web/src/lib/public/api.ts `cachedFetch`).
+ */
 function withTimeout(ms: number): typeof fetch {
   return (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(ms) });
 }
