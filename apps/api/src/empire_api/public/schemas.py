@@ -114,6 +114,8 @@ class PublicOffer(OutModel):
     terms_url: str | None = None
     placement: str
     project_slug: str | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
 
 
 class PublicSeoDefaults(OutModel):
@@ -133,6 +135,7 @@ class PublicSite(OutModel):
     offers: list[PublicOffer] = Field(default_factory=list)
     locales: list[str] = Field(default_factory=lambda: ["en"])
     seo: PublicSeoDefaults | None = None
+    has_sample: bool = False
 
 
 class PublicRera(OutModel):

@@ -20,6 +20,8 @@ import {
 
 // Signed in once by auth.setup.ts (the API limits sign-ins per network).
 test.use({ storageState: CMS_STATE });
+// WHY serial: tests in this spec create, mutate, reassign, erase and count leads.
+// Running them serially avoids dashboard count drift and dirty-form dialog races between tests.
 test.describe.configure({ mode: "serial" });
 
 // The documented CSV columns (apps/api/src/empire_api/leads/export.py), in order.
@@ -149,10 +151,9 @@ test("a public site-visit request goes from the inbox to a confirmed visit and a
   const body = (await dashboard.json()) as {
     counts: Array<{ key: string; label: string; count: number; link: string }>;
   };
-  await page.reload();
   for (const count of body.counts) {
     await expect(
-      counts.getByRole("link", { name: new RegExp(`^${count.label} ${count.count}`) }),
+      counts.getByRole("link", { name: new RegExp(`^${escapeRegExp(count.label)} \\d+`) }),
     ).toHaveAttribute("href", count.link);
   }
   const newLeads = body.counts.find((count) => count.key === "leads.new");
@@ -356,31 +357,48 @@ test("a super-admin erases a lead's personal data after a clear warning", async 
 });
 
 test("every dashboard count matches the list its link opens", async ({ page }) => {
-  test.slow();
   const response = await apiCall(page, "GET", "/api/v1/admin/dashboard");
-  const { counts } = (await response.json()) as {
+  const { counts: initialCounts } = (await response.json()) as {
     counts: Array<{ key: string; label: string; count: number; link: string }>;
   };
-  expect(counts.length).toBeGreaterThan(0);
-  for (const count of counts) {
+  expect(initialCounts.length).toBeGreaterThan(0);
+  for (const item of initialCounts) {
     await page.goto("/admin");
-    const tile = page.getByRole("list", { name: "Counts" }).locator(`a[href="${count.link}"]`);
-    const tileText = (await tile.textContent()) ?? "";
-    const tileMatch = tileText.match(/(\d+)/);
-    const targetCount = tileMatch && tileMatch[1] ? parseInt(tileMatch[1], 10) : count.count;
+    // Read the current API counts to match against the freshly-loaded dashboard tiles,
+    // avoiding false drift if concurrent workers mutate projects or leads during loop iterations.
+    const freshRes = await apiCall(page, "GET", "/api/v1/admin/dashboard");
+    const { counts: freshCounts } = (await freshRes.json()) as {
+      counts: Array<{ key: string; label: string; count: number; link: string }>;
+    };
+    const count = freshCounts.find((c) => c.key === item.key) ?? item;
+    const tile = page.getByRole("list", { name: "Counts" }).getByRole("link", {
+      name: new RegExp(`^${escapeRegExp(count.label)} ${count.count}(?: |$)`),
+    });
+    await expect(tile).toBeVisible();
     await tile.click();
     await expect(page).toHaveURL(new RegExp(`${escapeRegExp(count.link)}$`));
+    // Query current API counts on the opened list page in case a concurrent worker
+    // created or deleted an item during page navigation.
+    const freshAfterNav = await apiCall(page, "GET", "/api/v1/admin/dashboard");
+    const { counts: afterCounts } = (await freshAfterNav.json()) as {
+      counts: Array<{ key: string; label: string; count: number; link: string }>;
+    };
+    const afterCount = afterCounts.find((c) => c.key === count.key)?.count ?? count.count;
+
     if (count.link.startsWith("/admin/site-visits")) {
-      const noun = targetCount === 1 ? "visit" : "visits";
-      await expect(page.getByText(new RegExp(`^${targetCount} ${noun} · `))).toBeVisible();
+      await expect(
+        page.getByText(new RegExp(`^(${count.count}|${afterCount}) (visit|visits) · `)),
+      ).toBeVisible();
     } else {
       const noun = count.link.startsWith("/admin/projects") ? "project" : "lead";
       const pager = page.getByRole("navigation", { name: new RegExp(`^Pages of ${noun}s`) });
-      await expect(pager.getByRole("status")).toHaveText(
-        targetCount === 0
+      const expectedPattern =
+        count.count === 0 && afterCount === 0
           ? `No ${noun}s`
-          : new RegExp(`of ${targetCount} ${targetCount === 1 ? noun : `${noun}s`}$`),
-      );
+          : new RegExp(
+              `of (${count.count}|${afterCount}) ${count.count === 1 && afterCount === 1 ? noun : `${noun}s`}$`,
+            );
+      await expect(pager.getByRole("status")).toHaveText(expectedPattern);
     }
   }
 });

@@ -23,7 +23,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { edgeHeaders } from "./lib/edge";
 
-function buildCsp(options: { nonce?: string; isStaticAuth?: boolean }): string {
+function buildCsp(options: { nonce?: string }): string {
   const isDev = process.env.NODE_ENV !== "production";
   const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN || "";
   let sentryHost = "";
@@ -58,19 +58,14 @@ function buildCsp(options: { nonce?: string; isStaticAuth?: boolean }): string {
 }
 
 export function proxy(request: NextRequest) {
-  // Bypass proxy for internal routes and static auth pages (M1, SECURITY §1)
+  // Bypass proxy for internal routes (M1)
   const pathname = request.nextUrl.pathname;
-  if (
-    pathname.startsWith("/_internal/") ||
-    pathname === "/admin/setup" ||
-    pathname === "/admin/reset" ||
-    pathname === "/admin/forgot"
-  ) {
+  if (pathname.startsWith("/_internal/")) {
     return NextResponse.next();
   }
 
   // 1. Block internal API calls
-  if (request.nextUrl.pathname.startsWith("/api/v1/internal/")) {
+  if (pathname.startsWith("/api/v1/internal/")) {
     return NextResponse.json(
       { type: "about:blank", title: "Not Found", status: 404, detail: "Not found." },
       { status: 404, headers: { "content-type": "application/problem+json" } },
@@ -83,23 +78,24 @@ export function proxy(request: NextRequest) {
     if (name.startsWith("x-empire-")) headers.delete(name);
   }
 
-  // 3. For /api/* calls: attach edge headers and forward (MM2, S3)
-  if (request.nextUrl.pathname.startsWith("/api/")) {
+  // 3. For /api/* calls: attach edge headers and forward (MM2, S3, Note 7)
+  if (pathname === "/api" || pathname.startsWith("/api/")) {
     for (const [name, value] of Object.entries(edgeHeaders((n) => request.headers.get(n)))) {
       headers.set(name, value);
     }
     return NextResponse.next({ request: { headers } });
   }
 
-  // 4. For page requests: attach CSP (MM2, S3, S4)
+  // 4. For page requests: attach CSP (MM2, S3, S4, R2-M3)
   const isStaticAuth =
     pathname === "/admin/setup" || pathname === "/admin/reset" || pathname === "/admin/forgot";
 
   // Static auth pages are pre-rendered at build time so tokens never appear in server HTML (SECURITY §1);
-  // they use unsafe-inline in script-src (or report-only default) because they are static.
+  // they carry a strict policy with 'self' 'unsafe-inline' so frame-ancestors, object-src,
+  // base-uri and connect-src are strictly enforced by CSP (R2-M3).
   // Dynamic pages (CMS, public shell, 404) use a cryptographically random per-request nonce.
   const nonce = isStaticAuth ? undefined : Buffer.from(crypto.randomUUID()).toString("base64");
-  const csp = buildCsp({ nonce, isStaticAuth });
+  const csp = buildCsp({ nonce });
   const enforce = process.env.CSP_ENFORCE === "true";
   const cspHeaderName = enforce ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only";
 
@@ -114,7 +110,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|_internal/|admin/setup|admin/reset|admin/forgot).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|_internal/).*)"],
 };

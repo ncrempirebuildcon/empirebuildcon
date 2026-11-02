@@ -342,6 +342,8 @@ def get_public_site(db: Session, *, locale: str | None = None) -> schemas.Public
                     terms_url=off.terms_url,
                     placement=off.placement,
                     project_slug=p_ref.slug if p_ref else None,
+                    starts_at=off.starts_at,
+                    ends_at=off.ends_at,
                 )
             )
 
@@ -356,6 +358,17 @@ def get_public_site(db: Session, *, locale: str | None = None) -> schemas.Public
     if flags.is_enabled(db, "locale_hi"):
         available_locales.append("hi")
 
+    has_sample = False
+    if not prod:
+        has_sample = bool(
+            db.scalar(
+                select(Project.id)
+                .where(Project.is_sample.is_(True), Project.publish_state == "published")
+                .limit(1)
+            )
+            or any(getattr(off, "is_sample", False) for off in offer_rows)
+        )
+
     return schemas.PublicSite(
         company=company,
         social=social,
@@ -367,6 +380,7 @@ def get_public_site(db: Session, *, locale: str | None = None) -> schemas.Public
         offers=public_offers,
         locales=available_locales,
         seo=seo_defaults,
+        has_sample=has_sample,
     )
 
 
@@ -1732,6 +1746,8 @@ def _resolve_grid_block(
     prod: bool,
 ) -> bool:
     """Fallback single-grid resolver using the unified _batch_load_grid_blocks (S9)."""
+    # WHY: transient PageBlock instance passed to _batch_load_grid_blocks
+    # without attaching to DB session (Note 9)
     dummy = PageBlock(id=uuid.uuid4(), type=b_type, data=data)
     results = _batch_load_grid_blocks(db, [dummy], prod=prod, is_hi=is_hi)
     items = results.get(dummy.id, [])

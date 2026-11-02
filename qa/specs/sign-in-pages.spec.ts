@@ -52,8 +52,12 @@ for (const [kind, place] of [
   }) => {
     const token = fakeToken();
     const response = await page.goto(`/admin/${kind}${place}token=${token}`);
-    // SECURITY: no Referer header from this page, and the token isn't in the server's HTML.
+    // SECURITY: no Referer header from this page, CSP header present, and the token isn't in the server's HTML.
     expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
+    expect(
+      response?.headers()["content-security-policy"] ||
+        response?.headers()["content-security-policy-report-only"],
+    ).toBeTruthy();
     expect(await response?.text()).not.toContain(token);
     if (place === "#") expect(response?.url()).not.toContain(token);
     await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");

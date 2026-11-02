@@ -85,7 +85,7 @@ export function Footer({
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-gold-500/30 text-xs font-semibold text-gold-400 hover:border-gold-400 hover:text-gold-300 capitalize"
+                    className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-gold-500/30 text-xs font-semibold text-gold-400 hover:border-gold-400 hover:text-gold-300 capitalize"
                     aria-label={`Follow Empire on ${platform}`}
                   >
                     {platform.slice(0, 2).toUpperCase()}

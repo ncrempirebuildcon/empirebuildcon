@@ -21,8 +21,6 @@ export const MAX_REVALIDATE_BODY_BYTES = 16 * 1024;
 
 export const SIGNATURE_HEADER = "x-revalidate-signature";
 export const TIMESTAMP_HEADER = "x-revalidate-timestamp";
-export const LEGACY_SIGNATURE_HEADER = "x-empire-signature";
-export const LEGACY_TIMESTAMP_HEADER = "x-empire-timestamp";
 
 const seenSignatures = new Map<string, number>();
 
@@ -62,18 +60,9 @@ export async function processRevalidate(
     return { ok: false, status: 401 };
   }
 
-  // 1. Read headers (primary: x-revalidate-*, fallback: x-empire-*)
-  const signatureRaw = (
-    request.headers.get(SIGNATURE_HEADER) ??
-    request.headers.get(LEGACY_SIGNATURE_HEADER) ??
-    ""
-  ).trim();
-
-  const timestampRaw = (
-    request.headers.get(TIMESTAMP_HEADER) ??
-    request.headers.get(LEGACY_TIMESTAMP_HEADER) ??
-    ""
-  ).trim();
+  // 1. Read headers (x-revalidate-*)
+  const signatureRaw = (request.headers.get(SIGNATURE_HEADER) ?? "").trim();
+  const timestampRaw = (request.headers.get(TIMESTAMP_HEADER) ?? "").trim();
 
   if (!signatureRaw || !timestampRaw) {
     return { ok: false, status: 401 };
@@ -148,10 +137,12 @@ export async function processRevalidate(
   // 9. Record in replay cache keyed on the verified expected signature (M3)
   seenSignatures.set(expectedHex, timestamp);
 
-  // 10. Revalidate tags and layout
+  // 10. Revalidate tags (Note 1)
   for (const tag of tags) {
     try {
-      (revalidateTag as unknown as (t: string) => void)(tag);
+      (revalidateTag as unknown as (t: string, opts?: { expire: number }) => void)(tag, {
+        expire: 0,
+      });
     } catch {
       // Ignore in test or environments where cache is inactive
     }

@@ -71,7 +71,7 @@ Full list: [api/ENDPOINTS.md](api/ENDPOINTS.md) (159 operations).
 | CMS (`/admin/**`) | Client-rendered after a server session check; never cached | Always live |
 | Lead forms, chat | Client components posting to `/api/v1/public/*` | — |
 
-The `/_internal/revalidate` route lives outside `/api/*` so it is handled by Next.js, not proxied. It requires an HMAC-SHA256 signature (`X-Empire-Signature`) computed over the timestamp and raw JSON body (`${timestamp}.${body}`) using `REVALIDATE_SECRET`, along with `X-Empire-Timestamp`. Signatures older than 5 minutes or previously observed are refused (D-039). An API outbox handler (`integrations/handlers.py`) sends this request on CMS publish events with automatic retries.
+The `/_internal/revalidate` route lives outside `/api/*` so it is handled by Next.js, not proxied. It requires an HMAC-SHA256 signature (`X-Revalidate-Signature`) computed over the timestamp and raw JSON body (`${timestamp}.${body}`) using `REVALIDATE_SECRET`, along with `X-Revalidate-Timestamp`. Signatures older than 5 minutes or previously observed are refused (D-039). An API outbox handler (`integrations/handlers.py`) sends this request on CMS publish events with automatic retries.
 
 ## 6. Data model
 
@@ -200,6 +200,7 @@ Envelope: `{id, type, occurred_at, actor_id, aggregate: {type, id, slug}, data}`
 | `faq.changed`, `testimonial.changed` | | Revalidate · AI index (FAQs) |
 | `offer.started` / `offer.ended` / `offer.changed` | Scheduler tick or edit | Revalidate banners |
 | `settings.updated`, `flag.changed`, `redirect.changed`, `consent_text.published` | | Revalidate `site` tag |
+| `web.revalidate` | Independent retry after revalidation delivery failure (M2) | Revalidate Next.js cache tags with dedicated backoff |
 | `user.setup_link_issued`, `user.password_reset_requested` | Invite, resend, forgot password | Email the link (decrypted only in the handler, never logged) |
 | `user.locked`, password changed, `user.two_factor_enabled` / `_disabled` / `_reset` | | Security notices to that user (lock notices at most once an hour) |
 

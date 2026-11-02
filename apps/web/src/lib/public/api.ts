@@ -18,6 +18,7 @@ const API_ORIGIN = process.env.API_ORIGIN ?? "http://localhost:8000";
 const SAFETY_REVALIDATE_SECONDS = 3600; // 1 hour safety net fallback
 
 export type PublicSite = components["schemas"]["PublicSite"];
+export type PublicOffer = components["schemas"]["PublicOffer"];
 export type PublicProjectList = components["schemas"]["PublicProjectList"];
 export type PublicProjectDetail = components["schemas"]["PublicProjectDetail"];
 export type PublicPropertyList = components["schemas"]["PublicPropertyList"];

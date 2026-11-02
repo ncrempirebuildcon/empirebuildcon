@@ -272,11 +272,11 @@ def handle_revalidation(db: Session, event: OutboxEvent) -> None:
         handle_web_revalidate(db, event)
         return
 
-    tags = tags_for_event(db, event)
-    if not tags:
-        return
-
+    tags: list[str] = []
     try:
+        tags = tags_for_event(db, event)
+        if not tags:
+            return
         send_revalidation(tags)
     except Exception as exc:  # noqa: BLE001
         log.warning(
@@ -290,7 +290,7 @@ def handle_revalidation(db: Session, event: OutboxEvent) -> None:
             type_="web.revalidate",
             aggregate_type=event.aggregate_type,
             aggregate_id=event.aggregate_id,
-            data={"tags": list(tags)},
+            data={"tags": tags if tags else ["site", "content"]},
         )
 
 

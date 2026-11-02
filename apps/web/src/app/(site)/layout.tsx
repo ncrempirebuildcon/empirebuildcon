@@ -36,14 +36,11 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
   // S7: Determine production strictly from APP_ENV
   const isProd = process.env.APP_ENV === "production";
 
-  // S7: Detect whether current site payload contains sample items
-  const hasSample = Boolean(
-    site?.offers?.some((o) => (o as unknown as { is_sample?: boolean }).is_sample) ||
-    (site?.company as unknown as { is_sample?: boolean })?.is_sample,
-  );
+  // S7, S-N4: Detect whether current site payload contains sample items
+  const hasSample = !isProd && Boolean(site?.has_sample);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-noir-900 text-body pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0">
+    <div className="flex min-h-dvh flex-col bg-noir-900 text-body">
       <SampleDataRibbon hasSampleData={hasSample} />
       {site?.offers && <OfferBanner offers={site.offers} />}
       <Header site={site} isProduction={isProd} />

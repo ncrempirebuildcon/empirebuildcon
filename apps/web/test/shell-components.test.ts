@@ -3,7 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import React from "react";
 import MobileActionBar from "../src/components/shell/MobileActionBar";
 import Footer from "../src/components/shell/Footer";
-import type { PublicSite } from "../src/lib/public/api";
+import SampleDataRibbon from "../src/components/shell/SampleDataRibbon";
+import OfferBanner from "../src/components/shell/OfferBanner";
+import type { PublicSite, PublicOffer } from "../src/lib/public/api";
 
 const sampleCompany: PublicSite["company"] = {
   legal_name: "Empire Buildcon Private Limited",
@@ -72,6 +74,48 @@ describe("MobileActionBar Component (S6)", () => {
   });
 });
 
+describe("SampleDataRibbon Component (S7, S-N4)", () => {
+  it("renders sample notice in dev/staging when hasSampleData is true", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SampleDataRibbon, { hasSampleData: true }),
+    );
+    expect(html).toContain("Sample data");
+    expect(html).toContain(
+      "project names, prices, RERA numbers and images are placeholders for review",
+    );
+  });
+
+  it("renders nothing when hasSampleData is false", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SampleDataRibbon, { hasSampleData: false }),
+    );
+    expect(html).toBe("");
+  });
+});
+
+describe("OfferBanner Component (S8, S-N4)", () => {
+  const sampleOffer: PublicOffer = {
+    id: "11111111-1111-1111-1111-111111111111",
+    title: "Diwali Special Offer",
+    body: "No pre-EMI until possession",
+    cta_label: "Claim offer",
+    cta_url: "/contact#offer",
+    placement: "banner",
+    project_slug: "gomti-greens",
+    terms: "T&C apply",
+    terms_url: "/terms",
+    image: null,
+    starts_at: "2026-10-01T00:00:00Z",
+    ends_at: "2026-11-15T00:00:00Z",
+  };
+
+  it("renders validity date range when starts_at and ends_at are present (S-N4)", () => {
+    const html = renderToStaticMarkup(React.createElement(OfferBanner, { offers: [sampleOffer] }));
+    expect(html).toContain("Diwali Special Offer");
+    expect(html).toContain("Valid 1 Oct 2026 – 15 Nov 2026");
+  });
+});
+
 describe("Footer Component (S8)", () => {
   const dummySite: PublicSite = {
     company: sampleCompany,
@@ -93,6 +137,7 @@ describe("Footer Component (S8)", () => {
     features: {},
     locales: ["en"],
     seo: null,
+    has_sample: false,
     tracking: {
       ga4_id: null,
       gtm_id: null,
@@ -122,5 +167,7 @@ describe("Footer Component (S8)", () => {
     expect(html).toContain("Follow Empire on facebook");
     expect(html).toContain("Follow Empire on instagram");
     expect(html).not.toContain("Follow Empire on youtube");
+    // 44 px target on social icons (Note 5)
+    expect(html).toContain("min-h-[44px] min-w-[44px]");
   });
 });

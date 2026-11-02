@@ -44,7 +44,7 @@ Set by the web app (pages) and the API (JSON responses):
 | Header | Value |
 |---|---|
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` (add `preload` one month after go-live if nothing breaks) |
-| `Content-Security-Policy` | Nonce-based `script-src` for Next.js; `img-src 'self' https://res.cloudinary.com data: *.tile.openstreetmap.org`; `connect-src 'self' https://api.cloudinary.com` (the CMS uploads videos and documents straight to Cloudinary; add `api-eu`/`api-ap` only if the account lives there) plus Sentry ingest host and analytics hosts only when consented tools are enabled; `frame-ancestors 'none'`; `form-action 'self'`; `object-src 'none'`; `base-uri 'self'`. Report-only by default (`Content-Security-Policy-Report-Only`), enforced with `CSP_ENFORCE=true` (D-039). |
+| `Content-Security-Policy` | Nonce-based `script-src` for Next.js; `img-src 'self' https://res.cloudinary.com data: blob:`; `media-src 'self' https://res.cloudinary.com blob:`; `connect-src 'self' https://api.cloudinary.com` (the CMS uploads videos and documents straight to Cloudinary) plus Sentry ingest host; `frame-ancestors 'none'`; `form-action 'self'`; `object-src 'none'`; `base-uri 'self'`; `report-uri /_internal/csp-report`. Report-only by default (`Content-Security-Policy-Report-Only`), enforced with `CSP_ENFORCE=true` (D-039). All pages receive nonce-based CSP. |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | camera, microphone, geolocation, payment all `()` |

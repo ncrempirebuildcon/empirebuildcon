@@ -10738,6 +10738,18 @@
             ],
             "title": "Cta Url"
           },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -10767,6 +10779,18 @@
               }
             ],
             "title": "Project Slug"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
           },
           "terms": {
             "anyOf": [
@@ -10805,7 +10829,9 @@
           "terms",
           "terms_url",
           "placement",
-          "project_slug"
+          "project_slug",
+          "starts_at",
+          "ends_at"
         ],
         "title": "PublicOffer",
         "type": "object"
@@ -11993,6 +12019,11 @@
             "title": "Features",
             "type": "object"
           },
+          "has_sample": {
+            "default": false,
+            "title": "Has Sample",
+            "type": "boolean"
+          },
           "locales": {
             "items": {
               "type": "string"
@@ -12055,7 +12086,8 @@
           "consent",
           "offers",
           "locales",
-          "seo"
+          "seo",
+          "has_sample"
         ],
         "title": "PublicSite",
         "type": "object"

@@ -3,10 +3,9 @@ import {
   _clearReplayCache,
   computeSignature,
   processRevalidate,
+  revalidateHandler,
   SIGNATURE_HEADER,
   TIMESTAMP_HEADER,
-  LEGACY_SIGNATURE_HEADER,
-  LEGACY_TIMESTAMP_HEADER,
 } from "../src/lib/public/revalidate";
 
 // Mock next/cache so we can assert revalidateTag is called
@@ -52,28 +51,57 @@ describe("processRevalidate", () => {
     expect(result.status).toBe(200);
     expect(result.tags).toEqual(["site", "project:alpha"]);
     expect(mockRevalidateTag).toHaveBeenCalledTimes(2);
-    expect(mockRevalidateTag).toHaveBeenCalledWith("site");
-    expect(mockRevalidateTag).toHaveBeenCalledWith("project:alpha");
+    expect(mockRevalidateTag).toHaveBeenCalledWith("site", { expire: 0 });
+    expect(mockRevalidateTag).toHaveBeenCalledWith("project:alpha", { expire: 0 });
   });
 
-  it("supports legacy x-empire-* header names for backwards compatibility", async () => {
+  it("refuses unsigned request with 401 and empty body (S-N2)", async () => {
+    const request = new Request("https://example.com/_internal/revalidate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tags: ["site"] }),
+    });
+
+    const response = await revalidateHandler(request);
+    expect(response.status).toBe(401);
+    expect(await response.text()).toBe("");
+  });
+
+  it("refuses well-formed but invalid signature with 401 and empty body (S-N2)", async () => {
     const now = 1000000;
-    const body = JSON.stringify({ tags: ["site"] });
-    const signature = computeSignature(SECRET, now, body);
+    const request = new Request("https://example.com/_internal/revalidate", {
+      method: "POST",
+      headers: {
+        [SIGNATURE_HEADER]: "a".repeat(64), // valid 64-hex format, but wrong signature
+        [TIMESTAMP_HEADER]: String(now),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ tags: ["site"] }),
+    });
+
+    const response = await revalidateHandler(request);
+    expect(response.status).toBe(401);
+    expect(await response.text()).toBe("");
+  });
+
+  it("refuses missing or empty tags with 401 and empty body (S-N2)", async () => {
+    const now = 1000000;
+    const emptyBody = JSON.stringify({ tags: [] });
+    const signature = computeSignature(SECRET, now, emptyBody);
 
     const request = new Request("https://example.com/_internal/revalidate", {
       method: "POST",
       headers: {
-        [LEGACY_SIGNATURE_HEADER]: signature,
-        [LEGACY_TIMESTAMP_HEADER]: String(now),
+        [SIGNATURE_HEADER]: signature,
+        [TIMESTAMP_HEADER]: String(now),
         "content-type": "application/json",
       },
-      body,
+      body: emptyBody,
     });
 
-    const result = await processRevalidate(request, { secret: SECRET, now });
-    expect(result.ok).toBe(true);
-    expect(result.status).toBe(200);
+    const response = await revalidateHandler(request);
+    expect(response.status).toBe(401);
+    expect(await response.text()).toBe("");
   });
 
   it("rejects suffixed or non-hex signatures (M3)", async () => {

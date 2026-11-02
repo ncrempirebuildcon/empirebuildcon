@@ -64,21 +64,8 @@ export function OfferBanner({ offers }: { offers?: OfferItem[] }) {
     }
   }
 
-  const rawOffer = bannerOffer as unknown as Record<string, unknown>;
-  const rawStart =
-    typeof rawOffer.start_date === "string"
-      ? rawOffer.start_date
-      : typeof rawOffer.starts_at === "string"
-        ? rawOffer.starts_at
-        : null;
-  const rawEnd =
-    typeof rawOffer.end_date === "string"
-      ? rawOffer.end_date
-      : typeof rawOffer.ends_at === "string"
-        ? rawOffer.ends_at
-        : null;
-  const startDate = formatDate(rawStart);
-  const endDate = formatDate(rawEnd);
+  const startDate = formatDate(bannerOffer.starts_at);
+  const endDate = formatDate(bannerOffer.ends_at);
   const validityText =
     startDate && endDate
       ? `Valid ${startDate} – ${endDate}`

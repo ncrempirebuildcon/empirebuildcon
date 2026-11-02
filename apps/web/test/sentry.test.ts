@@ -70,32 +70,117 @@ describe("Sentry Scrubber (M5)", () => {
     expect(headers["x-forwarded-for"]).toBeUndefined();
   });
 
-  it("scrubs transaction events, deleting query_string and span URLs in beforeSendTransaction", () => {
-    const rawTx = {
-      request: {
-        url: "https://example.com/admin/leads?q=9876543210",
-        query_string: "q=9876543210",
+  it("scrubs transaction events with root-span trace data, deleting query_string, IP and headers (M5, R2-M2)", () => {
+    const sdkTransaction = {
+      type: "transaction",
+      transaction: "GET /admin/leads?q=9876543210",
+      contexts: {
+        trace: {
+          span_id: "1234567890abcdef",
+          trace_id: "abcdef1234567890abcdef1234567890",
+          op: "http.server",
+          data: {
+            "url.full": "http://localhost:3000/admin/leads?q=9876543210",
+            "url.path": "/admin/leads",
+            "url.query": "q=9876543210",
+            "http.target": "/admin/leads?q=9876543210",
+            "client.address": "203.0.113.195",
+            "network.peer.address": "127.0.0.1",
+            "user.ip_address": "203.0.113.195",
+            "http.request.header.x-forwarded-for": "203.0.113.195",
+            "http.request.header.x-nf-client-connection-ip": "203.0.113.195",
+            "http.request.header.x-empire-client-ip": "203.0.113.195",
+            "http.request.header.x-empire-edge-key": "secret-edge-key-here",
+            "http.request.header.user-agent": "Mozilla/5.0",
+            "http.request.body.data": "secret body",
+          },
+        },
       },
-      user: { id: "user-1", ip_address: "1.2.3.4" },
+      request: {
+        url: "http://localhost:3000/admin/leads?q=9876543210",
+        query_string: "q=9876543210",
+        headers: {
+          "x-forwarded-for": "203.0.113.195",
+          "x-nf-client-connection-ip": "203.0.113.195",
+          "x-empire-client-ip": "203.0.113.195",
+          "x-empire-edge-key": "secret-edge-key-here",
+          "user-agent": "Mozilla/5.0",
+        },
+      },
+      user: {
+        ip_address: "203.0.113.195",
+      },
       spans: [
         {
+          description: "GET /api/v1/admin/leads?q=9876543210",
+          op: "http.client",
           data: {
-            "http.url": "https://example.com/api/v1/leads?q=9876543210",
-            "http.query": "?q=9876543210",
-            description: "fetch lead",
+            "url.full": "http://localhost:8000/api/v1/admin/leads?q=9876543210",
+            "url.query": "q=9876543210",
+            "http.request.header.x-empire-edge-key": "secret-edge-key-here",
+            "http.request.header.x-empire-client-ip": "203.0.113.195",
           },
         },
       ],
     };
 
-    const scrubbed = beforeSendTransactionScrubber(rawTx);
-    expect(scrubbed.request?.url).toBe("https://example.com/admin/leads");
-    expect(scrubbed.request?.query_string).toBeUndefined();
-    expect(scrubbed.user).toBeUndefined();
+    const scrubbed = beforeSendTransactionScrubber(sdkTransaction);
 
-    const spanData = (scrubbed.spans?.[0]?.data ?? {}) as Record<string, unknown>;
-    expect(spanData["http.url"]).toBe("https://example.com/api/v1/leads");
-    expect(spanData["http.query"]).toBe("");
+    // Event-level fields
+    expect(scrubbed.transaction).toBe("GET /admin/leads");
+    expect(scrubbed.user).toBeUndefined();
+    expect(scrubbed.request?.url).toBe("http://localhost:3000/admin/leads");
+    expect(scrubbed.request?.query_string).toBeUndefined();
+
+    // Headers allowlisted on request
+    const reqHeaders = scrubbed.request?.headers ?? {};
+    expect(reqHeaders["x-forwarded-for"]).toBeUndefined();
+    expect(reqHeaders["x-empire-edge-key"]).toBeUndefined();
+    expect(reqHeaders["user-agent"]).toBe("Mozilla/5.0");
+
+    // Root span attributes scrubbed (R2-M2)
+    const traceData = (scrubbed.contexts?.trace?.data ?? {}) as Record<string, unknown>;
+    expect(traceData["url.full"]).toBe("http://localhost:3000/admin/leads");
+    expect(traceData["url.query"]).toBe("");
+    expect(traceData["http.target"]).toBe("/admin/leads");
+    expect(traceData["client.address"]).toBeUndefined();
+    expect(traceData["network.peer.address"]).toBeUndefined();
+    expect(traceData["user.ip_address"]).toBeUndefined();
+    expect(traceData["http.request.header.x-forwarded-for"]).toBeUndefined();
+    expect(traceData["http.request.header.x-nf-client-connection-ip"]).toBeUndefined();
+    expect(traceData["http.request.header.x-empire-client-ip"]).toBeUndefined();
+    expect(traceData["http.request.header.x-empire-edge-key"]).toBeUndefined();
+    expect(traceData["http.request.body.data"]).toBeUndefined();
+
+    // Child span scrubbed
+    const childSpan = scrubbed.spans?.[0];
+    expect(childSpan?.description).toBe("GET /api/v1/admin/leads");
+    const childSpanData = (childSpan?.data ?? {}) as Record<string, unknown>;
+    expect(childSpanData["url.full"]).toBe("http://localhost:8000/api/v1/admin/leads");
+    expect(childSpanData["url.query"]).toBe("");
+    expect(childSpanData["http.request.header.x-empire-edge-key"]).toBeUndefined();
+    expect(childSpanData["http.request.header.x-empire-client-ip"]).toBeUndefined();
+  });
+
+  it("starts with a DSN and stays off without one (M4, R2-M2)", async () => {
+    const Sentry = await import("@sentry/nextjs");
+    const clientWithDsn = new Sentry.NodeClient({
+      dsn: "https://public@example.com/1",
+      enabled: true,
+      stackParser: Sentry.defaultStackParser,
+      integrations: [],
+      transport: () => ({ send: () => Promise.resolve({}), flush: () => Promise.resolve(true) }),
+    });
+    expect(clientWithDsn.getOptions().enabled).toBe(true);
+
+    const clientWithoutDsn = new Sentry.NodeClient({
+      dsn: "",
+      enabled: false,
+      stackParser: Sentry.defaultStackParser,
+      integrations: [],
+      transport: () => ({ send: () => Promise.resolve({}), flush: () => Promise.resolve(true) }),
+    });
+    expect(clientWithoutDsn.getOptions().enabled).toBe(false);
   });
 
   it("scrubs URLs from breadcrumb data and breadcrumb message", () => {

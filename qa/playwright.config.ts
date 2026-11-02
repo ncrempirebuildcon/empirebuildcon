@@ -20,6 +20,8 @@ import { defineConfig, devices } from "@playwright/test";
 import { API_URL, WEB_URL, apiEnv } from "./lib/env";
 
 const env = apiEnv();
+// WHY: On Windows developer machines without playwright-installed headless-shell, fallback to installed Chrome.
+// CI and Linux environments use PW_CHROMIUM_PATH or Playwright-managed Chromium.
 const defaultChrome =
   process.platform === "win32" &&
   existsSync("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe")
@@ -27,13 +29,13 @@ const defaultChrome =
     : undefined;
 const executablePath = process.env.PW_CHROMIUM_PATH || defaultChrome;
 
-const REVALIDATE_SECRET = "test-revalidate-secret-minimum-32-chars-long";
-
 export default defineConfig({
   testDir: "./specs",
   globalSetup: "./global-setup.ts",
   fullyParallel: true,
-  workers: 2,
+  // WHY workers: 2: Matches CI (2 vCPUs) and avoids Windows socket exhaustion (ECONNRESET -4077)
+  // on a single-process uvicorn server when > 2 parallel browser contexts hammer loopback HTTP.
+  workers: process.env.CI ? 2 : 2,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
@@ -53,7 +55,7 @@ export default defineConfig({
       env: {
         ...env,
         WEB_REVALIDATE_URL: `${WEB_URL}/_internal/revalidate`,
-        REVALIDATE_SECRET,
+        REVALIDATE_SECRET: env.REVALIDATE_SECRET ?? "test-revalidate-secret-minimum-32-chars-long",
       },
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
@@ -66,7 +68,7 @@ export default defineConfig({
         SITE_URL: WEB_URL,
         EDGE_PROXY_KEY: env.EDGE_PROXY_KEY ?? "",
         CSP_ENFORCE: "true",
-        REVALIDATE_SECRET,
+        REVALIDATE_SECRET: env.REVALIDATE_SECRET ?? "test-revalidate-secret-minimum-32-chars-long",
       },
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,

@@ -48,6 +48,11 @@ describe("cloudinaryLoader", () => {
     );
   });
 
+  it("leaves raw resource URLs untouched (Note 10)", () => {
+    const raw = "https://res.cloudinary.com/demo/raw/upload/v1234567/brochure.pdf";
+    expect(cloudinaryLoader({ src: raw, width: 800 })).toBe(raw);
+  });
+
   it("returns empty string when src is empty", () => {
     expect(cloudinaryLoader({ src: "", width: 800 })).toBe("");
   });

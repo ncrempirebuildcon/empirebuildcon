@@ -50,10 +50,13 @@ export function sanitizeHeaders(
 
 export function sanitizeTextUrls(text?: string | null): string | undefined {
   if (!text) return text ?? undefined;
-  // Replace query strings and fragments in text containing URLs
-  return text.replace(/https?:\/\/[^\s?#]+(\?[^\s#]*)?(#[^\s]*)?/gi, (match) => {
+  // Replace query strings and fragments in text containing full URLs
+  let res = text.replace(/https?:\/\/[^\s?#]+(\?[^\s#]*)?(#[^\s]*)?/gi, (match) => {
     return sanitizeUrl(match) ?? match;
   });
+  // Also replace query strings and fragments in path-like strings e.g. "GET /admin/leads?q=..."
+  res = res.replace(/(\/[a-zA-Z0-9_\-./]+)(\?[^\s#]*)?(#[^\s]*)?/gi, "$1");
+  return res;
 }
 
 export interface SentryBreadcrumbLike {
@@ -78,12 +81,70 @@ export interface SentryEventLike {
     [key: string]: unknown;
   };
   user?: unknown;
+  transaction?: string;
+  contexts?: {
+    trace?: {
+      data?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
   spans?: Array<{
+    description?: string;
     data?: Record<string, unknown>;
     [key: string]: unknown;
   }>;
   breadcrumbs?: SentryBreadcrumbLike[];
   [key: string]: unknown;
+}
+
+/**
+ * Scrubs span attributes (used on root span `contexts.trace.data` and `spans[].data`).
+ *
+ * Drops:
+ *   - `http.request.header.*`, `http.response.header.*` (e.g. x-forwarded-for, x-empire-client-ip)
+ *   - `client.*`, `network.peer.*`, `user.*`, `http.request.body.*` (e.g. visitor IP address, body)
+ *   - Empties any `*.query` or `*.fragment`
+ *   - Sanitizes URLs and paths (dropping query strings and fragments)
+ */
+export function scrubSpanData(data?: Record<string, unknown>): void {
+  if (!data) return;
+  for (const key of Object.keys(data)) {
+    const lowerKey = key.toLowerCase();
+    // Drop sensitive headers, client IPs, peer info, user info, bodies
+    if (
+      lowerKey.startsWith("http.request.header.") ||
+      lowerKey.startsWith("http.response.header.") ||
+      lowerKey.startsWith("client.") ||
+      lowerKey.startsWith("network.peer.") ||
+      lowerKey.startsWith("user.") ||
+      lowerKey.startsWith("http.request.body.")
+    ) {
+      delete data[key];
+      continue;
+    }
+
+    // Empty query / fragment keys
+    if (lowerKey.endsWith(".query") || lowerKey.endsWith(".fragment") || lowerKey === "query") {
+      data[key] = "";
+      continue;
+    }
+
+    // Sanitize URLs and targets
+    if (
+      lowerKey.startsWith("url.") ||
+      lowerKey === "http.url" ||
+      lowerKey === "http.target" ||
+      lowerKey.includes("url") ||
+      lowerKey.includes("path") ||
+      lowerKey.includes("target")
+    ) {
+      const val = data[key];
+      if (typeof val === "string") {
+        data[key] = sanitizeUrl(val);
+      }
+    }
+  }
 }
 
 /**
@@ -111,7 +172,12 @@ export function beforeSendScrubber<T = unknown>(event: T): T {
     }
   }
 
-  // 3. Scrub breadcrumbs
+  // 3. Scrub root span trace data if present
+  if (ev.contexts?.trace?.data) {
+    scrubSpanData(ev.contexts.trace.data);
+  }
+
+  // 4. Scrub breadcrumbs
   if (Array.isArray(ev.breadcrumbs)) {
     for (const b of ev.breadcrumbs) {
       beforeBreadcrumbScrubber(b);
@@ -130,6 +196,10 @@ export function beforeSendTransactionScrubber<T = unknown>(event: T): T {
 
   delete ev.user;
 
+  if (ev.transaction && typeof ev.transaction === "string") {
+    ev.transaction = sanitizeTextUrls(ev.transaction);
+  }
+
   if (ev.request) {
     if (ev.request.url) {
       ev.request.url = sanitizeUrl(ev.request.url);
@@ -144,24 +214,19 @@ export function beforeSendTransactionScrubber<T = unknown>(event: T): T {
     }
   }
 
-  // Scrub spans data
+  // Root span data in contexts.trace.data (M5, R2-M2)
+  if (ev.contexts?.trace?.data) {
+    scrubSpanData(ev.contexts.trace.data);
+  }
+
+  // Child spans data and description (M5, R2-M2)
   if (Array.isArray(ev.spans)) {
     for (const span of ev.spans) {
       if (span.data) {
-        for (const [key, val] of Object.entries(span.data)) {
-          if (typeof val === "string") {
-            const lowerKey = key.toLowerCase();
-            if (lowerKey.includes("query")) {
-              span.data[key] = "";
-            } else if (
-              lowerKey.includes("url") ||
-              lowerKey.includes("path") ||
-              lowerKey.includes("target")
-            ) {
-              span.data[key] = sanitizeUrl(val);
-            }
-          }
-        }
+        scrubSpanData(span.data);
+      }
+      if (span.description && typeof span.description === "string") {
+        span.description = sanitizeTextUrls(span.description);
       }
     }
   }
