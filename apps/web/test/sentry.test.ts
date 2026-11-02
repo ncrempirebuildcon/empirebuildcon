@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   beforeBreadcrumbScrubber,
   beforeSendScrubber,
   beforeSendTransactionScrubber,
   sanitizeUrl,
 } from "../src/lib/sentry-scrubber";
+
+const mockInit = vi.fn();
+vi.mock("@sentry/nextjs", () => ({
+  init: (...args: unknown[]) => mockInit(...args),
+}));
 
 describe("Sentry Scrubber (M5)", () => {
   it("drops query parameters and fragments from URLs", () => {
@@ -162,25 +167,124 @@ describe("Sentry Scrubber (M5)", () => {
     expect(childSpanData["http.request.header.x-empire-client-ip"]).toBeUndefined();
   });
 
-  it("starts with a DSN and stays off without one (M4, R2-M2)", async () => {
-    const Sentry = await import("@sentry/nextjs");
-    const clientWithDsn = new Sentry.NodeClient({
-      dsn: "https://public@example.com/1",
-      enabled: true,
-      stackParser: Sentry.defaultStackParser,
-      integrations: [],
-      transport: () => ({ send: () => Promise.resolve({}), flush: () => Promise.resolve(true) }),
-    });
-    expect(clientWithDsn.getOptions().enabled).toBe(true);
+  describe("Sentry init configurations (R2-M2, S-4)", () => {
+    const originalDsn = process.env.SENTRY_DSN;
+    const originalPublicDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
-    const clientWithoutDsn = new Sentry.NodeClient({
-      dsn: "",
-      enabled: false,
-      stackParser: Sentry.defaultStackParser,
-      integrations: [],
-      transport: () => ({ send: () => Promise.resolve({}), flush: () => Promise.resolve(true) }),
+    afterEach(() => {
+      if (originalDsn !== undefined) {
+        process.env.SENTRY_DSN = originalDsn;
+      } else {
+        delete process.env.SENTRY_DSN;
+      }
+      if (originalPublicDsn !== undefined) {
+        process.env.NEXT_PUBLIC_SENTRY_DSN = originalPublicDsn;
+      } else {
+        delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+      }
+      mockInit.mockClear();
     });
-    expect(clientWithoutDsn.getOptions().enabled).toBe(false);
+
+    it("server config initializes Sentry when DSN is present and disables when absent", async () => {
+      // Unset DSN
+      delete process.env.SENTRY_DSN;
+      delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+      vi.resetModules();
+      await import("../sentry.server.config");
+      expect(mockInit).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          enabled: false,
+          dsn: "",
+          dataCollection: {
+            userInfo: false,
+            cookies: false,
+            httpHeaders: false,
+            httpBodies: [],
+            urlQueryParams: false,
+            databaseQueryData: false,
+          },
+        }),
+      );
+
+      // Set DSN
+      process.env.SENTRY_DSN = "https://public@example.com/1";
+      vi.resetModules();
+      await import("../sentry.server.config");
+      expect(mockInit).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          enabled: true,
+          dsn: "https://public@example.com/1",
+          dataCollection: {
+            userInfo: false,
+            cookies: false,
+            httpHeaders: false,
+            httpBodies: [],
+            urlQueryParams: false,
+            databaseQueryData: false,
+          },
+          beforeSend: expect.any(Function),
+          beforeSendTransaction: expect.any(Function),
+          beforeBreadcrumb: expect.any(Function),
+        }),
+      );
+    });
+
+    it("edge config initializes Sentry when DSN is present and disables when absent", async () => {
+      // Unset DSN
+      delete process.env.SENTRY_DSN;
+      delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+      vi.resetModules();
+      await import("../sentry.edge.config");
+      expect(mockInit).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          enabled: false,
+          dsn: "",
+        }),
+      );
+
+      // Set DSN via NEXT_PUBLIC_SENTRY_DSN
+      process.env.NEXT_PUBLIC_SENTRY_DSN = "https://edge@example.com/2";
+      vi.resetModules();
+      await import("../sentry.edge.config");
+      expect(mockInit).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          enabled: true,
+          dsn: "https://edge@example.com/2",
+        }),
+      );
+    });
+
+    it("client config initializes Sentry when NEXT_PUBLIC_SENTRY_DSN is present and disables when absent", async () => {
+      // Unset DSN
+      delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+      vi.resetModules();
+      await import("../sentry.client.config");
+      expect(mockInit).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          enabled: false,
+          dsn: "",
+        }),
+      );
+
+      // Set DSN
+      process.env.NEXT_PUBLIC_SENTRY_DSN = "https://client@example.com/3";
+      vi.resetModules();
+      await import("../sentry.client.config");
+      expect(mockInit).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          enabled: true,
+          dsn: "https://client@example.com/3",
+          dataCollection: {
+            userInfo: false,
+            cookies: false,
+            httpHeaders: false,
+            httpBodies: [],
+            urlQueryParams: false,
+            databaseQueryData: false,
+          },
+        }),
+      );
+    });
   });
 
   it("scrubs URLs from breadcrumb data and breadcrumb message", () => {

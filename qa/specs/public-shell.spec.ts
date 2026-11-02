@@ -212,8 +212,11 @@ test.describe("Public Website Shell", () => {
     await companyForm.getByRole("button", { name: "Save changes" }).click();
     await expect(companyForm.getByRole("status").filter({ hasText: /^Saved\./ })).toBeVisible();
 
-    // 3. Cached public page before drain does not contain new tagline (S-N6 deterministic check)
-    expect(initialText).not.toContain(testTagline);
+    // 3. Before draining the outbox, read the public page text to prove cached content
+    // is served and the new tagline is NOT present yet (S-N6 negative control).
+    await publicPage.reload();
+    const preDrainText = await footer.textContent();
+    expect(preDrainText).not.toContain(testTagline);
 
     // 4. Drain outbox through the API host directly with the internal key (M6)
     const internalKey = apiEnv().INTERNAL_API_KEY ?? "dev-internal-key-32-chars-minimum-ok";

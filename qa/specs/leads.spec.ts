@@ -147,13 +147,16 @@ test("a public site-visit request goes from the inbox to a confirmed visit and a
   await expect(upcoming.getByRole("link", { name: lead.name })).toBeVisible();
   const counts = page.getByRole("list", { name: "Counts" });
   await expect(counts.getByRole("link")).not.toHaveCount(0);
+  await page.reload();
   const dashboard = await apiCall(page, "GET", "/api/v1/admin/dashboard");
   const body = (await dashboard.json()) as {
     counts: Array<{ key: string; label: string; count: number; link: string }>;
   };
   for (const count of body.counts) {
     await expect(
-      counts.getByRole("link", { name: new RegExp(`^${escapeRegExp(count.label)} \\d+`) }),
+      counts.getByRole("link", {
+        name: new RegExp(`^${escapeRegExp(count.label)} ${count.count}`),
+      }),
     ).toHaveAttribute("href", count.link);
   }
   const newLeads = body.counts.find((count) => count.key === "leads.new");
@@ -358,47 +361,28 @@ test("a super-admin erases a lead's personal data after a clear warning", async 
 
 test("every dashboard count matches the list its link opens", async ({ page }) => {
   const response = await apiCall(page, "GET", "/api/v1/admin/dashboard");
-  const { counts: initialCounts } = (await response.json()) as {
+  const { counts } = (await response.json()) as {
     counts: Array<{ key: string; label: string; count: number; link: string }>;
   };
-  expect(initialCounts.length).toBeGreaterThan(0);
-  for (const item of initialCounts) {
+  expect(counts.length).toBeGreaterThan(0);
+  for (const count of counts) {
     await page.goto("/admin");
-    // Read the current API counts to match against the freshly-loaded dashboard tiles,
-    // avoiding false drift if concurrent workers mutate projects or leads during loop iterations.
-    const freshRes = await apiCall(page, "GET", "/api/v1/admin/dashboard");
-    const { counts: freshCounts } = (await freshRes.json()) as {
-      counts: Array<{ key: string; label: string; count: number; link: string }>;
-    };
-    const count = freshCounts.find((c) => c.key === item.key) ?? item;
-    const tile = page.getByRole("list", { name: "Counts" }).getByRole("link", {
-      name: new RegExp(`^${escapeRegExp(count.label)} ${count.count}(?: |$)`),
-    });
-    await expect(tile).toBeVisible();
-    await tile.click();
+    await page
+      .getByRole("list", { name: "Counts" })
+      .getByRole("link", { name: new RegExp(`^${escapeRegExp(count.label)} ${count.count} `) })
+      .click();
     await expect(page).toHaveURL(new RegExp(`${escapeRegExp(count.link)}$`));
-    // Query current API counts on the opened list page in case a concurrent worker
-    // created or deleted an item during page navigation.
-    const freshAfterNav = await apiCall(page, "GET", "/api/v1/admin/dashboard");
-    const { counts: afterCounts } = (await freshAfterNav.json()) as {
-      counts: Array<{ key: string; label: string; count: number; link: string }>;
-    };
-    const afterCount = afterCounts.find((c) => c.key === count.key)?.count ?? count.count;
-
     if (count.link.startsWith("/admin/site-visits")) {
-      await expect(
-        page.getByText(new RegExp(`^(${count.count}|${afterCount}) (visit|visits) · `)),
-      ).toBeVisible();
+      const noun = count.count === 1 ? "visit" : "visits";
+      await expect(page.getByText(new RegExp(`^${count.count} ${noun} · `))).toBeVisible();
     } else {
       const noun = count.link.startsWith("/admin/projects") ? "project" : "lead";
       const pager = page.getByRole("navigation", { name: new RegExp(`^Pages of ${noun}s`) });
-      const expectedPattern =
-        count.count === 0 && afterCount === 0
+      await expect(pager.getByRole("status")).toHaveText(
+        count.count === 0
           ? `No ${noun}s`
-          : new RegExp(
-              `of (${count.count}|${afterCount}) ${count.count === 1 && afterCount === 1 ? noun : `${noun}s`}$`,
-            );
-      await expect(pager.getByRole("status")).toHaveText(expectedPattern);
+          : new RegExp(`of ${count.count} ${count.count === 1 ? noun : `${noun}s`}$`),
+      );
     }
   }
 });

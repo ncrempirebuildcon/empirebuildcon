@@ -40,6 +40,23 @@ test("sign-in links to the forgot-password page, which is accessible", async ({ 
   await expectClean(page, "/admin/forgot with an error");
 });
 
+test("static auth pages (/admin/setup, /admin/reset, /admin/forgot) return strict CSP directives (R2-M3)", async ({
+  page,
+}) => {
+  for (const path of ["/admin/setup", "/admin/reset", "/admin/forgot"]) {
+    const response = await page.goto(path);
+    const csp =
+      response?.headers()["content-security-policy"] ||
+      response?.headers()["content-security-policy-report-only"] ||
+      "";
+    expect(csp, `${path} must carry a CSP header`).toBeTruthy();
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("base-uri 'self'");
+    expect(csp).toContain("form-action 'self'");
+  }
+});
+
 // The emailed links carry the token in the fragment (never sent to a server); links sent
 // before that change carry it in the query, which still works (review L10). Setup is tried with
 // the fragment, reset with the query.

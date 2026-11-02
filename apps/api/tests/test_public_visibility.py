@@ -968,3 +968,49 @@ def test_sample_media_filtering_across_remaining_slots(
     res_test_prod = client.get("/api/v1/public/testimonials").json()
     t_match_prod = next(item for item in res_test_prod if item["id"] == str(t.id))
     assert t_match_prod["photo"] is None
+
+
+def test_public_site_has_sample_and_offer_dates(
+    db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """S-N4 / Item 6: PublicSite exposes has_sample and PublicOffer exposes starts_at/ends_at."""
+    monkeypatch.setattr(get_settings(), "app_env", "development")
+    now = datetime.now(UTC)
+
+    real_proj = _seed_project(db, f"real-site-proj-{uuid.uuid4().hex[:4]}", is_sample=False)
+    starts = now - timedelta(days=1)
+    ends = now + timedelta(days=10)
+    offer = Offer(
+        title="Festive Offer",
+        placement="banner",
+        is_active=True,
+        project_id=real_proj.id,
+        starts_at=starts,
+        ends_at=ends,
+        is_sample=False,
+    )
+    db.add(offer)
+    db.commit()
+
+    res_dev = client.get("/api/v1/public/site").json()
+    matched = next(o for o in res_dev["offers"] if o["id"] == str(offer.id))
+    assert matched["starts_at"] is not None
+    assert matched["ends_at"] is not None
+    assert datetime.fromisoformat(matched["starts_at"]) == starts
+    assert datetime.fromisoformat(matched["ends_at"]) == ends
+
+    # Add published sample project -> has_sample is True in dev
+    _seed_project(
+        db,
+        f"sample-site-proj-{uuid.uuid4().hex[:4]}",
+        is_sample=True,
+        publish_state="published",
+    )
+    db.commit()
+    res_dev_sample = client.get("/api/v1/public/site").json()
+    assert res_dev_sample["has_sample"] is True
+
+    # In production -> has_sample is ALWAYS False
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+    res_prod = client.get("/api/v1/public/site").json()
+    assert res_prod["has_sample"] is False

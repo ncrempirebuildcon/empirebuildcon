@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _clearReplayCache,
   computeSignature,
@@ -15,11 +15,23 @@ vi.mock("next/cache", () => ({
 }));
 
 const SECRET = "test-secret-that-is-at-least-thirty-two-bytes-long";
+const WRONG_SECRET = "wrong-secret-that-is-also-at-least-thirty-two-bytes-long";
 
-describe("processRevalidate", () => {
+describe("processRevalidate and revalidateHandler", () => {
+  const originalSecret = process.env.REVALIDATE_SECRET;
+
   beforeEach(() => {
+    process.env.REVALIDATE_SECRET = SECRET;
     _clearReplayCache();
     mockRevalidateTag.mockClear();
+  });
+
+  afterEach(() => {
+    if (originalSecret !== undefined) {
+      process.env.REVALIDATE_SECRET = originalSecret;
+    } else {
+      delete process.env.REVALIDATE_SECRET;
+    }
   });
 
   it("matches the Python API shared test vector (N8)", () => {
@@ -31,8 +43,8 @@ describe("processRevalidate", () => {
     expect(computeSignature(sharedSecret, timestamp, body)).toBe(expected);
   });
 
-  it("accepts a valid signed POST request and calls revalidateTag for each tag", async () => {
-    const now = 1000000;
+  it("accepts a valid signed POST request via processRevalidate and calls revalidateTag for each tag", async () => {
+    const now = Date.now();
     const body = JSON.stringify({ tags: ["site", "project:alpha"] });
     const signature = computeSignature(SECRET, now, body);
 
@@ -55,6 +67,29 @@ describe("processRevalidate", () => {
     expect(mockRevalidateTag).toHaveBeenCalledWith("project:alpha", { expire: 0 });
   });
 
+  it("accepts a valid signed request via revalidateHandler reading secret from env", async () => {
+    const now = Date.now();
+    const body = JSON.stringify({ tags: ["site", "content"] });
+    const signature = computeSignature(SECRET, now, body);
+
+    const request = new Request("https://example.com/_internal/revalidate", {
+      method: "POST",
+      headers: {
+        [SIGNATURE_HEADER]: signature,
+        [TIMESTAMP_HEADER]: String(now),
+        "content-type": "application/json",
+      },
+      body,
+    });
+
+    const response = await revalidateHandler(request);
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as { revalidated: boolean; tags: string[] };
+    expect(json.revalidated).toBe(true);
+    expect(json.tags).toEqual(["site", "content"]);
+    expect(mockRevalidateTag).toHaveBeenCalledTimes(2);
+  });
+
   it("refuses unsigned request with 401 and empty body (S-N2)", async () => {
     const request = new Request("https://example.com/_internal/revalidate", {
       method: "POST",
@@ -65,27 +100,33 @@ describe("processRevalidate", () => {
     const response = await revalidateHandler(request);
     expect(response.status).toBe(401);
     expect(await response.text()).toBe("");
+    expect(mockRevalidateTag).not.toHaveBeenCalled();
   });
 
   it("refuses well-formed but invalid signature with 401 and empty body (S-N2)", async () => {
-    const now = 1000000;
+    const now = Date.now();
+    const body = JSON.stringify({ tags: ["site"] });
+    // Sign with a different secret to produce a well-formed 64-hex signature that fails timingSafeEqual
+    const wrongSignature = computeSignature(WRONG_SECRET, now, body);
+
     const request = new Request("https://example.com/_internal/revalidate", {
       method: "POST",
       headers: {
-        [SIGNATURE_HEADER]: "a".repeat(64), // valid 64-hex format, but wrong signature
+        [SIGNATURE_HEADER]: wrongSignature,
         [TIMESTAMP_HEADER]: String(now),
         "content-type": "application/json",
       },
-      body: JSON.stringify({ tags: ["site"] }),
+      body,
     });
 
     const response = await revalidateHandler(request);
     expect(response.status).toBe(401);
     expect(await response.text()).toBe("");
+    expect(mockRevalidateTag).not.toHaveBeenCalled();
   });
 
   it("refuses missing or empty tags with 401 and empty body (S-N2)", async () => {
-    const now = 1000000;
+    const now = Date.now();
     const emptyBody = JSON.stringify({ tags: [] });
     const signature = computeSignature(SECRET, now, emptyBody);
 
@@ -102,10 +143,11 @@ describe("processRevalidate", () => {
     const response = await revalidateHandler(request);
     expect(response.status).toBe(401);
     expect(await response.text()).toBe("");
+    expect(mockRevalidateTag).not.toHaveBeenCalled();
   });
 
   it("rejects suffixed or non-hex signatures (M3)", async () => {
-    const now = 1000000;
+    const now = Date.now();
     const body = JSON.stringify({ tags: ["site"] });
     const validSignature = computeSignature(SECRET, now, body);
 
@@ -137,7 +179,7 @@ describe("processRevalidate", () => {
   });
 
   it("rejects replayed requests within the window", async () => {
-    const now = 1000000;
+    const now = Date.now();
     const body = JSON.stringify({ tags: ["site"] });
     const signature = computeSignature(SECRET, now, body);
 
@@ -151,16 +193,16 @@ describe("processRevalidate", () => {
         body,
       });
 
-    const first = await processRevalidate(makeReq(), { secret: SECRET, now });
-    expect(first.ok).toBe(true);
+    const firstResponse = await revalidateHandler(makeReq());
+    expect(firstResponse.status).toBe(200);
 
-    const replay = await processRevalidate(makeReq(), { secret: SECRET, now });
-    expect(replay.ok).toBe(false);
-    expect(replay.status).toBe(401);
+    const replayResponse = await revalidateHandler(makeReq());
+    expect(replayResponse.status).toBe(401);
+    expect(await replayResponse.text()).toBe("");
   });
 
   it("rejects timestamps outside the 5-minute freshness window", async () => {
-    const now = 1000000;
+    const now = Date.now();
     const staleTime = now - 6 * 60 * 1000; // 6 minutes ago
     const body = JSON.stringify({ tags: ["site"] });
     const signature = computeSignature(SECRET, staleTime, body);
@@ -174,13 +216,14 @@ describe("processRevalidate", () => {
       body,
     });
 
-    const result = await processRevalidate(request, { secret: SECRET, now });
-    expect(result.ok).toBe(false);
-    expect(result.status).toBe(401);
+    const response = await revalidateHandler(request);
+    expect(response.status).toBe(401);
+    expect(await response.text()).toBe("");
+    expect(mockRevalidateTag).not.toHaveBeenCalled();
   });
 
   it("rejects oversized request bodies exceeding 16 KB (N2)", async () => {
-    const now = 1000000;
+    const now = Date.now();
     const hugeBody = JSON.stringify({ tags: ["site"], filler: "x".repeat(20 * 1024) });
     const signature = computeSignature(SECRET, now, hugeBody);
 
