@@ -2,7 +2,7 @@
 
 **Goal:** the website buyers see at `https://empirebuildcon.com`, built on the CMS data from Phase 4 and the approved "Black & gold (dark)" boards (owner approval, 22 Oct 2026). Every project view stays honest: RERA number, QR code and up-rera.in, carpet area first, the price note, no false urgency, nothing invented.
 
-**Who builds it:** a developer agent, one task at a time; Claude manages and tests ([../../agents/WORKFLOW.md](../../agents/WORKFLOW.md), D-037). Each task is one branch and one pull request. The next task doc is written after the previous task is merged, so it can build on what actually landed.
+**Who builds it:** two tracks in parallel from task 5.3 (D-040). **Track A** is built by Claude, **Track B** by the developer agent (Antigravity); Claude reviews both. Each task is one branch and one pull request ([../../agents/WORKFLOW.md](../../agents/WORKFLOW.md), D-037). Neither track waits for the other: Track B gets work that doesn't depend on any open Track A branch.
 
 ## Tasks
 
@@ -12,9 +12,21 @@
 | **5.2** Website shell | The frame every public page sits in | Root layout, header and menu, footer, mobile Call/WhatsApp bar, data-fetch layer with cache tags, revalidation from publish events (`/_internal/revalidate`), Cloudinary `next/image` loader, nonce-based Content-Security-Policy (report-only on staging first), Sentry for the web, 404 and error pages | 5.1 |
 | **5.3** Projects and properties | The pages people come for | Projects list with filters in the URL, project detail (RERA block, gallery with honest labels, floor plans, amenities, specifications, location advantages, construction progress, payment plans, FAQs, brochure), property (configuration) page, city pages, Leaflet map | 5.2 |
 | **5.4** Lead forms | Turning visitors into leads, with consent | Enquiry, site visit and brochure forms; two separate consent boxes, never pre-ticked; consent text version stored; UTM and click IDs; honeypot; thank-you state; offline and error states | 5.3 |
-| **5.5** Content pages | Everything built in the page builder | Home, every block's public rendering, blog list and article, About, Contact, legal pages (DRAFT marker until the owner approves), campaign landing pages | 5.4 |
+| **5.5a** Page-builder pages | Everything built in the page builder | Home, every block's public rendering, About, Contact, legal pages (DRAFT marker until the owner approves), campaign landing pages | 5.4 |
+| **5.5b** Blog | News and guides | Blog list with category filter and paging, article page, tags | 5.2 |
 | **5.6** SEO | Being found, correctly | Metadata and share images, structured data (`Organization`, `RealEstateListing`/`Residence`, `FAQPage`, `BreadcrumbList`), `sitemap.xml`, `robots.txt`, canonical `.com` URLs, breadcrumbs, the redirects middleware with hit counting | 5.5 |
 | **5.7** Performance and extras | Fast and finished | Lighthouse ≥ 90 on mobile in all four scores, Core Web Vitals, EMI calculator, share buttons, saved properties (browser only, no account), a full accessibility and 390 px pass | 5.6 |
+
+## Tracks and order (from 2 Nov 2026, D-040)
+
+| Track | Builder | Order | Reserved decision numbers |
+|---|---|---|---|
+| **A** | Claude | 5.2 merged → **5.3** projects and properties → **5.4** lead forms → **5.5a** page-builder pages → **5.6** SEO (metadata, structured data, redirects middleware) → **5.7** performance and the 390 px pass | 5.3 D-041 · 5.4 D-043 · 5.5a D-045 · 5.6 D-047 · 5.7 D-049 |
+| **B** | Developer agent | **5.5b** blog → **5.7b** standalone tools (EMI calculator, share buttons, saved properties, built as components with their own tests) → **5.6b** `sitemap.xml` and `robots.txt` | 5.5b D-042 · 5.7b D-044 · 5.6b D-046 |
+
+- **Who may change what.** Track B doesn't change `apps/api`, the API contract or the generated client, migrations, `proxy.ts`, `lib/edge.ts`, `next.config.ts` or the shell components (`components/shell/`), unless its task doc says so. If it needs one of those, it stops and asks in its report.
+- **Second to merge rebases.** When two branches are open, the one merged second brings in the new `main` and re-runs every check before its final review.
+- **Track B task docs** are written one ahead, so the agent never waits for a Track A merge.
 
 ## Standing rules for every Phase 5 task
 

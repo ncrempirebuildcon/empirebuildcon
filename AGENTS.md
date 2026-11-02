@@ -13,7 +13,7 @@ This file is for AI assistants (Claude Code and others) working in this reposito
 - **Secrets:** never print, store, commit or ask for passwords, API keys, tokens or connection strings. Only `.env.example` with names is committed. If a secret appears, don't repeat it; tell the owner to rotate it.
 - **Git:**
   - Never push to `main`, never merge your own pull request, and never force-push a branch you did not create.
-  - Claude has no GitHub access (owner's decision, 22 Oct 2026, D-029). From Phase 5, Claude is the **manager and tester**: it writes the task docs, reviews branches and recommends whether to merge (D-037).
+  - Claude has no GitHub access (owner's decision, 22 Oct 2026, D-029). From Phase 5, Claude is the **manager and tester**: it writes the task docs, reviews branches and recommends whether to merge (D-037). From task 5.3 Claude also builds the Track A tasks on its own branches, which the owner pushes (D-040).
   - A **developer agent** (for example Antigravity on the owner's computer) works on its own `feat/…` branch and may push that branch from the owner's computer with `git push -u origin <branch>`. Only the owner merges.
   - Follow [`handbook/agents/WORKFLOW.md`](handbook/agents/WORKFLOW.md) for every task: one task doc, one branch, one pull request, a written report, then the manager's review.
 - **Accounts:** never sign in, type passwords or accept terms for the owner. Ask them to do it.

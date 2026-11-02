@@ -8,9 +8,11 @@ From Phase 5 a **developer agent** (Antigravity on the owner's computer, or any 
 |---|---|---|
 | **Owner** | Starts each task by giving the developer its prompt; opens or approves the pull request; merges with **Squash and merge**; does every account, password and terms step. | — |
 | **Developer agent** | Builds one task on one branch, with tests and handbook updates; runs the checks; pushes the branch; writes a report; fixes review findings on the same branch. | Pushes to `main`, merges, force-pushes `main`, works on two tasks at once, changes scope without saying so, types passwords or accepts terms. |
-| **Manager (Claude)** | Writes the task docs and prompts; reviews every pushed branch from the owner's folder; runs the full check list in its own workspace; has an independent reviewer read the code; writes the review; tells the owner whether to merge; keeps the tracker, decisions log and handbook in order. | Has GitHub access (D-029); merges; commits on `main`. |
+| **Manager (Claude)** | Writes the task docs and prompts; from task 5.3 also builds the Track A tasks on its own branches, with the same checks and an independent reviewer (D-040); reviews every pushed branch from the owner's folder; runs the full check list in its own workspace; has an independent reviewer read the code; writes the review; tells the owner whether to merge; keeps the tracker, decisions log and handbook in order. | Has GitHub access (D-029); merges; commits on `main`. |
 
 ## 2. The cycle for one task
+
+From task 5.3 two tracks run at the same time (D-040): Track A is built by Claude, Track B by the developer agent. The cycle below is the same for both. For a Track A branch, Claude hands the branch to the owner's folder as a git bundle, the owner pushes it, and a separate reviewer agent does the review step.
 
 ```
  manager            owner              developer agent             GitHub
