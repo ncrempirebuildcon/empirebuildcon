@@ -80,4 +80,14 @@
   .star-rule::after {
     transform: scaleX(-1);
   }
+
+  /* Project map (task 5.3): the dark style from the boards, made from OpenStreetMap's standard
+     tiles with a filter, so no second tile provider is needed. Labels stay readable. */
+  .empire-map .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+  }
+  .empire-map.leaflet-container {
+    background-color: var(--color-noir-800);
+    font-family: var(--font-sans);
+  }
 }

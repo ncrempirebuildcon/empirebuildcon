@@ -78,7 +78,7 @@ from empire_api.public.visibility import (
 )
 from empire_api.search import set_search_trgm_threshold
 from empire_api.seo.models import Redirect
-from empire_api.seo.paths import page_path, post_path, project_path
+from empire_api.seo.paths import city_path, page_path, post_path, project_path, property_path
 from empire_api.site_settings import flags
 from empire_api.site_settings.defaults import read_group
 from empire_api.site_settings.models import FeatureFlag
@@ -875,11 +875,14 @@ def _apply_property_filters(
         stmt = stmt.where(Configuration.bhk == bhk)
     if project_status:
         stmt = stmt.where(Project.status == project_status)
+    # WHY coalesce: "From ₹ 78 L" (no upper end) is one figure for the budget filter (5.3 fix).
     eff_min = case(
-        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_min_inr
+        (Configuration.price_on_request.is_(True), None),
+        else_=func.coalesce(Configuration.price_min_inr, Configuration.price_max_inr),
     )
     eff_max = case(
-        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_max_inr
+        (Configuration.price_on_request.is_(True), None),
+        else_=func.coalesce(Configuration.price_max_inr, Configuration.price_min_inr),
     )
 
     if budget_min is not None:
@@ -893,11 +896,14 @@ def _property_order_clauses(sort: str | None) -> list[Any]:
     order_clauses: list[Any] = [
         case((Configuration.sales_status == "available", 0), else_=1),
     ]
+    # WHY coalesce: "From ₹ 78 L" (no upper end) is one figure for the budget filter (5.3 fix).
     eff_min = case(
-        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_min_inr
+        (Configuration.price_on_request.is_(True), None),
+        else_=func.coalesce(Configuration.price_min_inr, Configuration.price_max_inr),
     )
     eff_max = case(
-        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_max_inr
+        (Configuration.price_on_request.is_(True), None),
+        else_=func.coalesce(Configuration.price_max_inr, Configuration.price_min_inr),
     )
 
     sort_type = (sort or "recommended").lower()
@@ -2286,11 +2292,43 @@ def get_public_sitemap(db: Session) -> list[schemas.PublicSitemapEntry]:
             continue
         _add_entry(post_path(po.slug), po.updated_at or blog_lastmod)
 
-    # Add Projects (using canonical project_path; D-038: configuration & city URLs left out)
+    # Add Projects, then their configurations and the cities they are in (D-041). A noindex
+    # project leaves out its configurations too; a city is listed when it has at least one
+    # listed project, with that project's latest change as its lastmod.
+    listed: dict[uuid.UUID, Project] = {}
+    city_lastmod: dict[uuid.UUID, datetime] = {}
     for prj in published_projects:
         seo = dict(prj.seo or {})
         if seo.get("noindex"):
             continue
-        _add_entry(project_path(prj.slug), prj.updated_at or home_lastmod)
+        lastmod = prj.updated_at or home_lastmod
+        _add_entry(project_path(prj.slug), lastmod)
+        listed[prj.id] = prj
+        if prj.city_id is not None:
+            city_lastmod[prj.city_id] = max(city_lastmod.get(prj.city_id, lastmod), lastmod)
+
+    if listed:
+        cfg_stmt = (
+            select(Configuration)
+            .where(
+                Configuration.project_id.in_(list(listed)),
+                Configuration.sales_status != "off_market",
+            )
+            .order_by(Configuration.project_id, Configuration.sort_order, Configuration.slug)
+        )
+        if prod:
+            cfg_stmt = cfg_stmt.where(Configuration.is_sample.is_(False))
+        for cfg in db.scalars(cfg_stmt).all():
+            owner = listed[cfg.project_id]
+            _add_entry(
+                property_path(owner.slug, cfg.slug),
+                max(cfg.updated_at, owner.updated_at or cfg.updated_at),
+            )
+
+    if city_lastmod:
+        for city in db.scalars(
+            select(City).where(City.id.in_(list(city_lastmod))).order_by(City.slug)
+        ).all():
+            _add_entry(city_path(city.slug), city_lastmod[city.id])
 
     return entries

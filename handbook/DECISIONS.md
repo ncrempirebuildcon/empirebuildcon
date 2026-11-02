@@ -746,3 +746,29 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 - **Merging:** whichever branch merges second rebases on the new `main` (or merges `main` into the branch) and re-runs the checks before the final review.
 - **Claude's own branches** follow the same workflow as the agent's: task doc, branch, every check in WORKFLOW §4, the full pytest suite twice and `pnpm e2e` twice. An independent reviewer that didn't write the code reads the diff, so the work isn't graded by its author. Claude still has no GitHub access (D-029): it hands the branch to the owner's folder as a git bundle, and the owner pushes it and opens the PR. Only the owner merges.
 **Verified / assumed:** none; this is a process decision by the owner.
+
+## D-041 · Projects and properties pages: paths, filters, map and two fixes (Accepted, 2026-11-03)
+
+**Context:** Task 5.3 builds the catalogue pages on the 5.1 API. Configuration and city pages had no public path yet (D-038 left them out of the sitemap). The boards show a map, filters, a key-facts strip and a RERA block on every view.
+**Decision:**
+- **Paths:**
+  - a configuration ("property") is `/projects/<project>/<config>`, matching the API route;
+  - a city's projects are `/cities/<city>`, and `cities` is now a reserved page slug;
+  - the sitemap feed lists both: configurations of listed (not noindex) projects that aren't off-market (no sample rows in production), and cities with at least one listed project, using the latest project change as the date;
+  - helpers: `seo/paths.py` (`property_path`, `city_path`) and `lib/public/catalogue.ts`.
+- **Filters** live in the URL and work as a plain GET form. Budget is three bands from the boards (up to ₹ 75 L, ₹ 75 L – ₹ 1.5 Cr, above ₹ 1.5 Cr) sent as whole rupees. Anything invalid in the URL is dropped, not shown as an error. `/cities/<slug>` is a 404 unless the city is in `/public/cities`.
+- **Honesty on every view:** `ReraBlock` (QR, number, up-rera.in) near the top of project and property pages and again under "Documents & RERA"; the RERA line on every card; prices come only from the API's display text with the tax note; "Price on request" never shows a figure; carpet area first in both units; a sold-out home says so and takes no enquiries. No "only N left" wording.
+- **Enquire and site-visit buttons** go to `/contact?project=<slug>` (with `&want=visit` or `&want=brochure`, and `&home=<config>` on property pages) until 5.4 builds the forms. A gated brochure goes the same way.
+- **Map:** Leaflet 1.9.4 (latest stable on npm, May 2023; 2.0 is still beta on 2 Nov 2026) with OpenStreetMap tiles, loaded only on "Show map", a circle marker (no image paths), a pop-up built from text nodes, and attribution kept visible. The CSP `img-src` gains `https://tile.openstreetmap.org` (a `proxy.ts` change that needs the owner's approval). The address and a Google Maps directions link are always on the page.
+- **Fixes found while building:**
+  - **Cache tags:** the public data layer's cache tags never reached the Next.js data cache. The timeout wrapper's `fetch(request, init)` made Next rebuild the Request without the `next` options. Every read now passes its own fetch (`cachedFetch`). Merged separately as `fix/p5-cache-tags`.
+  - **Server pages:** `PublicImage` is now a client component, because a server page can't pass the Cloudinary loader function to `next/image`.
+  - **Budget filter:** a price with only one end ("From ₹ 78 L") now counts as that figure, instead of being left out of every band.
+**Consequences:**
+- `/projects` ignores the blocks of the seeded "projects" system page; its SEO fields are used from 5.6.
+- Galleries are a grid without a lightbox (5.7).
+- The cards have no WhatsApp button yet (the shell's bar has one).
+**Verified / assumed:**
+- Leaflet and `@types/leaflet` (1.9.22) versions checked on npm on 2 Nov 2026.
+- OpenStreetMap tile usage policy read on 2 Nov 2026 (operations.osmfoundation.org/policies/tiles).
+

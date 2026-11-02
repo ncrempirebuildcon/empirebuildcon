@@ -31,7 +31,19 @@ HOME_SLUG: Final = "home"
 # Slugs a page (other than the system page of the same name) can't take: they are the
 # website's own sections, or the CMS and API.
 RESERVED_PAGE_SLUGS: Final = frozenset(
-    {"admin", "api", "blog", "home", "hi", "en", "projects", "properties", "search", "sitemap"}
+    {
+        "admin",
+        "api",
+        "blog",
+        "cities",
+        "home",
+        "hi",
+        "en",
+        "projects",
+        "properties",
+        "search",
+        "sitemap",
+    }
 )
 FROM_MESSAGE: Final = (
     "Enter the old address as a path starting with /, like /old-page, without ? or #."
@@ -53,6 +65,16 @@ def post_path(slug: str) -> str:
 
 def project_path(slug: str) -> str:
     return f"/projects/{slug}"
+
+
+def property_path(project_slug: str, config_slug: str) -> str:
+    """One configuration's page (D-041). The web twin is apps/web/src/lib/public/catalogue.ts."""
+    return f"/projects/{project_slug}/{config_slug}"
+
+
+def city_path(slug: str) -> str:
+    """A city's projects (D-041); "cities" is a reserved page slug so no page can take it."""
+    return f"/cities/{slug}"
 
 
 def _clean(value: str) -> bool:
