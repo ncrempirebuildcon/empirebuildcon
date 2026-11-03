@@ -260,7 +260,9 @@ test("staff add a lead by hand, then change its owner, details, spam flag and re
 
   // Mark unread: back to the inbox, where it is unread again.
   await summary.getByRole("button", { name: "Mark unread" }).click();
-  await expect(page).toHaveURL(/\/admin\/leads$/);
+  // WHY 15 s: the inbox loads after the API call; on a busy machine (two workers, a growing
+  // local database) that took more than the default 5 s once. Only the wait changes.
+  await expect(page).toHaveURL(/\/admin\/leads$/, { timeout: 15_000 });
   await page.getByLabel("Search").fill(name);
   await page.getByRole("button", { name: "Search" }).click();
   await expect(page).toHaveURL(/[?&]q=E2E/);

@@ -241,6 +241,11 @@ test("offers show their state from their dates", async ({ page }) => {
   await editor.getByRole("checkbox", { name: /Switched on/ }).check();
   await editor.getByRole("button", { name: "Add offer" }).click();
   await expect(status(page, `Added “E2E Offer live ${id}”: live.`)).toBeVisible();
+  // WHY wait for the address: after saving, the screen reloads the list and then opens the new
+  // offer (?offer=<id>). Changing the filter before that lands builds the next address from the
+  // stale "new" selection, and "+ New offer" stays disabled. A person waits for the editor to
+  // show the saved offer; so does the test (it timed out this way on a busy machine).
+  await expect(page).toHaveURL(/[?&]offer=[0-9a-f-]{36}/, { timeout: 15_000 });
   // The list is paged (25 a page, review L10) and earlier runs leave offers behind, so the row is
   // looked for under its state filter, where the newest sort near the top.
   const list = page.getByRole("region", { name: "All offers" });
