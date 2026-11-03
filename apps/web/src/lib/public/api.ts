@@ -140,14 +140,25 @@ export async function fetchPublicCities(): Promise<PublicCity[]> {
   return unwrap(res);
 }
 
-export async function fetchPublicPage(slug: string): Promise<PublicPage> {
+/**
+ * A published page by slug, or null when there is none (draft, unknown). For pages a route
+ * shows anyway (the home page's holding content, the contact page's forms); other routes use
+ * `fetchPublicPage`, which turns a missing page into the site's 404.
+ */
+export async function fetchPublicPageOrNull(slug: string): Promise<PublicPage | null> {
   const client = getClient();
   const res = await client.GET("/api/v1/public/pages/{slug}", {
     params: { path: { slug } },
     fetch: cachedFetch([`page:${slug}`, "content"]),
   });
-  if (res.response.status === 404) notFound();
+  if (res.response.status === 404) return null;
   return unwrap(res);
+}
+
+export async function fetchPublicPage(slug: string): Promise<PublicPage> {
+  const page = await fetchPublicPageOrNull(slug);
+  if (!page) notFound();
+  return page;
 }
 
 export async function fetchPublicPosts(

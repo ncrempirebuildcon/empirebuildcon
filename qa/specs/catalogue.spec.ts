@@ -164,13 +164,16 @@ test("the project page shows the RERA block, carpet area first and the price not
   await expect(page.getByTestId("key-facts").getByTestId("area")).toHaveText(
     "720 sq ft · 66.9 sq m (carpet)",
   );
-  await expect(page.getByRole("link", { name: "Enquire" })).toBeVisible();
+  await expect(page.getByTestId("lead-form-enquiry")).toBeVisible();
+  await expect(page.getByTestId("lead-form-enquiry")).not.toContainText("(Required) (Required)");
   expect(await seriousAxe(page)).toEqual([]);
 
   // The sold-out home says so and takes no enquiries.
   await page.goto(`/projects/${project.slug}/${project.configSlugs[1]}`);
   await expect(page.getByRole("heading", { name: "Every 3 BHK (test) is booked" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Enquire" })).toHaveCount(0);
+  // No enquiry panel at all: neither the form nor its pre-hydration fallback.
+  await expect(page.getByTestId("lead-form-enquiry")).toHaveCount(0);
+  await expect(page.getByTestId("lead-fallback")).toHaveCount(0);
   expect(csp).toEqual([]);
 });
 
@@ -283,15 +286,19 @@ test("the properties list shows homes with carpet area first and the project's R
   const project = await catalogueProject(page);
   // The lists are cached by tag; a new project shows once the outbox has told the site.
   await drainOutbox(page);
-  await page.goto("/properties?city=sample-city&bhk=2&budget=75l-1.5cr");
+  const path = "/properties?city=sample-city&bhk=2&budget=75l-1.5cr";
+  await page.goto(path);
+  // WHY from the last page back: earlier runs leave their test homes in the sample city, and
+  // the newest home sorts last (the list orders by the configuration's order, then its id).
+  const total = Number(
+    ((await page.getByRole("status").first().textContent()) ?? "0").split(" ")[0],
+  );
+  const pages = Math.max(1, Math.ceil(total / 12));
   const card = page.getByTestId("property-card").filter({ hasText: project.name });
-  await expect(async () => {
-    if ((await card.count()) === 0) {
-      const next = page.getByRole("link", { name: "Next ›" });
-      if ((await next.count()) > 0) await next.click();
-    }
-    await expect(card).toHaveCount(1);
-  }).toPass({ timeout: 20_000 });
+  for (let p = pages; p >= 1 && (await card.count()) === 0; p -= 1) {
+    await page.goto(`${path}&page=${p}`);
+  }
+  await expect(card).toHaveCount(1);
   await expect(card.getByTestId("area")).toHaveText("720 sq ft · 66.9 sq m (carpet)");
   await expect(card.getByTestId("rera-line")).toContainText(project.rera);
   expect(await seriousAxe(page)).toEqual([]);

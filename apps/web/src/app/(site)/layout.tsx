@@ -16,6 +16,7 @@ import Footer from "@/components/shell/Footer";
 import MobileActionBar from "@/components/shell/MobileActionBar";
 import OfferBanner from "@/components/shell/OfferBanner";
 import SampleDataRibbon from "@/components/shell/SampleDataRibbon";
+import AttributionCapture from "@/components/leads/AttributionCapture";
 import { fetchPublicSite, type PublicSite } from "@/lib/public/api";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,7 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
 
   return (
     <div className="flex min-h-dvh flex-col bg-noir-900 text-body">
+      <AttributionCapture />
       <SampleDataRibbon hasSampleData={hasSample} />
       {site?.offers && <OfferBanner offers={site.offers} />}
       <Header site={site} isProduction={isProd} />

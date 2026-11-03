@@ -202,7 +202,11 @@ class PublicProjectDetail(PublicProjectSummary):
     videos: list[PublicLinkedMedia] = Field(default_factory=list)
     documents: list[PublicLinkedMedia] = Field(default_factory=list)
     brochure: PublicLinkedMedia | None = None
-    brochure_gated: bool = False
+    brochure_gated: bool = Field(
+        default=False,
+        description="True when a brochure is shown on the website but only after the lead form "
+        "(POST /public/brochure-requests gives its address); false when there is none to give.",
+    )
     faqs: list[PublicFaq] = Field(default_factory=list)
     seo: PublicSeo
     updated_at: datetime

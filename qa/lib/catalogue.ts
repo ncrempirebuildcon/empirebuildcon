@@ -9,7 +9,7 @@
 import { expect, type Page } from "@playwright/test";
 import { apiCall, apiUpload, runId } from "./auth";
 import { API_URL, apiEnv } from "./env";
-import { samplePhoto, sampleQr } from "./files";
+import { samplePdf, samplePhoto, sampleQr } from "./files";
 
 export interface CatalogueProject {
   id: string;
@@ -129,4 +129,38 @@ export async function drainOutbox(page: Page): Promise<void> {
     headers: { "X-Internal-Key": internalKey },
   });
   expect(res.status()).toBe(200);
+}
+
+/**
+ * Attaches a PDF brochure to a project through the store's direct upload (the fake store in
+ * development and tests), as the CMS does, and switches "brochure gated" on or off.
+ */
+export async function attachBrochure(page: Page, projectId: string, gated: boolean): Promise<void> {
+  const pdf = samplePdf(`SAMPLE-brochure-${runId()}.pdf`);
+  const signed = await apiCall(page, "POST", "/api/v1/admin/media/upload-signature", {
+    kind: "document",
+    filename: pdf.name,
+    bytes: pdf.buffer.length,
+    mime_type: pdf.mimeType,
+  });
+  expect(signed.status(), await signed.text()).toBe(200);
+  const { upload_url: uploadUrl, fields } = (await signed.json()) as {
+    upload_url: string;
+    fields: Record<string, string>;
+  };
+  const stored = await page.request.post(uploadUrl, {
+    multipart: { ...fields, file: { name: pdf.name, mimeType: pdf.mimeType, buffer: pdf.buffer } },
+  });
+  expect(stored.ok(), await stored.text()).toBe(true);
+  const confirmed = await apiCall(page, "POST", "/api/v1/admin/media/confirm", {
+    cloudinary_response: await stored.json(),
+    title: "SAMPLE brochure",
+    attach_to: `project:${projectId}`,
+    role: "brochure",
+  });
+  expect(confirmed.status(), await confirmed.text()).toBe(201);
+  const patched = await apiCall(page, "PATCH", `/api/v1/admin/projects/${projectId}`, {
+    brochure_gated: gated,
+  });
+  expect(patched.status(), await patched.text()).toBe(200);
 }

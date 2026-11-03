@@ -152,11 +152,11 @@ test("a public site-visit request goes from the inbox to a confirmed visit and a
   const body = (await dashboard.json()) as {
     counts: Array<{ key: string; label: string; count: number; link: string }>;
   };
+  // WHY no exact numbers here: specs running alongside add drafts and leads between the page
+  // and the API call. Exact counts are checked in dashboard-counts.serial.spec.ts, alone.
   for (const count of body.counts) {
     await expect(
-      counts.getByRole("link", {
-        name: new RegExp(`^${escapeRegExp(count.label)} ${count.count}`),
-      }),
+      counts.getByRole("link", { name: new RegExp(`^${escapeRegExp(count.label)} \\d`) }),
     ).toHaveAttribute("href", count.link);
   }
   const newLeads = body.counts.find((count) => count.key === "leads.new");
@@ -260,7 +260,9 @@ test("staff add a lead by hand, then change its owner, details, spam flag and re
 
   // Mark unread: back to the inbox, where it is unread again.
   await summary.getByRole("button", { name: "Mark unread" }).click();
-  await expect(page).toHaveURL(/\/admin\/leads$/);
+  // WHY 15 s: the inbox loads after the API call; on a busy machine (two workers, a growing
+  // local database) that took more than the default 5 s once. Only the wait changes.
+  await expect(page).toHaveURL(/\/admin\/leads$/, { timeout: 15_000 });
   await page.getByLabel("Search").fill(name);
   await page.getByRole("button", { name: "Search" }).click();
   await expect(page).toHaveURL(/[?&]q=E2E/);
@@ -357,34 +359,6 @@ test("a super-admin erases a lead's personal data after a clear warning", async 
   // The other lead with the same number is erased too.
   const erasedOther = await apiCall(page, "GET", `/api/v1/admin/leads/${other.id}`);
   expect(((await erasedOther.json()) as { name: string }).name).toBe("[erased]");
-});
-
-test("every dashboard count matches the list its link opens", async ({ page }) => {
-  const response = await apiCall(page, "GET", "/api/v1/admin/dashboard");
-  const { counts } = (await response.json()) as {
-    counts: Array<{ key: string; label: string; count: number; link: string }>;
-  };
-  expect(counts.length).toBeGreaterThan(0);
-  for (const count of counts) {
-    await page.goto("/admin");
-    await page
-      .getByRole("list", { name: "Counts" })
-      .getByRole("link", { name: new RegExp(`^${escapeRegExp(count.label)} ${count.count} `) })
-      .click();
-    await expect(page).toHaveURL(new RegExp(`${escapeRegExp(count.link)}$`));
-    if (count.link.startsWith("/admin/site-visits")) {
-      const noun = count.count === 1 ? "visit" : "visits";
-      await expect(page.getByText(new RegExp(`^${count.count} ${noun} · `))).toBeVisible();
-    } else {
-      const noun = count.link.startsWith("/admin/projects") ? "project" : "lead";
-      const pager = page.getByRole("navigation", { name: new RegExp(`^Pages of ${noun}s`) });
-      await expect(pager.getByRole("status")).toHaveText(
-        count.count === 0
-          ? `No ${noun}s`
-          : new RegExp(`of ${count.count} ${count.count === 1 ? noun : `${noun}s`}$`),
-      );
-    }
-  }
 });
 
 /** `text` as a literal inside a regular expression. */

@@ -774,3 +774,50 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 - Leaflet and `@types/leaflet` (1.9.22) versions checked on npm on 2 Nov 2026.
 - OpenStreetMap tile usage policy read on 2 Nov 2026 (operations.osmfoundation.org/policies/tiles).
 
+## D-043 · Lead forms on the website (Accepted, 2026-11-03)
+
+**Context:** Task 5.4 puts the Phase 4 intake API (`/public/leads`, `/public/site-visits`, `/public/brochure-requests`) on the public site. The rules that bind it are consent (D-017, AGENTS.md), the API's network rate limit (D-027, D-038) and honest content.
+**Decision:**
+- **One client form component** for the three intents. It posts with `fetch` to the site's own `/api` proxy, so the proxy adds the visitor's network and the API's limit counts per visitor, not per server.
+  - A server action would have sent every lead from the web server, putting all visitors in one bucket. So the form needs JavaScript.
+  - Without JavaScript the page shows call and WhatsApp links.
+- **Consent:**
+  - The required and the marketing boxes are separate and never pre-ticked. The required box is checked where the request body is built, so no way of sending the form (button, Enter key) can skip it.
+  - The labels come from the current texts in `/public/site`, and the full required text can be opened in place.
+  - Marketing consent is sent only when ticked.
+  - With no current lead-form text the form isn't drawn.
+  - A 409 asks the visitor to reload, keeping what they typed.
+- **Phone:** Indian numbers only, as the API requires (D-034). The hint sends visitors outside India to WhatsApp or email. The boards' country-code picker waits for the API change for NRI leads.
+- **Attribution:**
+  - UTM tags and click IDs are kept from the landing address in session storage, captured on every page view by `AttributionCapture` in the site layout: first touch for the tab, only the known keys, capped at the API's lengths, no cookie.
+  - `page_url` is the path only, and the referrer is sent without its query, because both could carry personal data.
+- **Placement:**
+  - project page: the enquiry in the sidebar, then the site visit (`#visit`) and, when gated, the brochure (`#brochure`);
+  - property page: an enquiry for that configuration, none when sold out;
+  - `/contact`: a code route with the contact details from settings (placeholders hidden in production) and the site-visit and enquiry forms. `?project=` preselects a project.
+  - The CMS's "contact" page blocks join it in 5.5a.
+- **API change:** `brochure_gated` in the project answer is true only when a brochure is actually shown on the site, so the site never offers a form that would end in a 404. The address stays withheld until the form is sent.
+**Consequences:**
+- The browser suite makes 3 real public submissions per run (plus 1 in `leads.spec.ts`), within the API's 5 per 10 minutes. One retried submitting test on CI still fits (5); two would get a 429. Locally, the 15 minutes between full runs (the sign-in limit) covers this too.
+- The error states use mocked answers.
+- "Every dashboard count matches its list" moved to the "serial" Playwright project (`dashboard-counts.serial.spec.ts`). The new specs change project and lead counts in parallel, so the exact comparison was racing them.
+**Verified / assumed:** none beyond the API's own rules (leads/intake.py, phone.py).
+
+## D-045 · Page-builder pages on the website (Accepted, 2026-11-03)
+
+**Context:** Task 5.5a shows the pages staff build in the CMS (D-035), using the resolved blocks from `GET /public/pages/{slug}` (D-038).
+**Decision:**
+- **Routes:**
+  - `/` is the "home" page. Until it is published with blocks, the holding content stays, so the home page is never empty.
+  - `/<slug>` is any other published page. Unknown or draft pages are the site's 404. The site's own sections are their own routes and win; their slugs are reserved for pages in the CMS.
+  - `/contact` (D-043) adds the "contact" page's blocks under its forms. A hero there is left out, because the page already has its h1.
+- **Blocks:** each of the 17 types is a server component (`components/blocks/Blocks.tsx`).
+  - A leading hero carries the page's only h1; otherwise the page title is the h1.
+  - Unknown types render nothing. The API already leaves out hidden or unresolved blocks.
+  - Formatted text goes through `FormattedText`, images through `PublicImage` with honest labels, grids through the 5.3 cards, the map through the 5.3 map, and lead forms through the 5.4 form (`source` kept, so a campaign page's leads count as `campaign`).
+- **Honesty:** every number in a stats block shows "As of <date> · Source: <source>". Offers show their terms line and link, with no countdown. A legal page whose text is still marked draft shows a red DRAFT notice (D-017).
+- **Video:** a library video plays from Cloudinary. YouTube and Vimeo videos are a link, not an embed, so no third-party request or script happens before the consent banner (Phase 6). Embeds can come with that banner.
+- **API change:** a `lead_form` block's resolved data now includes `project_slug`, because public intake takes the project by slug.
+- **Titles:** `<title>` comes from the page's SEO title or its title. Landing pages and `seo.noindex` pages get `noindex`. The rest of the metadata is 5.6.
+**Verified / assumed:** none; this applies D-035, D-038 and D-043.
+
