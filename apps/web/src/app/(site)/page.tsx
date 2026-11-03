@@ -3,9 +3,17 @@
  * the holding content below stays, so the site never shows an empty home page.
  * Restyled with the approved Black & gold theme (D-033, D-038).
  */
+import type { Metadata } from "next";
 import Image from "next/image";
 import { PageView } from "@/components/blocks/PageView";
 import { fetchPublicPageOrNull } from "@/lib/public/api";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const page = await fetchPublicPageOrNull("home");
+  // The site layout's default title stays until the home page is published.
+  if (!page || page.blocks.length === 0) return {};
+  return { title: page.seo?.title || page.title };
+}
 
 export default async function HomePage() {
   const page = await fetchPublicPageOrNull("home");

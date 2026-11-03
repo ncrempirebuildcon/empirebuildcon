@@ -7,13 +7,19 @@
  * routes and win over this one; their slugs are reserved for pages in the CMS (seo/paths.py).
  */
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { PageView } from "@/components/blocks/PageView";
 import { fetchPublicPage } from "@/lib/public/api";
 
 type Params = { params: Promise<{ slug: string }> };
 
+// WHY: the home page lives at "/" only; "/home" would be a duplicate of it.
+const HOME_SLUG = "home";
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const page = await fetchPublicPage((await params).slug);
+  const slug = (await params).slug;
+  if (slug === HOME_SLUG) notFound();
+  const page = await fetchPublicPage(slug);
   return {
     title: page.seo?.title || page.title,
     // Campaign landing pages are never indexed (D-035); the rest follows the site-wide rule.
@@ -25,6 +31,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function SitePage({ params }: Params) {
   const { slug } = await params;
+  if (slug === HOME_SLUG) notFound();
   const page = await fetchPublicPage(slug);
   return <PageView page={page} path={`/${slug}`} />;
 }

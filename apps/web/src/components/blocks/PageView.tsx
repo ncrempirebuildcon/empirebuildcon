@@ -30,11 +30,14 @@ export function PageView({ page, path }: { page: PublicPage; path: string }) {
           <h1 className="font-display text-[clamp(32px,6vw,58px)] leading-tight font-semibold text-balance text-metallic">
             {page.title}
           </h1>
-          {page.kind === "legal" && page.legal_version ? (
-            <p className="text-caption text-muted">Version {page.legal_version}</p>
-          ) : null}
         </header>
       )}
+      {page.kind === "legal" && page.legal_version ? (
+        // Shown even under a hero: readers must know which version of the terms they read.
+        <p className="-mt-6 text-caption text-muted" data-testid="legal-version">
+          Version {page.legal_version}
+        </p>
+      ) : null}
       <BlockList blocks={page.blocks} path={path} />
     </article>
   );

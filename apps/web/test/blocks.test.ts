@@ -27,6 +27,46 @@ const media = {
   duration_s: null,
 };
 
+const rera = {
+  authority: "UP-RERA",
+  number: "UPRERAPRJ123456",
+  qr: null,
+  url: "https://up-rera.in/x",
+};
+const price = { on_request: false, min_inr: 6500000, max_inr: 9000000, note: null };
+const area = { basis: "carpet", display_unit: "sqft", min_sqm: 90, max_sqm: 120 };
+const project = {
+  id: "p1",
+  slug: "empire-heights",
+  name: "Empire Heights",
+  status: "under_construction",
+  sales_status: "available",
+  city: { name: "Lucknow", slug: "lucknow" },
+  locality: { name: "Gomti Nagar", slug: "gomti-nagar" },
+  configuration_labels: ["2 BHK"],
+  property_types: ["apartment"],
+  cover: media,
+  is_featured: false,
+  is_sample: false,
+  possession_date: "2028-03-01",
+  price,
+  area,
+  rera,
+};
+const property = {
+  id: "h1",
+  slug: "tower-a-1203",
+  name: "Tower A 1203",
+  bhk: 2,
+  property_type: "apartment",
+  sales_status: "available",
+  is_sample: false,
+  cover: media,
+  price,
+  area,
+  project: { ...project, rera },
+};
+
 function render(type: string, data: Record<string, unknown>, first = false): string {
   return renderToStaticMarkup(
     React.createElement(BlockView, {
@@ -45,6 +85,7 @@ describe("block helpers", () => {
     expect(isSafeHref("javascript:alert(1)")).toBe(false);
     expect(isSafeHref("http://plain.example")).toBe(false);
     expect(isSafeHref(null)).toBe(false);
+    expect(isSafeHref("/\\evil.example")).toBe(false);
   });
 
   it("states the source and date of every number (COMPLIANCE, D-035)", () => {
@@ -172,6 +213,57 @@ describe("BlockView", () => {
     ).toContain("A. Buyer");
     expect(render("cta", { label: "Call us", href: "/contact" })).toContain('href="/contact"');
     expect(render("divider", {})).toContain("star-rule");
+  });
+
+  it("shows an image with its caption and honest label", () => {
+    const html = render("image", { image: media, caption: "Tower A" });
+    expect(html).toContain("Tower A at dusk");
+    expect(html).toContain("Tower A");
+    expect(html).toContain("Artist&#x27;s impression");
+  });
+
+  it("plays a library video from its own file, with no third-party player", () => {
+    const html = render("video", {
+      heading: "Walkthrough",
+      media: { ...media, kind: "video", url: "https://res.cloudinary.com/x/v.mp4" },
+    });
+    expect(html).toContain("<video");
+    expect(html).toContain('src="https://res.cloudinary.com/x/v.mp4"');
+    expect(html).not.toMatch(/<iframe|<script|youtube|vimeo/);
+  });
+
+  it("shows project and home grids as cards with the RERA line", () => {
+    const grid = render("project_grid", { heading: "Projects", projects: [project] });
+    expect(grid).toContain('data-testid="project-card"');
+    expect(grid).toContain("UPRERAPRJ123456");
+    const homes = render("property_grid", { heading: "Homes", properties: [property] });
+    expect(homes).toContain('data-testid="property-card"');
+    expect(homes).toContain("excludes GST");
+  });
+
+  it("shows the project's RERA block with a map block", () => {
+    const html = render("map", {
+      heading: "Where it is",
+      project: {
+        name: "Empire Heights",
+        slug: "empire-heights",
+        lat: 26.85,
+        lng: 80.95,
+        address: "Gomti Nagar",
+        directions_url: "https://www.openstreetmap.org/directions",
+        rera,
+      },
+    });
+    expect(html).toContain("UPRERAPRJ123456");
+    expect(html).toContain("up-rera.in");
+  });
+
+  it("gives step and column titles an h2 when the block has no heading", () => {
+    expect(render("steps", { items: [{ title: "Visit" }] })).toMatch(/<h2[^>]*>Visit/);
+    expect(render("steps", { heading: "How", items: [{ title: "Visit" }] })).toMatch(
+      /<h3[^>]*>Visit/,
+    );
+    expect(render("columns", { columns: [{ heading: "A", body: "x" }] })).toMatch(/<h2[^>]*>A/);
   });
 
   it("leaves out an unknown type and blocks with nothing resolved", () => {

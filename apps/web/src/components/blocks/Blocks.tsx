@@ -21,6 +21,7 @@ import { PublicImage } from "@/components/media/PublicImage";
 import { ProjectCard, PropertyCard } from "@/components/catalogue/Cards";
 import { Faqs } from "@/components/catalogue/ProjectSections";
 import ProjectMap from "@/components/catalogue/ProjectMap";
+import { ReraBlock } from "@/components/catalogue/ReraBlock";
 import { LeadPanel } from "@/components/leads/LeadPanel";
 import { formatCalendarDate } from "@/lib/dates";
 import type { components } from "@empire/api-client";
@@ -32,16 +33,15 @@ type ProjectSummary = components["schemas"]["PublicProjectSummary"];
 type PropertySummary = components["schemas"]["PublicPropertySummary"];
 type Testimonial = components["schemas"]["PublicTestimonial"];
 type Offer = components["schemas"]["PublicOffer"];
+type Rera = components["schemas"]["PublicRera"];
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- block data is typed per type below */
 type Data = Record<string, any>;
 
 /** True for a site path or an https address (what the API allows for block links). */
 export function isSafeHref(href: unknown): href is string {
-  return (
-    typeof href === "string" &&
-    ((href.startsWith("/") && !href.startsWith("//")) || href.startsWith("https://"))
-  );
+  if (typeof href !== "string" || href.includes("\\")) return false;
+  return (href.startsWith("/") && !href.startsWith("//")) || href.startsWith("https://");
 }
 
 function external(href: string): boolean {
@@ -250,9 +250,23 @@ function OfferBanner({ offer }: { offer: Offer }) {
             {offer.terms_url && isSafeHref(offer.terms_url) ? (
               <>
                 {" "}
-                <a href={offer.terms_url} className="underline underline-offset-2">
-                  Terms and conditions
-                </a>
+                {external(offer.terms_url) ? (
+                  <a
+                    href={offer.terms_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-11 items-center underline underline-offset-2"
+                  >
+                    Terms and conditions<span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                ) : (
+                  <Link
+                    href={offer.terms_url}
+                    className="inline-flex min-h-11 items-center underline underline-offset-2"
+                  >
+                    Terms and conditions
+                  </Link>
+                )}
               </>
             ) : null}
           </p>
@@ -384,20 +398,32 @@ export function BlockView({
           <ButtonLink href={d.href}>{d.label}</ButtonLink>
         </section>
       );
-    case "lead_form":
+    case "lead_form": {
+      // A site visit or brochure always needs a project (the API requires it). A block without
+      // one asks a plain question instead, so no visitor fills a form that can't be sent.
+      const intent = d.project_slug ? (LEAD_INTENT[d.source] ?? "enquiry") : "enquiry";
       return (
-        <section className="rounded-card border border-gold-line-strong bg-noir-800 p-5 lg:max-w-2xl">
+        <section className="flex flex-col gap-4 rounded-card border border-gold-line-strong bg-noir-800 p-5 lg:max-w-2xl">
           <LeadPanel
-            intent={LEAD_INTENT[d.source] ?? "enquiry"}
-            title={d.heading || (d.source === "site_visit" ? "Book a site visit" : "Talk to us")}
+            intent={intent}
+            title={d.heading || (intent === "visit" ? "Book a site visit" : "Talk to us")}
             intro={d.intro ?? undefined}
-            submitLabel={d.source === "site_visit" ? "Request a site visit" : "Send"}
+            submitLabel={intent === "visit" ? "Request a site visit" : "Send"}
             path={path}
             projectSlug={d.project_slug ?? null}
-            source={d.source}
+            source={intent === "enquiry" && d.source !== "campaign" ? undefined : d.source}
           />
+          {d.rera ? (
+            // COMPLIANCE: a form about a project shows the project's RERA block (D-045).
+            <ReraBlock
+              rera={d.rera as Rera}
+              projectName={d.project_name ?? "this project"}
+              variant="line"
+            />
+          ) : null}
         </section>
       );
+    }
     case "faq_list": {
       const faqs = (d.faqs ?? d.items ?? []) as Faq[];
       return faqs.length ? (
@@ -422,6 +448,7 @@ export function BlockView({
             lng: number | null;
             address: string;
             directions_url: string | null;
+            rera?: Rera;
           }
         | undefined;
       if (!p) return null;
@@ -439,13 +466,14 @@ export function BlockView({
               Get directions<span className="sr-only"> (opens Google Maps in a new tab)</span>
             </a>
           ) : null}
+          {p.rera ? <ReraBlock rera={p.rera} projectName={p.name} variant="line" /> : null}
           {p.lat != null && p.lng != null && p.directions_url ? (
             <ProjectMap
               lat={p.lat}
               lng={p.lng}
               name={p.name}
               address={p.address || null}
-              reraNumber={null}
+              reraNumber={p.rera?.number ?? null}
               directionsUrl={p.directions_url}
             />
           ) : null}
@@ -466,7 +494,12 @@ export function BlockView({
                 <span className="font-display text-2xl text-gold-400" aria-hidden="true">
                   {i + 1}
                 </span>
-                <h3 className="font-semibold text-ivory">{s.title}</h3>
+                {/* WHY: without a block heading these sit directly under the page's h1 (axe heading-order). */}
+                {d.heading ? (
+                  <h3 className="font-semibold text-ivory">{s.title}</h3>
+                ) : (
+                  <h2 className="font-semibold text-ivory">{s.title}</h2>
+                )}
                 {s.text ? <p className="text-small text-body">{s.text}</p> : null}
               </li>
             ))}
@@ -484,7 +517,13 @@ export function BlockView({
           >
             {cols.map((c, i) => (
               <div key={i} className="flex flex-col gap-2">
-                {c.heading ? <h3 className="font-semibold text-ivory">{c.heading}</h3> : null}
+                {c.heading ? (
+                  d.heading ? (
+                    <h3 className="font-semibold text-ivory">{c.heading}</h3>
+                  ) : (
+                    <h2 className="font-semibold text-ivory">{c.heading}</h2>
+                  )
+                ) : null}
                 <FormattedText text={c.body} />
               </div>
             ))}

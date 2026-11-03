@@ -3,8 +3,9 @@
  * with one block of most types, published and read at /<slug>; a legal page's DRAFT notice;
  * draft and unknown pages are 404; axe, the enforced CSP and 390 px.
  *
- * No public lead submission (the lead-form block is checked for its form only) and no sign-in.
- * The "home" page is not published here: other specs read "/".
+ * No real public lead submission: the lead-form block's send is answered by a mock, and the
+ * request body is checked (project slug and source). The "home" and "contact" pages are
+ * published in pages-home.serial.spec.ts, because other specs read "/" and "/contact".
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
@@ -33,6 +34,12 @@ function watchCsp(page: Page): string[] {
   return violations;
 }
 
+async function created201(page: Page, path: string, body: object): Promise<string> {
+  const response = await apiCall(page, "POST", path, body);
+  expect(response.status(), await response.text()).toBe(201);
+  return ((await response.json()) as { id: string }).id;
+}
+
 async function saveAndPublish(page: Page, pageId: string, blocks: unknown[]): Promise<void> {
   const saved = await apiCall(page, "PUT", `/api/v1/admin/pages/${pageId}/blocks`, { blocks });
   expect(saved.status(), await saved.text()).toBe(200);
@@ -44,6 +51,28 @@ test("a page built from blocks shows every block on the website", async ({ page,
   const id = runId();
   const project = await catalogueProject(page);
   const photo = await libraryPhoto(page, `E2E block photo ${id}`);
+  const faqId = await created201(page, "/api/v1/admin/faqs", {
+    project_id: null,
+    question: `E2E block question ${id}?`,
+    answer: "E2E block answer.",
+    is_visible: true,
+  });
+  const testimonialId = await created201(page, "/api/v1/admin/testimonials", {
+    person_name: `E2E Buyer ${id}`,
+    quote: "E2E quote, their words.",
+    source: "E2E feedback form",
+    consent_date: "2026-10-01",
+    is_visible: true,
+  });
+  const offerId = await created201(page, "/api/v1/admin/offers", {
+    title: `E2E offer ${id}`,
+    body: "E2E offer body.",
+    terms: "E2E terms line.",
+    terms_url: "/terms",
+    placement: "project",
+    project_id: project.id,
+    is_active: true,
+  });
   const created = await draftPage(page);
   await saveAndPublish(page, created.id, [
     {
@@ -97,6 +126,9 @@ test("a page built from blocks shows every block on the website", async ({ page,
         ],
       },
     },
+    { type: "faq_list", data: { heading: "Questions", faq_ids: [faqId] } },
+    { type: "testimonials", data: { heading: "Buyers say", testimonial_ids: [testimonialId] } },
+    { type: "offer_banner", data: { offer_id: offerId } },
     { type: "divider", data: {} },
   ]);
 
@@ -135,6 +167,21 @@ test("a page built from blocks shows every block on the website", async ({ page,
   await expect(main.getByRole("button", { name: "Show map" })).toBeVisible();
   await expect(main.getByRole("heading", { name: "How to book" })).toBeVisible();
   await expect(main.getByRole("heading", { name: "Right" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Homes" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Gallery" })).toBeVisible();
+  await expect(main.getByText(`E2E block question ${id}?`)).toBeVisible();
+  await expect(main.getByText(`E2E Buyer ${id}`)).toBeVisible();
+  await expect(main.getByText(`E2E offer ${id}`)).toBeVisible();
+  await expect(main.getByText("E2E terms line.")).toBeVisible();
+  await expect(main.getByRole("link", { name: "Terms and conditions" })).toHaveAttribute(
+    "href",
+    "/terms",
+  );
+  // The map block carries the project's RERA line (COMPLIANCE, D-045).
+  const mapSection = main.locator("section", {
+    has: visitor.getByRole("heading", { name: "Where it is" }),
+  });
+  await expect(mapSection.getByTestId("rera-line")).toBeVisible();
 
   expect(await seriousAxe(visitor)).toEqual([]);
   expect(csp).toEqual([]);
@@ -145,7 +192,31 @@ test("a page built from blocks shows every block on the website", async ({ page,
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
+
+  // The lead-form block sends the project and its source; the answer is mocked (no real lead).
+  const form = main.getByTestId("lead-form-enquiry");
+  let sent: Record<string, unknown> | null = null;
+  await visitor.route("**/api/v1/public/leads", async (route) => {
+    sent = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({ reference: "E2E-MOCK-1", message: "Thank you." }),
+    });
+  });
+  await form.getByLabel("Your name").fill("E2E Block Lead");
+  await form.getByLabel("Mobile number").fill("9876543210");
+  await form.getByTestId("consent-required").check();
+  await form.getByRole("button", { name: "Send" }).click();
+  await expect(main.getByTestId("lead-success")).toContainText("E2E-MOCK-1");
+  expect(sent).toMatchObject({ project_slug: project.slug, source: "project_form" });
   await visitorContext.close();
+
+  // Leave nothing live for other specs.
+  const off = await apiCall(page, "PATCH", `/api/v1/admin/offers/${offerId}`, {
+    is_active: false,
+  });
+  expect(off.status(), await off.text()).toBe(200);
 });
 
 test("a legal page with draft text shows the DRAFT notice", async ({ page }) => {
@@ -159,6 +230,22 @@ test("a legal page with draft text shows the DRAFT notice", async ({ page }) => 
   await page.goto(`/${created.slug}`);
   await expect(page.getByTestId("legal-draft-notice")).toContainText("DRAFT");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(created.title);
+});
+
+test("a site-visit form block with no project asks a plain question instead", async ({ page }) => {
+  const created = await draftPage(page);
+  await saveAndPublish(page, created.id, [
+    { type: "lead_form", data: { heading: "Visit us", source: "site_visit" } },
+  ]);
+  await page.goto(`/${created.slug}`);
+  // A site visit needs a project; a form that could never be sent is not shown.
+  await expect(page.getByTestId("lead-form-enquiry")).toBeVisible();
+  await expect(page.getByTestId("lead-form-visit")).toHaveCount(0);
+});
+
+test("/home is not a second copy of the home page", async ({ page }) => {
+  const response = await page.goto("/home");
+  expect(response?.status()).toBe(404);
 });
 
 test("draft and unknown pages are not found", async ({ page }) => {
