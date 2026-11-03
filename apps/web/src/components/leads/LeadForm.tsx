@@ -26,6 +26,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import Link from "next/link";
 import { Button, Checkbox, Select, Textarea, TextField } from "@empire/ui";
 import {
   captureAttribution,
@@ -37,6 +38,7 @@ import {
   outcomeFor,
   type VisitSlot,
   visitDateRange,
+  type LeadInput,
   type LeadIntent,
 } from "@/lib/public/leads";
 
@@ -56,6 +58,8 @@ export interface LeadFormProps {
   marketing: ConsentText | null;
   projectSlug?: string | null;
   configurationId?: string | null;
+  /** A page-builder form's source ("campaign" on landing pages); default from the intent. */
+  source?: LeadInput["source"];
   /** On the contact page: the projects a visit can be for, and the one to preselect. */
   projectChoices?: { slug: string; name: string }[];
   /** Shown instead of the form when it can't be used (no JavaScript, no consent text). */
@@ -183,6 +187,7 @@ export function LeadForm(props: LeadFormProps) {
         marketing,
         marketingTicked: form.get("marketing") === "on",
         website: text("cf_ref"),
+        source: props.source,
       },
       {
         pathname: window.location.pathname,
@@ -400,9 +405,9 @@ export function LeadForm(props: LeadFormProps) {
             {submitLabel}
           </Button>
           <p className="text-caption text-muted">
-            <a href="/privacy" className="underline underline-offset-2">
+            <Link href="/privacy" className="underline underline-offset-2">
               Privacy notice
-            </a>{" "}
+            </Link>{" "}
             · you can withdraw consent any time.
           </p>
         </form>

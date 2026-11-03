@@ -38,6 +38,11 @@ export default defineConfig({
   workers: process.env.CI ? 2 : 2,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
+  // WHY 60 s per test (default 30 s): the axe journeys walk every tab or section of a CMS screen,
+  // and on a 2-CPU machine running two workers they passed 30 s with nothing failing (3 Nov 2026,
+  // project editor, Settings, offers). Only the time limit changes; `expect` waits stay at 5 s
+  // unless a test says why it needs longer.
+  timeout: 60_000,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: WEB_URL,

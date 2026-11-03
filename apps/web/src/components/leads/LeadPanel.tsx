@@ -10,7 +10,7 @@ import Link from "next/link";
 import { fetchPublicSite } from "@/lib/public/api";
 import { buildTelLink, buildWhatsAppLink, filterValue, isProductionEnv } from "@/lib/public/format";
 import type { LeadIntent } from "@/lib/public/leads";
-import { LeadForm, type ConsentText } from "./LeadForm";
+import { LeadForm, type ConsentText, type LeadFormProps } from "./LeadForm";
 
 export interface LeadPanelProps {
   intent: LeadIntent;
@@ -21,6 +21,7 @@ export interface LeadPanelProps {
   path: string;
   projectSlug?: string | null;
   configurationId?: string | null;
+  source?: LeadFormProps["source"];
   projectChoices?: { slug: string; name: string }[];
   headingLevel?: 2 | 3;
 }
@@ -78,6 +79,7 @@ export async function LeadPanel(props: LeadPanelProps) {
       marketing={marketing}
       projectSlug={props.projectSlug}
       configurationId={props.configurationId}
+      source={props.source}
       projectChoices={props.projectChoices}
       headingLevel={props.headingLevel}
       fallback={fallback}

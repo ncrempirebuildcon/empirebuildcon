@@ -320,6 +320,12 @@ def test_page_blocks_resolution_and_stored_shapes(db: Session, client: TestClien
     assert form_data["consent"]["body"] == "I agree to receive project updates."
     assert form_data["marketing_consent"] is not None
     assert "WhatsApp" in form_data["marketing_consent"]["checkbox_label"]
+    # The website's form sends the project by slug (task 5.5a).
+    assert form_data["project_slug"] == proj.slug
+    # COMPLIANCE: a block that names a project carries its RERA block (D-045).
+    assert form_data["rera"]["authority"] == "UP-RERA"
+    assert form_data["rera"]["number"] == proj.rera_number
+    assert form_data["rera"]["url"] == "https://www.up-rera.in"
 
     # Query in Hindi: verify picked FAQ translation (S7)
     # Enable locale_hi feature flag first (D-014 gating)

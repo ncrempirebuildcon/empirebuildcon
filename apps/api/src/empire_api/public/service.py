@@ -1782,6 +1782,30 @@ def _resolve_grid_block(
     return True
 
 
+def _project_rera_dump(db: Session, project: Project, *, prod: bool) -> dict[str, Any]:
+    """The RERA block of one project for a page block that names it (map, lead form).
+
+    COMPLIANCE (AGENTS.md "Honest content"): a page that shows a project, such as a campaign
+    landing page, shows its UP-RERA number, QR code and portal too (task 5.5a, D-045).
+    """
+    qr_link = db.scalar(
+        select(MediaLink)
+        .where(
+            MediaLink.project_id == project.id,
+            MediaLink.role == "rera_qr",
+            MediaLink.is_visible.is_(True),
+        )
+        .options(joinedload(MediaLink.media))
+    )
+    qr_media = qr_link.media if qr_link else None
+    return schemas.PublicRera(
+        authority="UP-RERA",
+        number=project.rera_number,
+        url="https://www.up-rera.in",
+        qr=_media_schema(qr_media, prod=prod) if qr_media else None,
+    ).model_dump()
+
+
 def _resolve_single_block(
     db: Session,
     b: PageBlock,
@@ -1836,6 +1860,7 @@ def _resolve_single_block(
             "lng": float(p.lng) if p.lng is not None else None,
             "address": full_address,
             "directions_url": directions_url(p.lat, p.lng),
+            "rera": _project_rera_dump(db, p, prod=prod),
         }
     elif b_type == "faq_list":
         if not _resolve_faq_block(db, data, loaded_faqs, is_hi=is_hi, prod=prod):
@@ -1920,16 +1945,21 @@ def _resolve_single_block(
     elif b_type == "lead_form":
         if data.get("project_id"):
             pid = uuid.UUID(str(data["project_id"]))
-            form_p_stmt = select(Project.id).where(
+            form_p_stmt = select(Project).where(
                 Project.id == pid,
                 Project.publish_state == "published",
                 Project.sales_status != "off_market",
             )
             if prod:
                 form_p_stmt = form_p_stmt.where(Project.is_sample.is_(False))
-            p_vis = db.scalar(form_p_stmt)
-            if not p_vis:
+            form_project = db.scalar(form_p_stmt)
+            if not form_project:
                 return None, False
+            # The website's form sends the project by slug (public intake), and shows the
+            # project's RERA block next to it (task 5.5a, D-045).
+            data["project_slug"] = form_project.slug
+            data["project_name"] = form_project.name
+            data["rera"] = _project_rera_dump(db, form_project, prod=prod)
         ct_lead = current_text(db, "lead_form")
         if ct_lead:
             data["consent"] = schemas.PublicConsentText(

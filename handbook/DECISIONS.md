@@ -803,3 +803,21 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 - "Every dashboard count matches its list" moved to the "serial" Playwright project (`dashboard-counts.serial.spec.ts`). The new specs change project and lead counts in parallel, so the exact comparison was racing them.
 **Verified / assumed:** none beyond the API's own rules (leads/intake.py, phone.py).
 
+## D-045 · Page-builder pages on the website (Accepted, 2026-11-03)
+
+**Context:** Task 5.5a shows the pages staff build in the CMS (D-035), using the resolved blocks from `GET /public/pages/{slug}` (D-038).
+**Decision:**
+- **Routes:**
+  - `/` is the "home" page. Until it is published with blocks, the holding content stays, so the home page is never empty.
+  - `/<slug>` is any other published page. Unknown or draft pages are the site's 404. The site's own sections are their own routes and win; their slugs are reserved for pages in the CMS.
+  - `/contact` (D-043) adds the "contact" page's blocks under its forms. A hero there is left out, because the page already has its h1.
+- **Blocks:** each of the 17 types is a server component (`components/blocks/Blocks.tsx`).
+  - A leading hero carries the page's only h1; otherwise the page title is the h1.
+  - Unknown types render nothing. The API already leaves out hidden or unresolved blocks.
+  - Formatted text goes through `FormattedText`, images through `PublicImage` with honest labels, grids through the 5.3 cards, the map through the 5.3 map, and lead forms through the 5.4 form (`source` kept, so a campaign page's leads count as `campaign`).
+- **Honesty:** every number in a stats block shows "As of <date> · Source: <source>". Offers show their terms line and link, with no countdown. A legal page whose text is still marked draft shows a red DRAFT notice (D-017).
+- **Video:** a library video plays from Cloudinary. YouTube and Vimeo videos are a link, not an embed, so no third-party request or script happens before the consent banner (Phase 6). Embeds can come with that banner.
+- **API change:** a `lead_form` block's resolved data now includes `project_slug`, because public intake takes the project by slug.
+- **Titles:** `<title>` comes from the page's SEO title or its title. Landing pages and `seo.noindex` pages get `noindex`. The rest of the metadata is 5.6.
+**Verified / assumed:** none; this applies D-035, D-038 and D-043.
+

@@ -152,11 +152,11 @@ test("a public site-visit request goes from the inbox to a confirmed visit and a
   const body = (await dashboard.json()) as {
     counts: Array<{ key: string; label: string; count: number; link: string }>;
   };
+  // WHY no exact numbers here: specs running alongside add drafts and leads between the page
+  // and the API call. Exact counts are checked in dashboard-counts.serial.spec.ts, alone.
   for (const count of body.counts) {
     await expect(
-      counts.getByRole("link", {
-        name: new RegExp(`^${escapeRegExp(count.label)} ${count.count}`),
-      }),
+      counts.getByRole("link", { name: new RegExp(`^${escapeRegExp(count.label)} \\d`) }),
     ).toHaveAttribute("href", count.link);
   }
   const newLeads = body.counts.find((count) => count.key === "leads.new");
@@ -260,7 +260,9 @@ test("staff add a lead by hand, then change its owner, details, spam flag and re
 
   // Mark unread: back to the inbox, where it is unread again.
   await summary.getByRole("button", { name: "Mark unread" }).click();
-  await expect(page).toHaveURL(/\/admin\/leads$/);
+  // WHY 15 s: the inbox loads after the API call; on a busy machine (two workers, a growing
+  // local database) that took more than the default 5 s once. Only the wait changes.
+  await expect(page).toHaveURL(/\/admin\/leads$/, { timeout: 15_000 });
   await page.getByLabel("Search").fill(name);
   await page.getByRole("button", { name: "Search" }).click();
   await expect(page).toHaveURL(/[?&]q=E2E/);
