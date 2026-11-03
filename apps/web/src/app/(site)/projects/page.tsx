@@ -5,8 +5,16 @@ import type { Metadata } from "next";
 import { Breadcrumbs } from "@/components/catalogue/ListControls";
 import { ProjectListing } from "@/components/catalogue/ProjectListing";
 import { parseFilters, PROJECT_SORTS, type SearchParams } from "@/lib/public/catalogue";
+import { pageMetadata } from "@/lib/public/seo";
 
-export const metadata: Metadata = { title: "Projects" };
+// A filtered list is the same page: its canonical is /projects (ARCHITECTURE §15).
+export const metadata: Metadata = pageMetadata({
+  title: "Projects",
+  path: "/projects",
+  fallbackDescriptions: [
+    "Empire's projects in Uttar Pradesh, with prices, homes on offer, possession and the UP-RERA number.",
+  ],
+});
 
 export default async function ProjectsPage({
   searchParams,

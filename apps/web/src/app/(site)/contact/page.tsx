@@ -10,6 +10,7 @@
  * pages); an unknown slug is ignored.
  */
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/public/seo";
 import { Breadcrumbs } from "@/components/catalogue/ListControls";
 import { LeadPanel } from "@/components/leads/LeadPanel";
 import { fetchPublicPageOrNull, fetchPublicProjects, fetchPublicSite } from "@/lib/public/api";
@@ -23,7 +24,15 @@ import {
 } from "@/lib/public/format";
 import type { SearchParams } from "@/lib/public/catalogue";
 
-export const metadata: Metadata = { title: "Contact" };
+export async function generateMetadata(): Promise<Metadata> {
+  const cmsPage = await fetchPublicPageOrNull("contact");
+  return pageMetadata({
+    title: "Contact",
+    path: "/contact",
+    seo: cmsPage?.seo,
+    fallbackDescriptions: ["Call, WhatsApp or visit Empire, or book a site visit."],
+  });
+}
 
 export default async function ContactPage({
   searchParams,

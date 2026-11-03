@@ -6,6 +6,8 @@
  * or bookmarked. Paging links keep the filters (`filterHref`).
  */
 import Link from "next/link";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbLd } from "@/lib/public/seo";
 import type { components } from "@empire/api-client";
 import {
   BHKS,
@@ -197,9 +199,11 @@ export function Pager({
   );
 }
 
+/** Visible breadcrumbs, and the same trail as BreadcrumbList structured data (task 5.6). */
 export function Breadcrumbs({ items }: { items: { href?: string; label: string }[] }) {
   return (
     <nav aria-label="Breadcrumb" className="text-small text-muted">
+      <JsonLd data={breadcrumbLd(items)} />
       <ol className="flex flex-wrap items-center gap-1.5">
         {items.map((item, i) => (
           <li key={`${item.label}-${i}`} className="flex items-center gap-1.5">

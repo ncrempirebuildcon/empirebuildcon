@@ -6,19 +6,46 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { PageView } from "@/components/blocks/PageView";
-import { fetchPublicPageOrNull } from "@/lib/public/api";
+import { firstImage, firstText } from "@/components/blocks/Blocks";
+import { JsonLd } from "@/components/JsonLd";
+import { fetchPublicPageOrNull, fetchPublicSite } from "@/lib/public/api";
+import { absoluteUrl, organizationLd, pageMetadata } from "@/lib/public/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
   const page = await fetchPublicPageOrNull("home");
   // The site layout's default title stays until the home page is published.
-  if (!page || page.blocks.length === 0) return {};
-  return { title: page.seo?.title || page.title };
+  if (!page || page.blocks.length === 0) return { alternates: { canonical: absoluteUrl("/") } };
+  return {
+    ...pageMetadata({
+      title: page.title,
+      path: "/",
+      seo: page.seo,
+      fallbackDescriptions: [firstText(page.blocks)],
+      image: firstImage(page.blocks),
+    }),
+    // WHY absolute: the home page's title is the site's own, without the "· Empire" suffix.
+    title: { absolute: page.seo?.title?.trim() || page.title },
+  };
 }
 
 export default async function HomePage() {
-  const page = await fetchPublicPageOrNull("home");
-  if (page && page.blocks.length > 0) return <PageView page={page} path="/" />;
-  return <HoldingPage />;
+  const [page, site] = await Promise.all([fetchPublicPageOrNull("home"), fetchPublicSite()]);
+  // Organization structured data lives on the home page only (one per site).
+  const org = <JsonLd data={organizationLd(site.company, site.social)} />;
+  if (page && page.blocks.length > 0) {
+    return (
+      <>
+        {org}
+        <PageView page={page} path="/" />
+      </>
+    );
+  }
+  return (
+    <>
+      {org}
+      <HoldingPage />
+    </>
+  );
 }
 
 function HoldingPage() {

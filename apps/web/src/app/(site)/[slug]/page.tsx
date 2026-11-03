@@ -9,7 +9,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageView } from "@/components/blocks/PageView";
+import { firstImage, firstText } from "@/components/blocks/Blocks";
 import { fetchPublicPage } from "@/lib/public/api";
+import { pageMetadata } from "@/lib/public/seo";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -20,13 +22,15 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const slug = (await params).slug;
   if (slug === HOME_SLUG) notFound();
   const page = await fetchPublicPage(slug);
-  return {
-    title: page.seo?.title || page.title,
+  return pageMetadata({
+    title: page.title,
+    path: `/${page.slug}`,
+    seo: page.seo,
+    fallbackDescriptions: [firstText(page.blocks)],
+    image: firstImage(page.blocks),
     // Campaign landing pages are never indexed (D-035); the rest follows the site-wide rule.
-    ...(page.kind === "landing" || page.seo?.noindex
-      ? { robots: { index: false, follow: false } }
-      : {}),
-  };
+    noindex: page.kind === "landing",
+  });
 }
 
 export default async function SitePage({ params }: Params) {

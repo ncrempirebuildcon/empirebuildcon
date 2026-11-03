@@ -821,3 +821,30 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 - **Titles:** `<title>` comes from the page's SEO title or its title. Landing pages and `seo.noindex` pages get `noindex`. The rest of the metadata is 5.6.
 **Verified / assumed:** none; this applies D-035, D-038 and D-043.
 
+
+## D-047 · SEO on the website: metadata, structured data and redirects (Proposed, 2026-11-03)
+
+**Context:** Task 5.6 makes the public pages readable by search engines and link previews and puts the CMS's redirects (D-035) to work. `sitemap.xml` and `robots.txt` are task 5.6b (D-046).
+
+**Decision:**
+- **Metadata:** one helper (`lib/public/seo.ts` `pageMetadata`) for every public page.
+  - Title, description, canonical URL on `SITE_URL`, Open Graph and Twitter card.
+  - The CMS's SEO fields come first. Fallbacks are the page's own text and image, then the logo on black.
+  - A filtered list's canonical is the unfiltered list.
+  - Indexing stays off site-wide until go-live (Phase 9). Landing pages and `seo.noindex` stay off after that too.
+  - Next.js streams metadata to browsers and Googlebot, and puts it in `<head>` for crawlers that don't run JavaScript (its default list, including WhatsApp and Facebook).
+- **Structured data:**
+  - Types: `Organization` (home page), `RealEstateListing` (projects and homes), `FAQPage` and `BreadcrumbList`.
+  - It says only what the page says: the UP-RERA number as the identifier; no price when the page shows price on request; floor size only for a carpet area, labelled as such; nothing for sample data or placeholders; no ratings.
+  - It is written by `components/JsonLd.tsx`, the one place allowed raw HTML (escaped JSON, CSP nonce).
+- **Redirects:** `proxy.ts` answers a CMS redirect before anything else on a page request (GET and HEAD only).
+  - Targets are site paths only, checked again on the website.
+  - The list is cached for 60 s per server process. The revalidation endpoint can't reach the proxy's bundle, so the cache works by time; `REDIRECT_CACHE_SECONDS` changes it.
+  - When the API is down, no redirect applies, rather than an error.
+- **Hit counts:** `POST /api/v1/internal/redirects/hit`, sent after the answer.
+  - It is signed with the existing `REVALIDATE_SECRET` over `redirect-hit.{ts}.{body}`. The prefix keeps a hit signature from ever passing as a revalidation signature. This means no new secret, and the web host never holds the internal key.
+  - There is no replay cache, because counts are for staff insight only.
+
+**Verified / assumed:**
+- Verified in Next.js 16.4's source that Googlebot is not in its "HTML-limited bots" list, so it receives streamed metadata.
+- Assumed: Google reads that metadata after rendering, which Google documents for JavaScript sites.

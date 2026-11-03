@@ -88,6 +88,8 @@ export default defineConfig({
         SITE_URL: WEB_URL,
         EDGE_PROXY_KEY: env.EDGE_PROXY_KEY ?? "",
         CSP_ENFORCE: "true",
+        // CMS redirects reach the website within a second here (lib/public/redirects.ts).
+        REDIRECT_CACHE_SECONDS: "1",
         REVALIDATE_SECRET: env.REVALIDATE_SECRET ?? "test-revalidate-secret-minimum-32-chars-long",
       },
       reuseExistingServer: !process.env.CI,
