@@ -26,7 +26,10 @@ export function FeaturedPostCard({ post }: FeaturedPostCardProps) {
   const badgeText = post.category ? `Featured · ${post.category}` : "Featured";
 
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-[24px] border border-gold-line-strong bg-noir-800 text-body transition-colors hover:border-gold-500/60 focus-within:border-gold-500 md:flex-row">
+    <article
+      data-testid="featured-post-card"
+      className="group relative flex flex-col overflow-hidden rounded-[24px] border border-gold-line-strong bg-noir-800 text-body transition-colors hover:border-gold-500/60 focus-within:border-gold-500 md:flex-row"
+    >
       {/* Cover image side */}
       <div className="w-full p-4 md:w-1/2 md:p-5">
         {post.cover?.url ? (

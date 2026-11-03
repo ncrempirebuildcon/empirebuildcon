@@ -150,22 +150,19 @@ test.describe("Public Blog (Task 5.5b)", () => {
   });
 
   test.afterAll(async ({ browser, request }) => {
-    // Clean up seeded posts: unpublish them so lists and chips don't grow across test runs (Item 9)
+    // Clean up seeded posts: unpublish sequentially asserting 200 (Item 3)
     const adminContext = await browser.newContext({ storageState: CMS_STATE });
     const adminPage = await adminContext.newPage();
     const me = await adminPage.request.get("/api/v1/auth/me");
-    if (me.ok()) {
-      const { csrf_token: csrf } = (await me.json()) as { csrf_token: string };
-      await Promise.all(
-        allCreatedPostIds.map((postId) =>
-          adminPage.request
-            .fetch(`/api/v1/admin/posts/${postId}/unpublish`, {
-              method: "POST",
-              headers: { "X-CSRF-Token": csrf },
-            })
-            .catch(() => null),
-        ),
-      );
+    expect(me.status(), "cleanup /auth/me should succeed").toBe(200);
+    const { csrf_token: csrf } = (await me.json()) as { csrf_token: string };
+
+    for (const postId of allCreatedPostIds) {
+      const res = await adminPage.request.fetch(`/api/v1/admin/posts/${postId}/unpublish`, {
+        method: "POST",
+        headers: { "X-CSRF-Token": csrf },
+      });
+      expect(res.status(), `unpublish post ${postId} should return 200`).toBe(200);
     }
     await drainOutbox(request);
     await adminContext.close();
@@ -181,11 +178,17 @@ test.describe("Public Blog (Task 5.5b)", () => {
     const h1 = page.getByRole("heading", { level: 1 });
     await expect(h1).toHaveText("News & guides");
 
-    // Featured post on page 1: postA2 is the newest in this run and sits in the hero featured card (Item 4)
-    const featuredCard = page.locator("article").first();
+    // Featured post on page 1: postA2 is newest in this run and sits specifically in the hero featured card (Item 2)
+    const featuredCard = page.getByTestId("featured-post-card");
+    await expect(featuredCard).toBeVisible();
     await expect(featuredCard.getByText(postA2.title)).toBeVisible();
+    await expect(featuredCard.getByText(/Featured/)).toBeVisible();
 
-    // Order assertion (Item 4): relative order of this run's posts must be A2 (newest) -> B1 -> A1 (oldest)
+    // The newest post must NOT be among the grid cards
+    const gridCards = page.getByRole("region", { name: "Articles" }).locator("article");
+    await expect(gridCards.getByText(postA2.title)).not.toBeVisible();
+
+    // Order assertion: relative order of this run's posts must be A2 (newest) -> B1 -> A1 (oldest)
     const articleHeadings = await page.locator("article h2").allTextContents();
     const idxA2 = articleHeadings.indexOf(postA2.title);
     const idxB1 = articleHeadings.indexOf(postB1.title);
@@ -298,7 +301,8 @@ test.describe("Public Blog (Task 5.5b)", () => {
   test("article page shows title, author, date, body with *bold* rendered as <strong>, and tags", async ({
     page,
   }) => {
-    await page.goto(`/blog/${postA1.slug}`);
+    // Open article with query parameter and fragment to verify clean URL stripping (Item 4)
+    await page.goto(`/blog/${postA1.slug}?utm_source=x#y`);
 
     // Page title set from post title
     await expect(page).toHaveTitle(new RegExp(`${postA1.title} · Empire`));
@@ -334,13 +338,19 @@ test.describe("Public Blog (Task 5.5b)", () => {
     await expect(page.getByText("#guides")).toBeVisible();
     await expect(page.getByText("#buyer")).toBeVisible();
 
-    // WhatsApp share link sends absolute URL (Item 1)
+    // WhatsApp share link sends exact absolute URL without query/hash (Item 4)
+    const expectedCleanUrl = new URL(`/blog/${postA1.slug}`, page.url()).href;
     const waLink = page.getByRole("link", { name: "Share on WhatsApp" }).first();
     await expect(waLink).toBeVisible();
-    await expect(waLink).toHaveAttribute("href", /https?%3A%2F%2F.+%2Fblog%2F/);
-    await expect(waLink).not.toHaveAttribute("href", /%2Fblog%2Fcheck-rera/);
+    const encodedExpected = encodeURIComponent(expectedCleanUrl);
+    await expect(waLink).toHaveAttribute(
+      "href",
+      new RegExp(
+        `https://wa\\.me/\\?text=.*${encodedExpected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+      ),
+    );
 
-    // Copy link: stub clipboard.writeText to verify exact value passed (Item 5, Item 7)
+    // Copy link: stub clipboard.writeText to verify exact value passed (Item 4, Item 5, Item 7)
     await page.evaluate(() => {
       const win = window as unknown as Record<string, unknown>;
       win.__copiedVal = null;
@@ -365,10 +375,7 @@ test.describe("Public Blog (Task 5.5b)", () => {
     const copiedVal = await page.evaluate(
       () => (window as unknown as Record<string, unknown>).__copiedVal as string | null,
     );
-    expect(copiedVal).toBeTruthy();
-    expect(copiedVal).toMatch(/^https?:\/\/.+\/blog\/.+/);
-    expect(copiedVal).not.toContain("?");
-    expect(copiedVal).not.toContain("#");
+    expect(copiedVal).toBe(expectedCleanUrl);
 
     // Button remains mounted and focused (Item 7)
     const copiedBtn = page.getByRole("button", { name: "Link copied" }).first();
