@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   BlockView,
   isSafeHref,
+  leadFormSetup,
   startsWithHero,
   statSourceLine,
   videoWatchUrl,
@@ -86,6 +87,8 @@ describe("block helpers", () => {
     expect(isSafeHref("http://plain.example")).toBe(false);
     expect(isSafeHref(null)).toBe(false);
     expect(isSafeHref("/\\evil.example")).toBe(false);
+    expect(isSafeHref("/\t/evil.example")).toBe(false);
+    expect(isSafeHref("/\n/evil.example")).toBe(false);
   });
 
   it("states the source and date of every number (COMPLIANCE, D-035)", () => {
@@ -101,6 +104,39 @@ describe("block helpers", () => {
     expect(videoWatchUrl("vimeo", "123456789")).toBe("https://vimeo.com/123456789");
     expect(videoWatchUrl("youtube", 'x"><script>')).toBeNull();
     expect(videoWatchUrl("other", "abcdefghijk")).toBeNull();
+  });
+});
+
+describe("leadFormSetup", () => {
+  it("keeps the staff's choice when the form can be sent", () => {
+    expect(leadFormSetup("site_visit", "empire-heights")).toEqual({
+      intent: "visit",
+      source: "site_visit",
+    });
+    expect(leadFormSetup("brochure", "empire-heights")).toEqual({
+      intent: "brochure",
+      source: "brochure",
+    });
+    expect(leadFormSetup("contact_form", "empire-heights")).toEqual({
+      intent: "enquiry",
+      source: "contact_form",
+    });
+    expect(leadFormSetup("project_form", "empire-heights")).toEqual({
+      intent: "enquiry",
+      source: "project_form",
+    });
+    expect(leadFormSetup("campaign", null)).toEqual({ intent: "enquiry", source: "campaign" });
+  });
+
+  it("asks a plain question when a site visit or brochure has no project", () => {
+    expect(leadFormSetup("site_visit", null)).toEqual({
+      intent: "enquiry",
+      source: "contact_form",
+    });
+    expect(leadFormSetup("brochure", undefined)).toEqual({
+      intent: "enquiry",
+      source: "contact_form",
+    });
   });
 });
 
@@ -251,10 +287,13 @@ describe("BlockView", () => {
         lng: 80.95,
         address: "Gomti Nagar",
         directions_url: "https://www.openstreetmap.org/directions",
-        rera,
+        rera: { ...rera, qr: { ...media, url: "/qr.png", alt_text: "QR" } },
       },
     });
+    // COMPLIANCE: the full block — number, QR and up-rera.in — not just a line.
+    expect(html).toContain('data-testid="rera-block"');
     expect(html).toContain("UPRERAPRJ123456");
+    expect(html).toContain("UP-RERA QR code for Empire Heights");
     expect(html).toContain("up-rera.in");
   });
 

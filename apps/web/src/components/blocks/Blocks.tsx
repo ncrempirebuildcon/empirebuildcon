@@ -15,7 +15,7 @@
  * external ones.
  */
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { FormattedText } from "@empire/ui";
 import { PublicImage } from "@/components/media/PublicImage";
 import { ProjectCard, PropertyCard } from "@/components/catalogue/Cards";
@@ -40,7 +40,9 @@ type Data = Record<string, any>;
 
 /** True for a site path or an https address (what the API allows for block links). */
 export function isSafeHref(href: unknown): href is string {
-  if (typeof href !== "string" || href.includes("\\")) return false;
+  // SECURITY: browsers drop tabs and newlines and read "\\" as "/", so "/\\x" or "/\t/x" would
+  // become "//x" (another site). Refuse backslashes and every control or space character.
+  if (typeof href !== "string" || /[\\\u0000-\u0020]/.test(href)) return false;
   return (href.startsWith("/") && !href.startsWith("//")) || href.startsWith("https://");
 }
 
@@ -304,10 +306,27 @@ function Testimonials({ d }: { d: Data }) {
   );
 }
 
+type LeadSource = "project_form" | "contact_form" | "campaign" | "site_visit" | "brochure";
+
 const LEAD_INTENT: Record<string, "enquiry" | "visit" | "brochure"> = {
   site_visit: "visit",
   brochure: "brochure",
 };
+
+/**
+ * What a lead-form block asks and the source it sends. The staff's choice stands, except that a
+ * site visit or brochure needs a project (the API requires one): without a project the block
+ * asks a plain question and sends `contact_form`, so no visitor fills a form that can't be sent.
+ */
+export function leadFormSetup(
+  source: string | null | undefined,
+  projectSlug: string | null | undefined,
+): { intent: "enquiry" | "visit" | "brochure"; source: LeadSource } {
+  const chosen = (source ?? "contact_form") as LeadSource;
+  const wanted = LEAD_INTENT[chosen] ?? "enquiry";
+  if (wanted !== "enquiry" && !projectSlug) return { intent: "enquiry", source: "contact_form" };
+  return { intent: wanted, source: chosen };
+}
 
 /** One block. `first` makes a leading hero the page's h1. */
 export function BlockView({
@@ -399,9 +418,7 @@ export function BlockView({
         </section>
       );
     case "lead_form": {
-      // A site visit or brochure always needs a project (the API requires it). A block without
-      // one asks a plain question instead, so no visitor fills a form that can't be sent.
-      const intent = d.project_slug ? (LEAD_INTENT[d.source] ?? "enquiry") : "enquiry";
+      const { intent, source } = leadFormSetup(d.source, d.project_slug);
       return (
         <section className="flex flex-col gap-4 rounded-card border border-gold-line-strong bg-noir-800 p-5 lg:max-w-2xl">
           <LeadPanel
@@ -411,15 +428,11 @@ export function BlockView({
             submitLabel={intent === "visit" ? "Request a site visit" : "Send"}
             path={path}
             projectSlug={d.project_slug ?? null}
-            source={intent === "enquiry" && d.source !== "campaign" ? undefined : d.source}
+            source={source}
           />
           {d.rera ? (
             // COMPLIANCE: a form about a project shows the project's RERA block (D-045).
-            <ReraBlock
-              rera={d.rera as Rera}
-              projectName={d.project_name ?? "this project"}
-              variant="line"
-            />
+            <ReraBlock rera={d.rera as Rera} projectName={d.project_name ?? "this project"} />
           ) : null}
         </section>
       );
@@ -466,7 +479,10 @@ export function BlockView({
               Get directions<span className="sr-only"> (opens Google Maps in a new tab)</span>
             </a>
           ) : null}
-          {p.rera ? <ReraBlock rera={p.rera} projectName={p.name} variant="line" /> : null}
+          {p.rera ? (
+            // COMPLIANCE: the full RERA block (number, QR, up-rera.in) beside the project's map.
+            <ReraBlock rera={p.rera} projectName={p.name} />
+          ) : null}
           {p.lat != null && p.lng != null && p.directions_url ? (
             <ProjectMap
               lat={p.lat}
@@ -544,14 +560,26 @@ export function BlockView({
 }
 
 /** The page's blocks in order. A leading hero becomes the page's only h1. */
-export function BlockList({ blocks, path }: { blocks: PublicBlock[]; path: string }) {
+export function BlockList({
+  blocks,
+  path,
+  afterFirst,
+}: {
+  blocks: PublicBlock[];
+  path: string;
+  /** Shown right after the first block (e.g. a legal page's version under its hero). */
+  afterFirst?: ReactNode;
+}) {
   const ordered = [...blocks]
     .filter((b) => b.is_visible !== false)
     .sort((a, b) => a.sort_order - b.sort_order);
   return (
     <div className="flex flex-col gap-14">
       {ordered.map((b, i) => (
-        <BlockView key={b.id} block={b} first={i === 0 && b.type === "hero"} path={path} />
+        <Fragment key={b.id}>
+          <BlockView block={b} first={i === 0 && b.type === "hero"} path={path} />
+          {i === 0 ? afterFirst : null}
+        </Fragment>
       ))}
     </div>
   );

@@ -10,7 +10,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import { apiCall, CMS_STATE, runId } from "../lib/auth";
-import { catalogueProject } from "../lib/catalogue";
+import { catalogueProject, drainOutbox } from "../lib/catalogue";
 import { draftPage, libraryPhoto } from "../lib/content";
 
 test.use({ storageState: CMS_STATE });
@@ -73,150 +73,165 @@ test("a page built from blocks shows every block on the website", async ({ page,
     project_id: project.id,
     is_active: true,
   });
-  const created = await draftPage(page);
-  await saveAndPublish(page, created.id, [
-    {
-      type: "hero",
-      data: {
-        eyebrow: "E2E",
-        heading: `E2E hero ${id}`,
-        subheading: "Homes in Uttar Pradesh",
-        image_id: photo,
-        cta: { label: "See projects", href: "/projects" },
+  try {
+    const created = await draftPage(page);
+    await saveAndPublish(page, created.id, [
+      {
+        type: "hero",
+        data: {
+          eyebrow: "E2E",
+          heading: `E2E hero ${id}`,
+          subheading: "Homes in Uttar Pradesh",
+          image_id: photo,
+          cta: { label: "See projects", href: "/projects" },
+        },
       },
-    },
-    {
-      type: "rich_text",
-      data: { heading: "About us", body: "We *build* homes.\n\n- Honest\n- On time" },
-    },
-    { type: "image", data: { image_id: photo, caption: "E2E caption" } },
-    { type: "gallery", data: { heading: "Gallery", image_ids: [photo] } },
-    {
-      type: "video",
-      data: { heading: "Site tour", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-    },
-    { type: "project_grid", data: { heading: "Our projects", limit: 3 } },
-    { type: "property_grid", data: { heading: "Homes", limit: 3 } },
-    {
-      type: "cta",
-      data: { heading: "Talk to us", text: "We call back.", label: "Contact", href: "/contact" },
-    },
-    {
-      type: "lead_form",
-      data: { heading: "Ask about it", source: "project_form", project_id: project.id },
-    },
-    {
-      type: "stats",
-      data: {
-        heading: "In numbers",
-        items: [{ value: "12", label: "towers", source: "E2E register", as_of: "2026-09-30" }],
+      {
+        type: "rich_text",
+        data: { heading: "About us", body: "We *build* homes.\n\n- Honest\n- On time" },
       },
-    },
-    { type: "map", data: { heading: "Where it is", project_id: project.id } },
-    {
-      type: "steps",
-      data: { heading: "How to book", items: [{ title: "Visit", text: "See the site" }] },
-    },
-    {
-      type: "columns",
-      data: {
-        columns: [
-          { heading: "Left", body: "A" },
-          { heading: "Right", body: "B" },
-        ],
+      { type: "image", data: { image_id: photo, caption: "E2E caption" } },
+      { type: "gallery", data: { heading: "Gallery", image_ids: [photo] } },
+      {
+        type: "video",
+        data: { heading: "Site tour", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
       },
-    },
-    { type: "faq_list", data: { heading: "Questions", faq_ids: [faqId] } },
-    { type: "testimonials", data: { heading: "Buyers say", testimonial_ids: [testimonialId] } },
-    { type: "offer_banner", data: { offer_id: offerId } },
-    { type: "divider", data: {} },
-  ]);
+      { type: "project_grid", data: { heading: "Our projects", limit: 3 } },
+      { type: "property_grid", data: { heading: "Homes", limit: 3 } },
+      {
+        type: "cta",
+        data: { heading: "Talk to us", text: "We call back.", label: "Contact", href: "/contact" },
+      },
+      {
+        type: "lead_form",
+        data: { heading: "Ask about it", source: "project_form", project_id: project.id },
+      },
+      {
+        type: "stats",
+        data: {
+          heading: "In numbers",
+          items: [{ value: "12", label: "towers", source: "E2E register", as_of: "2026-09-30" }],
+        },
+      },
+      { type: "map", data: { heading: "Where it is", project_id: project.id } },
+      {
+        type: "steps",
+        data: { heading: "How to book", items: [{ title: "Visit", text: "See the site" }] },
+      },
+      {
+        type: "columns",
+        data: {
+          columns: [
+            { heading: "Left", body: "A" },
+            { heading: "Right", body: "B" },
+          ],
+        },
+      },
+      { type: "faq_list", data: { heading: "Questions", faq_ids: [faqId] } },
+      { type: "testimonials", data: { heading: "Buyers say", testimonial_ids: [testimonialId] } },
+      { type: "offer_banner", data: { offer_id: offerId } },
+      { type: "divider", data: {} },
+    ]);
 
-  const visitorContext = await browser.newContext();
-  const visitor = await visitorContext.newPage();
-  const csp = watchCsp(visitor);
-  const response = await visitor.goto(`/${created.slug}`);
-  expect(response?.status()).toBe(200);
-  const main = visitor.locator("#main-content");
+    const visitorContext = await browser.newContext();
+    const visitor = await visitorContext.newPage();
+    const csp = watchCsp(visitor);
+    const response = await visitor.goto(`/${created.slug}`);
+    expect(response?.status()).toBe(200);
+    const main = visitor.locator("#main-content");
 
-  await expect(visitor.getByRole("heading", { level: 1 })).toHaveText(`E2E hero ${id}`);
-  await expect(visitor.getByRole("heading", { level: 1 })).toHaveCount(1);
-  await expect(main.getByRole("link", { name: "See projects" })).toHaveAttribute(
-    "href",
-    "/projects",
-  );
-  await expect(main.locator("strong", { hasText: "build" })).toBeVisible();
-  await expect(main.getByText("E2E caption")).toBeVisible();
-  await expect(main.getByText("Artist's impression").first()).toBeVisible();
-  await expect(main.getByTestId("video-link")).toHaveAttribute(
-    "href",
-    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  );
-  await expect(main.locator("iframe")).toHaveCount(0);
-  await expect(main.getByRole("heading", { name: "Our projects" })).toBeVisible();
-  await expect(main.getByTestId("project-card").first()).toBeVisible();
-  await expect(main.getByTestId("rera-line").first()).toBeVisible();
-  await expect(main.getByRole("link", { name: "Contact", exact: true })).toHaveAttribute(
-    "href",
-    "/contact",
-  );
-  await expect(main.getByTestId("lead-form-enquiry")).toBeVisible();
-  await expect(main.getByTestId("stat-source")).toHaveText(
-    "As of 30 Sep 2026 · Source: E2E register",
-  );
-  await expect(main.getByRole("button", { name: "Show map" })).toBeVisible();
-  await expect(main.getByRole("heading", { name: "How to book" })).toBeVisible();
-  await expect(main.getByRole("heading", { name: "Right" })).toBeVisible();
-  await expect(main.getByRole("heading", { name: "Homes" })).toBeVisible();
-  await expect(main.getByRole("heading", { name: "Gallery" })).toBeVisible();
-  await expect(main.getByText(`E2E block question ${id}?`)).toBeVisible();
-  await expect(main.getByText(`E2E Buyer ${id}`)).toBeVisible();
-  await expect(main.getByText(`E2E offer ${id}`)).toBeVisible();
-  await expect(main.getByText("E2E terms line.")).toBeVisible();
-  await expect(main.getByRole("link", { name: "Terms and conditions" })).toHaveAttribute(
-    "href",
-    "/terms",
-  );
-  // The map block carries the project's RERA line (COMPLIANCE, D-045).
-  const mapSection = main.locator("section", {
-    has: visitor.getByRole("heading", { name: "Where it is" }),
-  });
-  await expect(mapSection.getByTestId("rera-line")).toBeVisible();
+    await expect(visitor.getByRole("heading", { level: 1 })).toHaveText(`E2E hero ${id}`);
+    await expect(visitor.getByRole("heading", { level: 1 })).toHaveCount(1);
+    await expect(main.getByRole("link", { name: "See projects" })).toHaveAttribute(
+      "href",
+      "/projects",
+    );
+    await expect(main.locator("strong", { hasText: "build" })).toBeVisible();
+    await expect(main.getByText("E2E caption")).toBeVisible();
+    await expect(main.getByText("Artist's impression").first()).toBeVisible();
+    await expect(main.getByTestId("video-link")).toHaveAttribute(
+      "href",
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    );
+    await expect(main.locator("iframe")).toHaveCount(0);
+    await expect(main.getByRole("heading", { name: "Our projects" })).toBeVisible();
+    await expect(main.getByTestId("project-card").first()).toBeVisible();
+    await expect(main.getByTestId("rera-line").first()).toBeVisible();
+    await expect(main.getByRole("link", { name: "Contact", exact: true })).toHaveAttribute(
+      "href",
+      "/contact",
+    );
+    await expect(main.getByTestId("lead-form-enquiry")).toBeVisible();
+    await expect(main.getByTestId("stat-source")).toHaveText(
+      "As of 30 Sep 2026 · Source: E2E register",
+    );
+    await expect(main.getByRole("button", { name: "Show map" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "How to book" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "Right" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "Homes" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "Gallery" })).toBeVisible();
+    await expect(main.getByText(`E2E block question ${id}?`)).toBeVisible();
+    await expect(main.getByText(`E2E Buyer ${id}`)).toBeVisible();
+    await expect(main.getByText(`E2E offer ${id}`)).toBeVisible();
+    await expect(main.getByText("E2E terms line.")).toBeVisible();
+    await expect(main.getByRole("link", { name: "Terms and conditions" })).toHaveAttribute(
+      "href",
+      "/terms",
+    );
+    // The map and lead-form blocks carry the project's full RERA block: number, QR and
+    // up-rera.in (COMPLIANCE, D-045).
+    for (const heading of ["Where it is", "Ask about it"]) {
+      const section = main.locator("section", {
+        has: visitor.getByRole("heading", { name: heading }),
+      });
+      const rera = section.getByTestId("rera-block");
+      await expect(rera, heading).toBeVisible();
+      await expect(rera.getByTestId("rera-number"), heading).toBeVisible();
+      await expect(rera.getByRole("img", { name: /QR code/ }), heading).toBeVisible();
+      await expect(
+        rera.getByRole("link", { name: /Verify on up-rera\.in/ }),
+        heading,
+      ).toBeVisible();
+    }
 
-  expect(await seriousAxe(visitor)).toEqual([]);
-  expect(csp).toEqual([]);
+    expect(await seriousAxe(visitor)).toEqual([]);
+    expect(csp).toEqual([]);
 
-  await visitor.setViewportSize({ width: 390, height: 844 });
-  await visitor.reload();
-  const overflow = await visitor.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
+    await visitor.setViewportSize({ width: 390, height: 844 });
+    await visitor.reload();
+    const overflow = await visitor.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
 
-  // The lead-form block sends the project and its source; the answer is mocked (no real lead).
-  const form = main.getByTestId("lead-form-enquiry");
-  let sent: Record<string, unknown> | null = null;
-  await visitor.route("**/api/v1/public/leads", async (route) => {
-    sent = route.request().postDataJSON() as Record<string, unknown>;
-    await route.fulfill({
-      status: 201,
-      contentType: "application/json",
-      body: JSON.stringify({ reference: "E2E-MOCK-1", message: "Thank you." }),
+    // The lead-form block sends the project and its source; the answer is mocked (no real lead).
+    const form = main.getByTestId("lead-form-enquiry");
+    let sent: Record<string, unknown> | null = null;
+    await visitor.route("**/api/v1/public/leads", async (route) => {
+      sent = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({ reference: "E2E-MOCK-1", message: "Thank you." }),
+      });
     });
-  });
-  await form.getByLabel("Your name").fill("E2E Block Lead");
-  await form.getByLabel("Mobile number").fill("9876543210");
-  await form.getByTestId("consent-required").check();
-  await form.getByRole("button", { name: "Send" }).click();
-  await expect(main.getByTestId("lead-success")).toContainText("E2E-MOCK-1");
-  expect(sent).toMatchObject({ project_slug: project.slug, source: "project_form" });
-  await visitorContext.close();
-
-  // Leave nothing live for other specs.
-  const off = await apiCall(page, "PATCH", `/api/v1/admin/offers/${offerId}`, {
-    is_active: false,
-  });
-  expect(off.status(), await off.text()).toBe(200);
+    await form.getByLabel("Your name").fill("E2E Block Lead");
+    await form.getByLabel("Mobile number").fill("9876543210");
+    await form.getByTestId("consent-required").check();
+    await form.getByRole("button", { name: "Send" }).click();
+    await expect(main.getByTestId("lead-success")).toContainText("E2E-MOCK-1");
+    expect(sent).toMatchObject({ project_slug: project.slug, source: "project_form" });
+    await visitorContext.close();
+  } finally {
+    // Leave nothing live for other specs or later runs, even when a check above failed.
+    const cleanup = await Promise.all([
+      apiCall(page, "PATCH", `/api/v1/admin/offers/${offerId}`, { is_active: false }),
+      apiCall(page, "PATCH", `/api/v1/admin/faqs/${faqId}`, { is_visible: false }),
+      apiCall(page, "PATCH", `/api/v1/admin/testimonials/${testimonialId}`, { is_visible: false }),
+    ]);
+    for (const response of cleanup) expect(response.status(), await response.text()).toBe(200);
+    await drainOutbox(page);
+  }
 });
 
 test("a legal page with draft text shows the DRAFT notice", async ({ page }) => {
