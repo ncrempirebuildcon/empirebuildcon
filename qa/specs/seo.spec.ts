@@ -153,6 +153,12 @@ test("the home page carries the organisation's structured data", async ({ page }
   expect(JSON.stringify(org)).not.toMatch(/\[[^\]]*\]/); // no [placeholders]
 });
 
+async function hitsOf(page: Page, redirectId: string): Promise<number> {
+  const list = await apiCall(page, "GET", "/api/v1/admin/redirects?per_page=100&q=e2e-old");
+  const { items } = (await list.json()) as { items: { id: string; hits: number }[] };
+  return items.find((r) => r.id === redirectId)?.hits ?? 0;
+}
+
 test("a CMS redirect is answered by the website and counted", async ({ page, browser }) => {
   const id = runId();
   const from = `/e2e-old-${id}`;
@@ -163,13 +169,16 @@ test("a CMS redirect is answered by the website and counted", async ({ page, bro
   expect(made.status(), await made.text()).toBe(201);
   const { id: redirectId } = (await made.json()) as { id: string };
 
-  // A fresh request context: no cookies, no redirects followed.
+  // A fresh request context: no cookies, no redirects followed. Every 308 here is one counted visit.
   const visitor = await browser.newContext({ baseURL: WEB_URL });
+  let visits = 0;
   let response = await visitor.request.get(`${from}/?utm_source=e2e`, { maxRedirects: 0 });
+  if (response.status() === 308) visits += 1;
   await expect
     .poll(
       async () => {
         response = await visitor.request.get(`${from}/?utm_source=e2e`, { maxRedirects: 0 });
+        if (response.status() === 308) visits += 1;
         return response.status();
       },
       { timeout: 10_000 },
@@ -180,22 +189,27 @@ test("a CMS redirect is answered by the website and counted", async ({ page, bro
   expect(new URL(response.headers()["location"] ?? "", WEB_URL).href).toBe(
     `${WEB_URL}/projects?utm_source=e2e#list`,
   );
-  expect(response.headers()["cache-control"]).toBe("public, max-age=3600");
+  expect(response.headers()["cache-control"]).toBe("private, max-age=3600");
   // A form post is never sent elsewhere.
   const posted = await visitor.request.post(from, { maxRedirects: 0, data: {} });
-  expect(posted.status()).not.toBe(308);
+  expect(posted.status() >= 300 && posted.status() < 400, String(posted.status())).toBe(false);
+  expect(posted.headers()["location"]).toBeUndefined();
 
-  // The visit was counted (sent after the answer, so allow a moment).
-  await expect
-    .poll(
-      async () => {
-        const list = await apiCall(page, "GET", "/api/v1/admin/redirects?per_page=100&q=e2e-old");
-        const { items } = (await list.json()) as { items: { id: string; hits: number }[] };
-        return items.find((r) => r.id === redirectId)?.hits ?? 0;
-      },
-      { timeout: 10_000 },
-    )
-    .toBeGreaterThanOrEqual(1);
+  // Each visit was counted (sent after the answer, so allow a moment).
+  await expect.poll(() => hitsOf(page, redirectId), { timeout: 10_000 }).toBe(visits);
+
+  // A HEAD request or a browser prefetch is redirected but not counted.
+  const counted = await hitsOf(page, redirectId);
+  expect((await visitor.request.head(from, { maxRedirects: 0 })).status()).toBe(308);
+
+  const prefetch = await visitor.request.get(from, {
+    maxRedirects: 0,
+    headers: { "sec-purpose": "prefetch" },
+  });
+  expect(prefetch.status()).toBe(308);
+  // Give a stray report time to land, then check nothing was added.
+  await page.waitForTimeout(1_500);
+  expect(await hitsOf(page, redirectId)).toBe(counted);
 
   // Switched off, the old address is a 404 again.
   const off = await apiCall(page, "PATCH", `/api/v1/admin/redirects/${redirectId}`, {

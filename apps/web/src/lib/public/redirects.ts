@@ -16,9 +16,11 @@
  *   - Matching is exact and case-sensitive on the path, after trimming a trailing "/" (the API
  *     stores paths the same way, seo/paths.py) and decoding the visitor's %-escapes (except %2F,
  *     so "/a%2Fb" never matches "/a/b"). The visitor's query string is kept unless the target has
- *     its own, and goes before the target's "#fragment". Next.js's own `_rsc` parameter is dropped.
- *   - The answer may be kept by browsers for an hour (Cache-Control), so a redirect switched off
- *     in the CMS can still apply for a returning visitor for up to that long.
+ *     its own, and goes before the target's "#fragment". Next.js's own `_rsc` parameter is dropped (Next.js
+ *     already removes it before the proxy; this is a second guard).
+ *   - The answer may be kept by the visitor's browser for an hour (`Cache-Control: private`, so
+ *     no CDN keeps it for everyone), so a redirect switched off in the CMS can still apply for a
+ *     returning visitor for up to that long.
  *   - Each redirect served is counted by a signed POST to /api/v1/internal/redirects/hit
  *     (apps/api seo/hits.py), sent after the answer (`waitUntil`), so a slow API never slows a
  *     redirect. A failed report is dropped: counts are for staff insight only.
@@ -66,7 +68,7 @@ export function trimPath(path: string): string {
   return path.replace(/\/+$/, "") || "/";
 }
 
-/** The visitor's path as the API stores it: `%C3%A9` → `é`, but `%2F` stays `%2F`. */
+/** A path for matching (the visitor's and the stored one): `%C3%A9` → `é`, `%2F` stays `%2F`. */
 export function normalisePath(pathname: string): string {
   let path = pathname;
   try {
@@ -109,7 +111,8 @@ async function loadRedirects(): Promise<Map<string, ActiveRedirect>> {
   });
   if (!response.ok) throw new Error(`redirects: HTTP ${response.status}`);
   const rows = (await response.json()) as ActiveRedirect[];
-  return new Map(rows.map((r) => [trimPath(r.from_path), r]));
+  // Stored addresses may be typed %-encoded (copied from a browser); both sides are decoded alike.
+  return new Map(rows.map((r) => [normalisePath(r.from_path), r]));
 }
 
 function refresh(): Promise<Map<string, ActiveRedirect>> {

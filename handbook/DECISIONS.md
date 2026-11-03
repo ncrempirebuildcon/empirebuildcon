@@ -847,8 +847,9 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - The list is cached for 60 s per server process. The revalidation endpoint can't reach the proxy's bundle, so the cache works by time; `REDIRECT_CACHE_SECONDS` changes it.
   - An old list is served while a new one loads, so pages never wait for the API; only a process's first list is awaited, for at most 800 ms.
   - When the API is down, the last list (or none) applies, rather than an error.
-  - Answers carry `Cache-Control: public, max-age=3600`. A redirect switched off in the CMS can therefore still apply for up to an hour for a returning visitor.
-  - Prefetches and HEAD requests are not counted.
+  - Answers carry `Cache-Control: private, max-age=3600` (the visitor's browser only, never a shared CDN cache). A redirect switched off in the CMS can therefore still apply for up to an hour for a returning visitor.
+  - Browser prefetches and HEAD requests are not counted. A Next.js `<Link>` prefetch can't be told apart (Next.js removes its router headers before the proxy), so a site link to an old address may add a count.
+  - `Location` is built on `SITE_URL`, so a preview deploy whose `SITE_URL` is production sends testers' redirects to the live site. Set `SITE_URL` to the preview's own address there.
 - **Hit counts:** `POST /api/v1/internal/redirects/hit`, sent after the answer.
   - It is signed with the existing `REVALIDATE_SECRET` over `redirect-hit.{ts}.{body}`. The prefix keeps a hit signature from ever passing as a revalidation signature. This means no new secret, and the web host never holds the internal key.
   - There is no replay cache, because counts are for staff insight only.

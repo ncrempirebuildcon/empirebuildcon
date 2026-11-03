@@ -15,6 +15,8 @@ const rows = [
   { from_path: "/old-tower", to_path: "/projects/x?tab=prices", status_code: 301 },
   { from_path: "/évènement", to_path: "/about", status_code: 308 },
   { from_path: "/evil", to_path: "//evil.example", status_code: 308 },
+  { from_path: "/caf%C3%A9", to_path: "/about", status_code: 308 },
+  { from_path: "/a%2Fb", to_path: "/about", status_code: 308 },
 ];
 
 function mockApi(ok = true) {
@@ -92,6 +94,12 @@ describe("findRedirect", () => {
     expect((await findRedirect("/%C3%A9v%C3%A8nement", ""))?.location).toBe("/about");
     expect(await findRedirect("/evil", "")).toBeNull();
     expect(await findRedirect("/Old-Offer", "")).toBeNull();
+    // An address staff typed %-encoded matches the visitor's, encoded or not.
+    expect((await findRedirect("/caf%C3%A9", ""))?.location).toBe("/about");
+    expect((await findRedirect("/café", ""))?.location).toBe("/about");
+    // An escaped slash is its own address.
+    expect(await findRedirect("/a/b", "")).toBeNull();
+    expect((await findRedirect("/a%2Fb", ""))?.location).toBe("/about");
   });
 
   it("asks the API once a minute, not on every page", async () => {

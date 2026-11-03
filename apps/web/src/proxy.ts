@@ -96,9 +96,10 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   if (request.method === "GET" || request.method === "HEAD") {
     const found = await findRedirect(pathname, request.nextUrl.search);
     if (found) {
-      // A link prefetch is not a visit, so it is not counted.
+      // A browser prefetch is not a visit, so it is not counted. WHY only the browser's own
+      // headers: Next.js removes its router headers (next-router-prefetch, rsc) before the proxy
+      // runs, so a <Link> prefetch of an old address can't be told apart and may be counted.
       const prefetch =
-        request.headers.has("next-router-prefetch") ||
         request.headers.get("purpose") === "prefetch" ||
         request.headers.get("sec-purpose")?.includes("prefetch");
       if (!prefetch && request.method === "GET") {
@@ -108,7 +109,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         status: found.redirect.status_code === 301 ? 301 : 308,
         headers: {
           Location: new URL(found.location, process.env.SITE_URL || request.nextUrl.origin).href,
-          "Cache-Control": "public, max-age=3600",
+          "Cache-Control": "private, max-age=3600",
         },
       });
     }

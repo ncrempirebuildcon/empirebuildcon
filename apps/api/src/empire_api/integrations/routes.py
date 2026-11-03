@@ -68,7 +68,8 @@ async def _signed_body(
     if not x_redirect_hit_signature or hits.fresh_timestamp(x_redirect_hit_timestamp) is None:
         raise ApiProblem(401, "Missing or wrong signature.")
     declared = request.headers.get("content-length", "")
-    if declared and (not declared.isdigit() or int(declared) > hits.MAX_BODY_BYTES):
+    size_ok = declared.isascii() and declared.isdigit() and int(declared) <= hits.MAX_BODY_BYTES
+    if declared and not size_ok:
         raise ApiProblem(413, "Too large.")
     body = b""
     async for chunk in request.stream():
