@@ -92,7 +92,7 @@ The `/_internal/revalidate` route lives outside `/api/*` so it is handled by Nex
 - **Translations (D-014):** English lives in the normal columns. A `translations` JSON column holds overlays per locale, e.g. `{"hi": {"name": "…", "tagline": "…"}}`. Missing translations fall back to English.
 - **SEO:** a `seo` JSON column on projects, configurations, pages, posts and cities: title, description, OG image, noindex, canonical path.
 - **Media links (exclusive arc):** `media_link` has one nullable foreign key per owner type (project, configuration, construction update, page, post) and a check constraint that exactly one is set. Real foreign keys, cascades on delete, one table to query. A partial unique index allows one cover per owner and role.
-- **Public paths:** `/` is the home page, `/<slug>` a page, `/blog/<slug>` a post and `/projects/<slug>` a project. Redirects and the sitemap use these.
+- **Public paths:** `/` is the home page, `/<slug>` a page, `/blog/<slug>` a post, `/projects/<slug>` a project, `/projects/<slug>/<config-slug>` one of its configurations ("property"), `/properties` every configuration and `/cities/<slug>` a city's projects (D-041). `apps/api/src/empire_api/seo/paths.py` and `apps/web/src/lib/public/catalogue.ts` hold the same rules. Redirects and the sitemap use these.
 - **Publishing:** content rows have `publish_state` (draft, published, archived). Projects and configurations also have `sales_status`: **available**, **sold_out** (shown after available items with a "Sold out" badge), **off_market** (hidden from the public site).
 - **Sample data (D-015):** rows created by the sample seed carry `is_sample = true`. Public endpoints never return them in production, publish is blocked for them in production, and the CMS shows a "Sample" badge.
 - **Deletion:** projects with leads, and pages and posts that were ever published, are archived, not deleted. Offers that were ever live stay too (switch them off). Leads are never hard-deleted by staff; `leads.erase` (super-admin) replaces personal fields with a stub on a data-erasure request and logs it.
@@ -303,7 +303,8 @@ Every create, update, delete, publish, export, login and permission change write
   - **Full plus codes** (e.g. `7JWV8XX8+XX`): decoded by our own port of Open Location Code, tested against Google's official vectors (D-031).
   - **Short plus codes** (`8XX8+XX Noida`): refused, with a message asking for the full code or a Maps link.
 - Staff can also type the pin. Dragging the pin on a map arrives with the map component in Phase 5.
-- The site shows the pin with **Leaflet + OpenStreetMap** tiles, lazy-loaded below the fold, with a pop-up giving the project name, address, RERA number and a "Directions" link to Google Maps.
+- The site shows the pin with **Leaflet 1.9.4 + OpenStreetMap** tiles, loaded only when the visitor presses "Show map". The pop-up gives the project name, address, RERA number and a "Get directions" link to Google Maps. The address and the directions link are always on the page, so the map is never the only way to find the site (task 5.3, D-041).
+  - **OpenStreetMap tile policy** (checked 2 Nov 2026): HTTPS tile URL only, visible attribution, the browser's normal Referer, no bulk or offline use, and no service level. Phase 9 check: if traffic grows, move to a paid tile provider and change the CSP `img-src` host with it.
 
 ## 14. Search
 

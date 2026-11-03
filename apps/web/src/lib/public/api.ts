@@ -23,6 +23,8 @@ export type PublicOffer = components["schemas"]["PublicOffer"];
 export type PublicProjectList = components["schemas"]["PublicProjectList"];
 export type PublicProjectDetail = components["schemas"]["PublicProjectDetail"];
 export type PublicPropertyList = components["schemas"]["PublicPropertyList"];
+export type PublicPropertyDetail = components["schemas"]["PublicPropertyDetail"];
+export type PublicCity = components["schemas"]["PublicCity"];
 export type PublicPage = components["schemas"]["PublicPage"];
 export type PublicPostList = components["schemas"]["PublicPostList"];
 export type PublicPostDetail = components["schemas"]["PublicPost"];
@@ -109,6 +111,32 @@ export async function fetchPublicProperties(
     fetch: cachedFetch(["properties", "content"]),
   });
   if (res.response.status === 404) notFound();
+  return unwrap(res);
+}
+
+/** One configuration ("property") of a published project (task 5.3). */
+export async function fetchPublicProperty(
+  slug: string,
+  configSlug: string,
+): Promise<PublicPropertyDetail> {
+  const client = getClient();
+  const res = await client.GET("/api/v1/public/projects/{slug}/configurations/{config_slug}", {
+    params: { path: { slug, config_slug: configSlug } },
+    fetch: cachedFetch(["properties", "projects", `project:${slug}`, "content"]),
+  });
+  if (res.response.status === 404) notFound();
+  return unwrap(res);
+}
+
+/**
+ * Cities with at least one published project (task 5.3). Tagged `projects` because a project
+ * publish, unpublish or move is what changes this list and its counts.
+ */
+export async function fetchPublicCities(): Promise<PublicCity[]> {
+  const client = getClient();
+  const res = await client.GET("/api/v1/public/cities", {
+    fetch: cachedFetch(["projects", "content"]),
+  });
   return unwrap(res);
 }
 

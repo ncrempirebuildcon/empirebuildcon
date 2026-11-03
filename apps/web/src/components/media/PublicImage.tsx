@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Public image component for the Empire website (Phase 5 Task 5.2).
  *
@@ -5,6 +7,8 @@
  *   - Custom Cloudinary loader for responsive widths and automatic format/quality.
  *   - Preserves fake media store and local image paths.
  *   - Alt text is required (never empty without explicit decorative role).
+ *   - A client component (task 5.3 fix): next/image is one, and the custom `loader` is a
+ *     function, which a server component can't pass to it. Server pages render it as usual.
  *   - Displays honest labels (Artist's impression, Actual photo, Progress photo) and
  *     the SAMPLE badge when specified.
  */

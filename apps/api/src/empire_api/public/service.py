@@ -78,7 +78,7 @@ from empire_api.public.visibility import (
 )
 from empire_api.search import set_search_trgm_threshold
 from empire_api.seo.models import Redirect
-from empire_api.seo.paths import page_path, post_path, project_path
+from empire_api.seo.paths import city_path, page_path, post_path, project_path, property_path
 from empire_api.site_settings import flags
 from empire_api.site_settings.defaults import read_group
 from empire_api.site_settings.models import FeatureFlag
@@ -178,7 +178,13 @@ def _build_public_seo(
     )
 
 
-def _public_price(row: Any) -> Price:
+def _public_price(row: Any, *, project_on_request: bool = False) -> Price:
+    """The public price of a project or configuration.
+
+    COMPLIANCE: when the project asks for "price on request", its configurations do too, even
+    if staff left figures on them, so no figure for that project reaches the site (task 5.3,
+    D-041). The budget filter and the price sorts follow the same rule.
+    """
     base = price_of(row)
     std_note = "excludes GST, stamp duty and registration"
     if base.note and std_note not in base.note:
@@ -186,7 +192,7 @@ def _public_price(row: Any) -> Price:
     else:
         note = base.note or std_note
 
-    if base.on_request:
+    if base.on_request or project_on_request:
         return Price(
             on_request=True,
             min_inr=None,
@@ -563,6 +569,7 @@ def _build_configurations(
     *,
     is_hi: bool,
     prod: bool,
+    project_on_request: bool = False,
 ) -> list[schemas.PublicConfiguration]:
     active = [c for c in configs if c.sales_status != "off_market"]
     if prod:
@@ -587,7 +594,7 @@ def _build_configurations(
                 bathrooms=c.bathrooms,
                 balconies=c.balconies,
                 area=area_of(c.area_min_sqm, c.area_max_sqm, c.area_basis, c.area_display_unit),
-                price=_public_price(c),
+                price=_public_price(c, project_on_request=project_on_request),
                 sales_status=c.sales_status,
                 floor_plans=fp_links,
                 sort_order=c.sort_order,
@@ -723,7 +730,13 @@ def get_public_project(
         elif link.construction_update_id:
             update_links[link.construction_update_id].append(link)
 
-    configurations = _build_configurations(p.configurations, config_links, is_hi=is_hi, prod=prod)
+    configurations = _build_configurations(
+        p.configurations,
+        config_links,
+        is_hi=is_hi,
+        prod=prod,
+        project_on_request=bool(p.price_on_request),
+    )
     summary = _build_public_summary(p, project_links, qr_media, p.configurations, is_hi=is_hi)
     towers = _build_towers(p.towers, p.construction_updates)
     construction_updates = _build_updates(p.construction_updates, update_links, prod=prod)
@@ -875,11 +888,15 @@ def _apply_property_filters(
         stmt = stmt.where(Configuration.bhk == bhk)
     if project_status:
         stmt = stmt.where(Project.status == project_status)
+    # WHY coalesce: "From ₹ 78 L" (no upper end) is one figure for the budget filter (5.3 fix).
+    hidden = Configuration.price_on_request.is_(True) | Project.price_on_request.is_(True)
     eff_min = case(
-        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_min_inr
+        (hidden, None),
+        else_=func.coalesce(Configuration.price_min_inr, Configuration.price_max_inr),
     )
     eff_max = case(
-        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_max_inr
+        (hidden, None),
+        else_=func.coalesce(Configuration.price_max_inr, Configuration.price_min_inr),
     )
 
     if budget_min is not None:
@@ -893,11 +910,15 @@ def _property_order_clauses(sort: str | None) -> list[Any]:
     order_clauses: list[Any] = [
         case((Configuration.sales_status == "available", 0), else_=1),
     ]
+    # WHY coalesce: "From ₹ 78 L" (no upper end) is one figure for the budget filter (5.3 fix).
+    hidden = Configuration.price_on_request.is_(True) | Project.price_on_request.is_(True)
     eff_min = case(
-        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_min_inr
+        (hidden, None),
+        else_=func.coalesce(Configuration.price_min_inr, Configuration.price_max_inr),
     )
     eff_max = case(
-        (Configuration.price_on_request.is_(True), None), else_=Configuration.price_max_inr
+        (hidden, None),
+        else_=func.coalesce(Configuration.price_max_inr, Configuration.price_min_inr),
     )
 
     sort_type = (sort or "recommended").lower()
@@ -1048,7 +1069,7 @@ def list_public_properties(
                 property_type=c.property_type,
                 bhk=float(c.bhk) if c.bhk is not None else None,
                 area=area_of(c.area_min_sqm, c.area_max_sqm, c.area_basis, c.area_display_unit),
-                price=_public_price(c),
+                price=_public_price(c, project_on_request=bool(p.price_on_request)),
                 sales_status=c.sales_status,
                 cover=_media_schema(cover_media, prod=prod) if cover_media else None,
                 project=proj_ref,
@@ -1137,7 +1158,7 @@ def get_public_property(
         bathrooms=c.bathrooms,
         balconies=c.balconies,
         area=area_of(c.area_min_sqm, c.area_max_sqm, c.area_basis, c.area_display_unit),
-        price=_public_price(c),
+        price=_public_price(c, project_on_request=bool(p.price_on_request)),
         sales_status=c.sales_status,
         floor_plans=fp_links,
         sort_order=c.sort_order,
@@ -1725,7 +1746,7 @@ def _batch_load_grid_blocks(
                         area=area_of(
                             c.area_min_sqm, c.area_max_sqm, c.area_basis, c.area_display_unit
                         ),
-                        price=_public_price(c),
+                        price=_public_price(c, project_on_request=bool(p.price_on_request)),
                         sales_status=c.sales_status,
                         cover=_media_schema(fp_m, prod=prod) if fp_m else None,
                         project=proj_ref,
@@ -2286,11 +2307,43 @@ def get_public_sitemap(db: Session) -> list[schemas.PublicSitemapEntry]:
             continue
         _add_entry(post_path(po.slug), po.updated_at or blog_lastmod)
 
-    # Add Projects (using canonical project_path; D-038: configuration & city URLs left out)
+    # Add Projects, then their configurations and the cities they are in (D-041). A noindex
+    # project leaves out its configurations too; a city is listed when it has at least one
+    # listed project, with that project's latest change as its lastmod.
+    listed: dict[uuid.UUID, Project] = {}
+    city_lastmod: dict[uuid.UUID, datetime] = {}
     for prj in published_projects:
         seo = dict(prj.seo or {})
         if seo.get("noindex"):
             continue
-        _add_entry(project_path(prj.slug), prj.updated_at or home_lastmod)
+        lastmod = prj.updated_at or home_lastmod
+        _add_entry(project_path(prj.slug), lastmod)
+        listed[prj.id] = prj
+        if prj.city_id is not None:
+            city_lastmod[prj.city_id] = max(city_lastmod.get(prj.city_id, lastmod), lastmod)
+
+    if listed:
+        cfg_stmt = (
+            select(Configuration)
+            .where(
+                Configuration.project_id.in_(list(listed)),
+                Configuration.sales_status != "off_market",
+            )
+            .order_by(Configuration.project_id, Configuration.sort_order, Configuration.slug)
+        )
+        if prod:
+            cfg_stmt = cfg_stmt.where(Configuration.is_sample.is_(False))
+        for cfg in db.scalars(cfg_stmt).all():
+            owner = listed[cfg.project_id]
+            _add_entry(
+                property_path(owner.slug, cfg.slug),
+                max(cfg.updated_at, owner.updated_at or cfg.updated_at),
+            )
+
+    if city_lastmod:
+        for city in db.scalars(
+            select(City).where(City.id.in_(list(city_lastmod))).order_by(City.slug)
+        ).all():
+            _add_entry(city_path(city.slug), city_lastmod[city.id])
 
     return entries

@@ -36,6 +36,10 @@ test("the catalogue has no serious accessibility violations", async ({ page }) =
 test("every tab of the project editor has no serious accessibility violations", async ({
   page,
 }) => {
+  // WHY a longer timeout: axe runs on every one of the ~11 tabs. That takes about 26 s locally
+  // and went past the default 30 s on CI once the suite had more specs (task 5.3), with nothing
+  // failing. Only the time limit changes; every check stays.
+  test.setTimeout(90_000);
   // The sample project has towers, configurations, plans and the rest, so every tab has content.
   await page.goto("/admin/projects?q=sample-project-a");
   await page.getByRole("link", { name: "Sample — Project A" }).click();
