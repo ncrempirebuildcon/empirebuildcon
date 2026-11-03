@@ -99,7 +99,8 @@ test("the home page shows its CMS blocks at /", async ({ page, browser }) => {
       await expect(visitor.getByRole("heading", { level: 1 })).toHaveText(`E2E home hero ${id}`);
       await expect(visitor.getByText(`E2E home text ${id}`)).toBeVisible();
       await expect(visitor.getByText("Our new website is on its way")).toHaveCount(0);
-      expect(await visitor.title()).toContain("Home");
+      // The home page's title stands alone, without the "· Empire" suffix (task 5.6).
+      expect(await visitor.title()).toBe("Home");
       await visitorContext.close();
     },
   );

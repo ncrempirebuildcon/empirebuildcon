@@ -24,13 +24,23 @@ import { configurationTitle, Section } from "@/components/catalogue/ProjectSecti
 import { LeadPanel } from "@/components/leads/LeadPanel";
 import { fetchPublicProject, fetchPublicProperty } from "@/lib/public/api";
 import { formatMonthYear, projectPath, propertyPath } from "@/lib/public/catalogue";
+import { pageMetadata, propertyLd } from "@/lib/public/seo";
+import { JsonLd } from "@/components/JsonLd";
 
 type Params = { params: Promise<{ slug: string; config: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug, config } = await params;
   const property = await fetchPublicProperty(slug, config);
-  return { title: `${configurationTitle(property)} · ${property.project.name}` };
+  const title = `${configurationTitle(property)} · ${property.project.name}`;
+  return pageMetadata({
+    title,
+    path: propertyPath(property.project.slug, property.slug),
+    fallbackDescriptions: [
+      `${title}: carpet area, price and possession, with the project's UP-RERA number.`,
+    ],
+    image: property.project.cover,
+  });
 }
 
 export default async function PropertyPage({ params }: Params) {
@@ -56,7 +66,11 @@ export default async function PropertyPage({ params }: Params) {
 
   return (
     <article className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8">
+      <JsonLd
+        data={propertyLd(property, project, propertyPath(project.slug, property.slug), title)}
+      />
       <Breadcrumbs
+        structuredData={!project.is_sample && !property.is_sample}
         items={[
           { href: "/", label: "Home" },
           { href: "/properties", label: "Properties" },

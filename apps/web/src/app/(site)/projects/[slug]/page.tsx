@@ -37,13 +37,21 @@ import {
   Videos,
 } from "@/components/catalogue/ProjectSections";
 import { fetchPublicProject } from "@/lib/public/api";
-import { cityPath, directionsUrl, formatMonthYear } from "@/lib/public/catalogue";
+import { cityPath, directionsUrl, formatMonthYear, projectPath } from "@/lib/public/catalogue";
+import { faqLd, pageMetadata, projectLd } from "@/lib/public/seo";
+import { JsonLd } from "@/components/JsonLd";
 
 type Params = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const project = await fetchPublicProject((await params).slug);
-  return { title: project.seo?.title || project.name };
+  return pageMetadata({
+    title: project.name,
+    path: projectPath(project.slug),
+    seo: project.seo,
+    fallbackDescriptions: [project.tagline, project.description],
+    image: project.cover,
+  });
 }
 
 export default async function ProjectPage({ params }: Params) {
@@ -95,7 +103,10 @@ export default async function ProjectPage({ params }: Params) {
 
   return (
     <article className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8">
+      <JsonLd data={projectLd(project, path)} />
+      {project.is_sample ? null : <JsonLd data={faqLd(project.faqs)} />}
       <Breadcrumbs
+        structuredData={!project.is_sample}
         items={[
           { href: "/", label: "Home" },
           { href: "/projects", label: "Projects" },

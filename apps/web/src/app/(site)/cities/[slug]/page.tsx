@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/catalogue/ListControls";
 import { ProjectListing } from "@/components/catalogue/ProjectListing";
 import { fetchPublicCities } from "@/lib/public/api";
+import { pageMetadata } from "@/lib/public/seo";
 import { cityPath, parseFilters, PROJECT_SORTS, type SearchParams } from "@/lib/public/catalogue";
 
 async function findCity(slug: string) {
@@ -21,7 +22,14 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const city = await findCity((await params).slug);
-  return { title: city ? `Projects in ${city.name}` : "City not found" };
+  if (!city) return { title: "City not found" };
+  return pageMetadata({
+    title: `Projects in ${city.name}`,
+    path: cityPath(city.slug),
+    fallbackDescriptions: [
+      `Empire's projects in ${city.name}, ${city.state}: prices, homes on offer and the UP-RERA number.`,
+    ],
+  });
 }
 
 export default async function CityPage({
