@@ -49,6 +49,18 @@ function categoryScore(lhr: Lhr, name: Category): number {
   return weight ? Math.round((total / weight) * 100) : 0;
 }
 
+/**
+ * The CPU slowdown that makes this host behave like a mid-tier phone, from Lighthouse's own
+ * table (docs/throttling.md): high-end desktop (benchmark 1500–2000) 4×, low-end desktop
+ * (1000–1500) 2×, high-end mobile (800–1200) 2×, in between by the benchmark, never below 1×
+ * and never above Lighthouse's default 4×.
+ */
+function cpuMultiplier(benchmarkIndex: number | undefined): number {
+  if (!benchmarkIndex || !Number.isFinite(benchmarkIndex)) return 4;
+  const value = benchmarkIndex / 375;
+  return Math.round(Math.min(4, Math.max(1, value)) * 10) / 10;
+}
+
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
@@ -73,6 +85,14 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
   const misses: string[] = [];
   const table: string[] = [];
   try {
+    // Calibration (Lighthouse docs/throttling.md): the default 4× CPU slowdown assumes a
+    // high-end desktop host. A slower host (a CI runner) would then simulate a phone far slower
+    // than the mid-tier phone we target. This run also warms the server.
+    const probe = await lighthouse(`${WEB_URL}/`, { port: chrome.port, logLevel: "error" });
+    const benchmark = (probe?.lhr as unknown as { environment?: { benchmarkIndex?: number } })
+      ?.environment?.benchmarkIndex;
+    const cpu = cpuMultiplier(benchmark);
+    table.push(`host benchmarkIndex ${Math.round(benchmark ?? 0)} → CPU slowdown ${cpu}×`);
     for (const path of paths) {
       const scores: Record<Category, number[]> = {
         performance: [],
@@ -84,6 +104,7 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
         const result = await lighthouse(`${WEB_URL}${path}`, {
           port: chrome.port,
           output: ["json", "html"],
+          throttling: { cpuSlowdownMultiplier: cpu },
           logLevel: "error",
         });
         const lhr = result?.lhr as unknown as Lhr | undefined;

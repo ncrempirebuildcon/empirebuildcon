@@ -878,6 +878,10 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - SEO ≥ 90, counted without "is-crawlable" until go-live (the site is `noindex` by design). An audit that errors counts as 0.
   - This replaces the lhci job, which measured `/` with no API.
   - No retries, and JSON and HTML reports as a CI artifact.
+  - **CPU calibration** (Lighthouse `docs/throttling.md`): Lighthouse's default 4× CPU slowdown assumes a high-end desktop host. The first CI run on GitHub's runner scored 69–89 on the same code that scored 91–97 here, because the slower runner times 4 simulated a much slower phone.
+    - The spec now reads the host's `benchmarkIndex` from a warm-up run and uses `benchmarkIndex / 375` as the slowdown, between 1× and 4×. That is 4× on a high-end desktop (≥ 1500) and about 2.7× on a low-end desktop (1000), following the table's "host → mid-tier mobile" row.
+    - It never goes above Lighthouse's default 4×, which is what PageSpeed Insights uses.
+    - The summary prints the benchmark and the slowdown used.
   - The CI build has no Sentry DSN, so the Sentry chunk that production loads after `load` is not in the measurement.
 **Verified / assumed:**
 - Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.
