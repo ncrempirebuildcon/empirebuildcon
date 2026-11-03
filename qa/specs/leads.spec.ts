@@ -152,11 +152,11 @@ test("a public site-visit request goes from the inbox to a confirmed visit and a
   const body = (await dashboard.json()) as {
     counts: Array<{ key: string; label: string; count: number; link: string }>;
   };
+  // WHY no exact numbers here: specs running alongside add drafts and leads between the page
+  // and the API call. Exact counts are checked in dashboard-counts.serial.spec.ts, alone.
   for (const count of body.counts) {
     await expect(
-      counts.getByRole("link", {
-        name: new RegExp(`^${escapeRegExp(count.label)} ${count.count}`),
-      }),
+      counts.getByRole("link", { name: new RegExp(`^${escapeRegExp(count.label)} \\d`) }),
     ).toHaveAttribute("href", count.link);
   }
   const newLeads = body.counts.find((count) => count.key === "leads.new");
