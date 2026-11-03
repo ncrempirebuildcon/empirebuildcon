@@ -802,11 +802,12 @@ def get_public_project(
         for lnk in project_links
         if lnk.role == "document" and (m := _linked_media_schema(lnk, prod=prod)) is not None
     ]
-    brochure = (
-        None
-        if p.brochure_gated
-        else (_linked_media_schema(brochure_media, prod=prod) if brochure_media else None)
-    )
+    # The brochure the site may show. Gated: the address is withheld (the lead form gives it,
+    # /public/brochure-requests) and `brochure_gated` says one exists, so the site can offer the
+    # form. No visible brochure → no form either (task 5.4, D-043).
+    shown_brochure = _linked_media_schema(brochure_media, prod=prod) if brochure_media else None
+    brochure = None if p.brochure_gated else shown_brochure
+    brochure_gated = bool(p.brochure_gated and shown_brochure is not None)
 
     location = Location(
         address_line=p.address_line,
@@ -854,7 +855,7 @@ def get_public_project(
         videos=videos,
         documents=documents,
         brochure=brochure,
-        brochure_gated=p.brochure_gated,
+        brochure_gated=brochure_gated,
         faqs=project_faqs,
         seo=_build_public_seo(db, p.seo or {}, prod=prod),
         updated_at=p.updated_at,

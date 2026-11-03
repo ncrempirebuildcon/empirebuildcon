@@ -10,7 +10,6 @@
  * The enquiry and site-visit buttons go to the contact page until 5.4 adds the forms.
  */
 import type { Metadata } from "next";
-import Link from "next/link";
 import { FormattedText } from "@empire/ui";
 import { PublicImage } from "@/components/media/PublicImage";
 import { Breadcrumbs } from "@/components/catalogue/ListControls";
@@ -22,6 +21,7 @@ import {
   SoldOutChip,
 } from "@/components/catalogue/Facts";
 import ProjectMap from "@/components/catalogue/ProjectMap";
+import { LeadPanel } from "@/components/leads/LeadPanel";
 import {
   Amenities,
   ConfigurationsTable,
@@ -57,12 +57,9 @@ export default async function ProjectPage({ params }: Params) {
   const address = [project.location.address_line, project.location.pincode]
     .filter(Boolean)
     .join(" ");
-  const enquire = `/contact?project=${encodeURIComponent(project.slug)}`;
-  const brochureHref = project.brochure
-    ? project.brochure_gated
-      ? `${enquire}&want=brochure`
-      : project.brochure.url
-    : null;
+  // A gated brochure is given by the form below (#brochure); an open one is a plain link.
+  const brochureHref = project.brochure_gated ? "#brochure" : (project.brochure?.url ?? null);
+  const path = `/projects/${project.slug}`;
 
   const nav = [
     { id: "overview", label: "Overview", show: Boolean(project.description || project.tagline) },
@@ -291,6 +288,36 @@ export default async function ProjectPage({ params }: Params) {
             </Section>
           ) : null}
 
+          <section
+            id="visit"
+            className="scroll-mt-24 rounded-card border border-gold-line bg-noir-800 p-5"
+          >
+            <LeadPanel
+              intent="visit"
+              title="Book a site visit"
+              intro="Pick a day and a time of day. We confirm the exact time by phone."
+              submitLabel="Request a site visit"
+              path={path}
+              projectSlug={project.slug}
+            />
+          </section>
+
+          {project.brochure_gated ? (
+            <section
+              id="brochure"
+              className="scroll-mt-24 rounded-card border border-gold-line bg-noir-800 p-5"
+            >
+              <LeadPanel
+                intent="brochure"
+                title="Get the brochure"
+                intro="Share your number and the brochure opens here. Our team may call you about it."
+                submitLabel="Show the brochure"
+                path={path}
+                projectSlug={project.slug}
+              />
+            </section>
+          ) : null}
+
           <p className="text-caption text-muted">
             Specifications, plans and the completion date are as declared to{" "}
             {project.rera.authority} and can change only as the law allows. This page is not an
@@ -302,21 +329,21 @@ export default async function ProjectPage({ params }: Params) {
           aria-label={`Talk to us about ${project.name}`}
           className="lg:sticky lg:top-32 lg:self-start"
         >
-          <div className="flex flex-col gap-3 rounded-card border border-gold-line-strong bg-noir-800 p-5">
-            <h2 className="font-display text-h3 font-semibold">Talk to our sales team</h2>
-            <p className="text-small text-body">About {project.name}.</p>
-            <Link
-              href={enquire}
-              className="inline-flex min-h-11 items-center justify-center rounded-pill bg-gold-500 px-5 font-extrabold text-noir-900 hover:bg-gold-400 hover:text-noir-900"
-            >
-              Enquire
-            </Link>
-            <Link
-              href={`${enquire}&want=visit`}
+          <div className="flex flex-col gap-4 rounded-card border border-gold-line-strong bg-noir-800 p-5">
+            <LeadPanel
+              intent="enquiry"
+              title="Talk to our sales team"
+              intro={`About ${project.name}. We call you back.`}
+              submitLabel="Request a call back"
+              path={path}
+              projectSlug={project.slug}
+            />
+            <a
+              href="#visit"
               className="inline-flex min-h-11 items-center justify-center rounded-pill border border-gold-500 px-5 font-semibold text-gold-300"
             >
               Book a site visit
-            </Link>
+            </a>
             {brochureHref ? (
               <a
                 href={brochureHref}

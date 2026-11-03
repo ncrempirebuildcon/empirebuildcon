@@ -6199,6 +6199,7 @@ export interface components {
             brochure: components["schemas"]["PublicLinkedMedia"] | null;
             /**
              * Brochure Gated
+             * @description True when a brochure is shown on the website but only after the lead form (POST /public/brochure-requests gives its address); false when there is none to give.
              * @default false
              */
             brochure_gated: boolean;

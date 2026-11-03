@@ -21,6 +21,7 @@ import {
   SoldOutChip,
 } from "@/components/catalogue/Facts";
 import { configurationTitle, Section } from "@/components/catalogue/ProjectSections";
+import { LeadPanel } from "@/components/leads/LeadPanel";
 import { fetchPublicProject, fetchPublicProperty } from "@/lib/public/api";
 import { formatMonthYear, projectPath, propertyPath } from "@/lib/public/catalogue";
 
@@ -51,7 +52,6 @@ export default async function PropertyPage({ params }: Params) {
       const rank = (s: string) => (s === "sold_out" ? 1 : 0);
       return rank(a.sales_status) - rank(b.sales_status) || a.sort_order - b.sort_order;
     });
-  const enquire = `/contact?project=${encodeURIComponent(project.slug)}&home=${encodeURIComponent(property.slug)}`;
   const plan = property.floor_plans[0];
 
   return (
@@ -207,17 +207,18 @@ export default async function PropertyPage({ params }: Params) {
               </>
             ) : (
               <>
-                <h2 className="font-display text-h3 font-semibold">Ask about this home</h2>
                 <p className="text-small text-body">{title}</p>
                 <PriceText price={property.price} />
+                <LeadPanel
+                  intent="enquiry"
+                  title="Ask about this home"
+                  submitLabel="Request a call back"
+                  path={projectPath(project.slug) + "/" + property.slug}
+                  projectSlug={project.slug}
+                  configurationId={property.id}
+                />
                 <Link
-                  href={enquire}
-                  className="inline-flex min-h-11 items-center justify-center rounded-pill bg-gold-500 px-5 font-extrabold text-noir-900 hover:bg-gold-400 hover:text-noir-900"
-                >
-                  Enquire
-                </Link>
-                <Link
-                  href={`${enquire}&want=visit`}
+                  href={`${projectPath(project.slug)}#visit`}
                   className="inline-flex min-h-11 items-center justify-center rounded-pill border border-gold-500 px-5 font-semibold text-gold-300"
                 >
                   Book a site visit
