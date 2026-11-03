@@ -10,6 +10,7 @@
  * Only the Latin subset is loaded; other characters fall back to the system font.
  */
 import localFont from "next/font/local";
+import { SITE_DESCRIPTION } from "@/lib/public/seo";
 import "./globals.css";
 
 import type { Metadata, Viewport } from "next";
@@ -56,8 +57,7 @@ const sans = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL ?? "http://localhost:3000"),
   title: { default: "Empire · Delivering Happiness", template: "%s · Empire" },
-  description:
-    "Empire — Delivering Happiness. Projects and homes in Uttar Pradesh, each with its UP-RERA registration.",
+  description: SITE_DESCRIPTION,
   // TODO(phase-9): allow indexing at go-live (Phase 9 gate). Until then nothing is indexed.
   robots: { index: false, follow: false },
 };

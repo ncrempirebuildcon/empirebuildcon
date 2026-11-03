@@ -102,13 +102,15 @@ async function overreachingLabels(page: Page): Promise<string[]> {
     for (const input of document.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) {
       const label = input.labels?.[0];
       if (!label) continue;
+      // Measured on screen: elementFromPoint sees nothing outside the viewport.
+      label.scrollIntoView({ block: "center" });
       const box = label.getBoundingClientRect();
       if (box.height === 0) continue;
       // Anything else on screen whose box meets the label's: a tap in the shared strip must
       // reach that element, not the label.
-      const others = label
-        .closest("form, fieldset, section")
-        ?.querySelectorAll<HTMLElement>("a, button, summary, input, label, p, li, span");
+      const others = document.querySelectorAll<HTMLElement>(
+        "a, button, summary, input, textarea, select, label, p, li, span",
+      );
       for (const other of others ?? []) {
         if (other === input || label.contains(other) || other.contains(label)) continue;
         // Text inside a closed <details> keeps a layout box but isn't shown.
@@ -120,7 +122,13 @@ async function overreachingLabels(page: Page): Promise<string[]> {
         const left = Math.max(box.left, o.left);
         const right = Math.min(box.right, o.right);
         if (bottom - top < 1 || right - left < 1) continue;
-        const hit = document.elementFromPoint((left + right) / 2, (top + bottom) / 2);
+        const x = (left + right) / 2;
+        const y = (top + bottom) / 2;
+        if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
+          found.push(`label "${(label.textContent ?? "").trim().slice(0, 30)}" not measurable`);
+          continue;
+        }
+        const hit = document.elementFromPoint(x, y);
         if (hit && label.contains(hit) && !other.contains(hit)) {
           const name = (label.textContent ?? "").trim().slice(0, 30);
           const what = (other.textContent ?? other.tagName).trim().slice(0, 30);
@@ -161,15 +169,12 @@ for (const viewport of VIEWPORTS) {
       );
       if (overflow > 0) problems.push(`${path}: ${overflow}px sideways scroll`);
       for (const small of await smallTargets(visitor)) problems.push(`${path}: small ${small}`);
-      // Labels are checked where they are on screen, one form at a time, with every
+      // Labels are checked with every
       // disclosure open (an open consent text sits right above the marketing box).
       await visitor.evaluate(() => {
         for (const d of document.querySelectorAll("details")) d.open = true;
       });
-      for (const form of await visitor.locator("form").all()) {
-        await form.scrollIntoViewIfNeeded();
-        for (const over of await overreachingLabels(visitor)) problems.push(`${path}: ${over}`);
-      }
+      for (const over of await overreachingLabels(visitor)) problems.push(`${path}: ${over}`);
       const h1 = await visitor.getByRole("heading", { level: 1 }).count();
       if (h1 !== 1) problems.push(`${path}: ${h1} h1`);
     }
