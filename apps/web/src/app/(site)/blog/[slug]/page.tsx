@@ -2,8 +2,8 @@
  * Public Blog article detail page (Phase 5 Task 5.5b).
  *
  * Implements:
- *   - Fetches post by slug via fetchPublicPost(slug); calls notFound() if not found or unpublished.
- *   - Metadata title from post.seo.title || post.title.
+ *   - Fetches post by slug via fetchPublicPost(slug); data layer calls notFound() on 404.
+ *   - Metadata title from post.seo.title || post.title (description out of scope until 5.6).
  *   - ArticleHeader with breadcrumbs, category, single H1, excerpt, author, date, read time, and share.
  *   - Cover image via PublicImage with honest label.
  *   - Article body rendered with FormattedText (never HTML).
@@ -12,8 +12,7 @@
  *   - Accessible and responsive without horizontal scroll at 390px.
  */
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { fetchPublicPost, type PublicPostDetail } from "@/lib/public/api";
+import { fetchPublicPost } from "@/lib/public/api";
 import { FormattedText } from "@empire/ui";
 import PublicImage from "@/components/media/PublicImage";
 import ArticleHeader from "@/components/blog/ArticleHeader";
@@ -25,29 +24,16 @@ interface BlogSlugPageProps {
 
 export async function generateMetadata({ params }: BlogSlugPageProps): Promise<Metadata> {
   const { slug } = await params;
-  try {
-    const post = await fetchPublicPost(slug);
-    const title = post.seo?.title || post.title;
-    return {
-      title: { absolute: `${title} · Empire` },
-      description: post.seo?.description || post.excerpt || undefined,
-    };
-  } catch {
-    return {
-      title: { absolute: "Article not found · Empire" },
-    };
-  }
+  const post = await fetchPublicPost(slug);
+  const title = post.seo?.title || post.title;
+  return {
+    title: { absolute: `${title} · Empire` },
+  };
 }
 
 export default async function BlogSlugPage({ params }: BlogSlugPageProps) {
   const { slug } = await params;
-
-  let post: PublicPostDetail;
-  try {
-    post = await fetchPublicPost(slug);
-  } catch {
-    notFound();
-  }
+  const post = await fetchPublicPost(slug);
 
   return (
     <div className="mx-auto flex max-w-[1280px] flex-col gap-8 px-4 py-8 sm:px-8 sm:py-10 md:gap-10">
@@ -73,32 +59,32 @@ export default async function BlogSlugPage({ params }: BlogSlugPageProps) {
         </div>
       )}
 
-      {/* Article Body & Tags */}
-      <div className="mx-auto flex w-full max-w-[800px] flex-col gap-8 py-4 sm:py-6">
-        <article className="flex flex-col gap-6 text-base leading-[1.75] text-body sm:text-lg sm:leading-[1.8]">
-          <FormattedText text={post.body} />
-        </article>
+      {/* Article body */}
+      <article className="prose prose-invert mx-auto w-full max-w-[760px] text-body">
+        <FormattedText text={post.body} />
+      </article>
 
-        {/* Tags */}
-        {post.tags && post.tags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-6">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted">Tags:</span>
-            {post.tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-md border border-line bg-noir-800 px-2.5 py-1 text-xs text-body"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Bottom share bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
-          <span className="text-sm font-semibold text-ivory">Share this article:</span>
-          <ShareLinks title={post.title} url={`/blog/${post.slug}`} />
+      {/* Tags section */}
+      {post.tags && post.tags.length > 0 && (
+        <div className="mx-auto flex w-full max-w-[760px] flex-wrap items-center gap-2 pt-4">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted">Tags:</span>
+          {post.tags.map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center rounded-full border border-line bg-noir-800 px-3 py-1 text-xs text-muted"
+            >
+              #{tag}
+            </span>
+          ))}
         </div>
+      )}
+
+      {/* Bottom share bar */}
+      <div className="mx-auto flex w-full max-w-[760px] flex-col gap-3 border-t border-line pt-8">
+        <p className="font-serif text-sm font-semibold uppercase tracking-wider text-gold-400">
+          Share this article
+        </p>
+        <ShareLinks url={`/blog/${post.slug}`} title={post.title} />
       </div>
     </div>
   );

@@ -5,13 +5,22 @@
  *   - Read time calculation (empty body, short body, long body, boundary cases).
  *   - Indian date formatting (D MMM YYYY in Asia/Kolkata timezone).
  *   - Link builders: category changes drop page, pagination keeps category, URL-encoded values.
- *   - ShareLinks helpers: strips query and fragment, URL-encodes WhatsApp link, hides native share without navigator.share.
+ *   - ShareLinks helpers:
+ *     - strips query and fragment.
+ *     - resolveShareUrl converts relative paths to absolute URLs using origin.
+ *     - buildWhatsAppShareUrl sends absolute URL when given relative url + origin.
+ *     - canShare tests whether native share is offered for mock navigators.
  */
 import { describe, expect, it } from "vitest";
 import { formatBlogDate } from "@/lib/blog/dates";
 import { buildBlogHref, buildCategoryHref, buildPaginationHref } from "@/lib/blog/links";
 import { calculateReadTimeMinutes, formatReadTime } from "@/lib/blog/readTime";
-import { buildWhatsAppShareUrl, stripQueryAndFragment } from "@/components/public/ShareLinks";
+import {
+  buildWhatsAppShareUrl,
+  canShare,
+  resolveShareUrl,
+  stripQueryAndFragment,
+} from "@/components/public/ShareLinks";
 
 describe("blog read time calculation", () => {
   it("defaults empty, null or whitespace body to 1 min read", () => {
@@ -102,7 +111,33 @@ describe("blog link builders", () => {
   });
 });
 
-describe("ShareLinks helpers", () => {
+describe("ShareLinks pure decision helpers", () => {
+  it("canShare correctly detects native share capability on navigator", () => {
+    expect(canShare({ share: () => Promise.resolve() })).toBe(true);
+    expect(canShare({ share: "not-a-func" })).toBe(false);
+    expect(canShare({})).toBe(false);
+    expect(canShare(null)).toBe(false);
+    expect(canShare(undefined)).toBe(false);
+  });
+
+  it("resolveShareUrl creates clean absolute URL given relative path and origin", () => {
+    const resolved = resolveShareUrl("/blog/rera-guide?ref=1#tips", "https://empirebuildcon.com");
+    expect(resolved).toBe("https://empirebuildcon.com/blog/rera-guide");
+    expect(resolved).not.toContain("?");
+    expect(resolved).not.toContain("#");
+
+    // Trailing slash on origin handled cleanly
+    const withSlash = resolveShareUrl("/blog/guide", "https://empirebuildcon.com/");
+    expect(withSlash).toBe("https://empirebuildcon.com/blog/guide");
+
+    // Already absolute URL preserves its own origin
+    const absolute = resolveShareUrl(
+      "https://other.com/blog/guide?foo=bar#hash",
+      "https://empirebuildcon.com",
+    );
+    expect(absolute).toBe("https://other.com/blog/guide");
+  });
+
   it("strips query string and fragment from URLs", () => {
     expect(
       stripQueryAndFragment(
@@ -116,22 +151,26 @@ describe("ShareLinks helpers", () => {
     );
   });
 
-  it("builds URL-encoded WhatsApp share link using clean URL without query/hash", () => {
+  it("builds WhatsApp share link sending absolute URL when given relative url and origin", () => {
+    // Item 1: passes a relative url and expects an absolute address in the WhatsApp text
     const waUrl = buildWhatsAppShareUrl(
       "How to check UP-RERA",
-      "https://empirebuildcon.com/blog/check-rera?ref=share#top",
+      "/blog/check-rera?ref=share#top",
+      "https://empirebuildcon.com",
     );
 
     expect(waUrl).toBe(
       "https://wa.me/?text=How%20to%20check%20UP-RERA%20https%3A%2F%2Fempirebuildcon.com%2Fblog%2Fcheck-rera",
     );
+    expect(waUrl).toContain("https%3A%2F%2Fempirebuildcon.com%2Fblog%2Fcheck-rera");
     expect(waUrl).not.toContain("ref=share");
     expect(waUrl).not.toContain("#top");
   });
 
-  it("native share is unsupported in standard Node environment", () => {
-    const hasNativeShare =
-      typeof navigator !== "undefined" && typeof navigator.share === "function";
-    expect(hasNativeShare).toBe(false);
+  it("builds WhatsApp share link without broken relative path if origin is missing on SSR", () => {
+    const waUrl = buildWhatsAppShareUrl("UP-RERA Guide", "/blog/check-rera");
+    // Should NOT send a relative path "/blog/check-rera" without domain
+    expect(waUrl).toBe("https://wa.me/?text=UP-RERA%20Guide");
+    expect(waUrl).not.toContain("%2Fblog%2Fcheck-rera");
   });
 });

@@ -5,6 +5,7 @@
  *   - "All" first, followed by distinct categories.
  *   - Plain links `<a href="...">` working without JavaScript.
  *   - Active chip has `aria-current="page"`.
+ *   - Matches exact category text with API filter.
  *   - Changing category drops `page` parameter.
  *   - Min 44px touch targets.
  */
@@ -35,10 +36,9 @@ export function CategoryChips({ categories, activeCategory }: CategoryChipsProps
         All
       </Link>
 
-      {/* Individual category chips */}
+      {/* Individual category chips (exact match with API) */}
       {categories.map((cat) => {
-        const isActive =
-          !isAllActive && activeCategory?.trim().toLowerCase() === cat.trim().toLowerCase();
+        const isActive = !isAllActive && activeCategory === cat;
 
         return (
           <Link

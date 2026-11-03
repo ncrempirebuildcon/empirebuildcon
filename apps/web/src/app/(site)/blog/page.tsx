@@ -12,7 +12,7 @@
  */
 import type { Metadata } from "next";
 import Link from "next/link";
-import { fetchPublicPosts, type PublicPostList } from "@/lib/public/api";
+import { fetchPublicPosts } from "@/lib/public/api";
 import CategoryChips from "@/components/blog/CategoryChips";
 import FeaturedPostCard from "@/components/blog/FeaturedPostCard";
 import PostCard from "@/components/blog/PostCard";
@@ -21,8 +21,6 @@ import BlogEmptyState from "@/components/blog/BlogEmptyState";
 
 export const metadata: Metadata = {
   title: { absolute: "News & guides · Empire" },
-  description:
-    "Plain-language guides for home buyers, dated construction updates from our sites, and company news.",
 };
 
 interface BlogPageProps {
@@ -32,9 +30,10 @@ interface BlogPageProps {
 export default async function BlogPage({ searchParams }: BlogPageProps) {
   const resolvedParams = await searchParams;
 
-  // Parse page number
+  // Parse page number: clamp to 1-1000 before calling API (Item 6)
   const rawPage = Array.isArray(resolvedParams.page) ? resolvedParams.page[0] : resolvedParams.page;
-  const pageNum = Math.max(1, parseInt(rawPage || "1", 10) || 1);
+  const parsedPage = parseInt(rawPage || "1", 10);
+  const pageNum = Number.isFinite(parsedPage) ? Math.min(1000, Math.max(1, parsedPage)) : 1;
 
   // Parse category filter
   const rawCat = Array.isArray(resolvedParams.category)
@@ -44,34 +43,21 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
     rawCat && rawCat.trim().toLowerCase() !== "all" ? rawCat.trim() : undefined;
 
   // 1. Fetch categories list (up to max API limit 100, cached under "posts")
-  let categories: string[] = [];
-  try {
-    const allPostsRes = await fetchPublicPosts({ per_page: 100 });
-    const categorySet = new Set<string>();
-    for (const post of allPostsRes.items) {
-      if (post.category && post.category.trim()) {
-        categorySet.add(post.category.trim());
-      }
+  const allPostsRes = await fetchPublicPosts({ per_page: 100 });
+  const categorySet = new Set<string>();
+  for (const post of allPostsRes.items) {
+    if (post.category && post.category.trim()) {
+      categorySet.add(post.category.trim());
     }
-    categories = Array.from(categorySet).sort((a, b) => a.localeCompare(b));
-  } catch {
-    categories = [];
   }
+  const categories = Array.from(categorySet).sort((a, b) => a.localeCompare(b));
 
   // 2. Fetch current page of posts (per_page = 9 for 3-column grid)
-  let posts: PublicPostList;
-  try {
-    posts = await fetchPublicPosts({
-      page: pageNum,
-      per_page: 9,
-      category: activeCategory,
-    });
-  } catch {
-    posts = {
-      items: [],
-      meta: { page: pageNum, per_page: 9, total: 0, pages: 0 },
-    };
-  }
+  const posts = await fetchPublicPosts({
+    page: pageNum,
+    per_page: 9,
+    category: activeCategory,
+  });
 
   const isPageOneNoCategory = pageNum === 1 && !activeCategory;
   const hasPosts = posts.items.length > 0;
@@ -82,11 +68,11 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 
   return (
     <div className="mx-auto flex max-w-[1280px] flex-col gap-8 px-4 py-8 sm:px-8 sm:py-10 md:gap-10">
-      {/* Breadcrumb */}
+      {/* Breadcrumb with 44px min-h touch target */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-muted">
         <Link
           href="/"
-          className="transition-colors hover:text-gold-300 focus-visible:outline-2 focus-visible:outline-gold-300"
+          className="inline-flex min-h-11 items-center transition-colors hover:text-gold-300 focus-visible:outline-2 focus-visible:outline-gold-300"
         >
           Home
         </Link>

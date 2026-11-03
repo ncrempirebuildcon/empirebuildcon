@@ -39,18 +39,18 @@ export function ArticleHeader({ post }: ArticleHeaderProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Breadcrumbs */}
+      {/* Breadcrumbs with 44px min-h touch target */}
       <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-muted">
         <Link
           href="/"
-          className="transition-colors hover:text-gold-300 focus-visible:outline-2 focus-visible:outline-gold-300"
+          className="inline-flex min-h-11 items-center transition-colors hover:text-gold-300 focus-visible:outline-2 focus-visible:outline-gold-300"
         >
           Home
         </Link>
         <span aria-hidden="true">/</span>
         <Link
           href="/blog"
-          className="transition-colors hover:text-gold-300 focus-visible:outline-2 focus-visible:outline-gold-300"
+          className="inline-flex min-h-11 items-center transition-colors hover:text-gold-300 focus-visible:outline-2 focus-visible:outline-gold-300"
         >
           Blog
         </Link>
@@ -59,7 +59,7 @@ export function ArticleHeader({ post }: ArticleHeaderProps) {
             <span aria-hidden="true">/</span>
             <Link
               href={`/blog?category=${encodeURIComponent(post.category)}`}
-              className="transition-colors hover:text-gold-300 focus-visible:outline-2 focus-visible:outline-gold-300"
+              className="inline-flex min-h-11 items-center transition-colors hover:text-gold-300 focus-visible:outline-2 focus-visible:outline-gold-300"
             >
               {post.category}
             </Link>

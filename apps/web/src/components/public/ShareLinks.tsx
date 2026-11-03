@@ -6,8 +6,10 @@
  * Implements:
  *   - Reusable share bar independent of post data (props: `url`, `title`).
  *   - Native share via `navigator.share` when supported; hidden otherwise.
- *   - Copy link: copies URL without query string or fragment; announces "Link copied" in polite live region.
- *   - WhatsApp share: link to `https://wa.me/?text=<encoded title and URL>`.
+ *   - Copy link: copies clean URL without query string or fragment.
+ *   - WhatsApp share: link to `https://wa.me/?text=<encoded title and absolute URL>`.
+ *   - Button remains mounted on copy so focus never drops to body.
+ *   - Persistent polite live region in the DOM for accessible status announcement.
  *   - Zero third-party scripts or SDKs.
  *   - 44px minimum touch targets.
  */
@@ -19,16 +21,31 @@ export interface ShareLinksProps {
   className?: string;
 }
 
-function subscribe() {
+function noopSubscribe() {
   return () => {};
 }
 
-function getCanShareSnapshot(): boolean {
-  return typeof navigator !== "undefined" && typeof navigator.share === "function";
+/**
+ * Determines whether native Web Share is supported by the environment.
+ */
+export function canShare(nav?: { share?: unknown } | null): boolean {
+  return Boolean(nav && typeof nav.share === "function");
 }
 
-function getServerSnapshot(): boolean {
+function getCanShareSnapshot(): boolean {
+  return typeof navigator !== "undefined" && canShare(navigator);
+}
+
+function getServerCanShareSnapshot(): boolean {
   return false;
+}
+
+function getOriginSnapshot(): string {
+  return typeof window !== "undefined" ? window.location.origin : "";
+}
+
+function getServerOriginSnapshot(): string {
+  return "";
 }
 
 /**
@@ -49,27 +66,53 @@ export function stripQueryAndFragment(rawUrl: string): string {
 }
 
 /**
- * Builds the WhatsApp share link with URL-encoded text.
+ * Resolves a raw URL (relative or absolute) to an absolute URL using the provided origin.
+ * Strips query parameters and fragments.
  */
-export function buildWhatsAppShareUrl(title: string, rawUrl: string): string {
-  const cleanUrl = stripQueryAndFragment(rawUrl);
-  const text = cleanUrl ? `${title} ${cleanUrl}`.trim() : title.trim();
+export function resolveShareUrl(rawUrl: string | undefined, origin?: string): string {
+  if (!rawUrl && !origin) return "";
+  const clean = stripQueryAndFragment(rawUrl || "");
+  if (clean.startsWith("http://") || clean.startsWith("https://")) {
+    return clean;
+  }
+  if (origin) {
+    const base = origin.replace(/\/+$/, "");
+    const path = clean.startsWith("/") ? clean : `/${clean}`;
+    return `${base}${path}`;
+  }
+  return clean;
+}
+
+/**
+ * Builds the WhatsApp share link with URL-encoded text and absolute URL.
+ */
+export function buildWhatsAppShareUrl(title: string, rawUrl: string, origin?: string): string {
+  const fullUrl = resolveShareUrl(rawUrl, origin);
+  const isAbsolute = fullUrl.startsWith("http://") || fullUrl.startsWith("https://");
+  const text = isAbsolute ? `${title} ${fullUrl}`.trim() : title.trim();
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
 export function ShareLinks({ url, title, className = "" }: ShareLinksProps) {
-  const canNativeShare = useSyncExternalStore(subscribe, getCanShareSnapshot, getServerSnapshot);
+  const isNativeShareSupported = useSyncExternalStore(
+    noopSubscribe,
+    getCanShareSnapshot,
+    getServerCanShareSnapshot,
+  );
+  const clientOrigin = useSyncExternalStore(
+    noopSubscribe,
+    getOriginSnapshot,
+    getServerOriginSnapshot,
+  );
   const [copied, setCopied] = useState(false);
 
-  const cleanUrl = stripQueryAndFragment(url || "");
-  const whatsappHref = buildWhatsAppShareUrl(title, cleanUrl);
+  const whatsappHref = buildWhatsAppShareUrl(title, url || "", clientOrigin);
 
   const getFullShareUrl = (): string => {
-    if (cleanUrl.startsWith("http")) return cleanUrl;
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}${cleanUrl || window.location.pathname}`;
-    }
-    return cleanUrl;
+    return resolveShareUrl(
+      url || (typeof window !== "undefined" ? window.location.pathname : ""),
+      clientOrigin || (typeof window !== "undefined" ? window.location.origin : ""),
+    );
   };
 
   const handleCopy = async () => {
@@ -122,11 +165,11 @@ export function ShareLinks({ url, title, className = "" }: ShareLinksProps) {
       </a>
 
       {/* Native Web Share button (only rendered if supported) */}
-      {canNativeShare && (
+      {isNativeShareSupported && (
         <button
           type="button"
           onClick={handleNativeShare}
-          aria-label="Share article"
+          aria-label="Share this page"
           className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border border-gold-500 bg-transparent px-4 py-2.5 text-sm font-bold text-gold-300 transition-colors hover:bg-gold-500/10 focus-visible:outline-2 focus-visible:outline-gold-300"
         >
           <svg
@@ -148,13 +191,18 @@ export function ShareLinks({ url, title, className = "" }: ShareLinksProps) {
         </button>
       )}
 
-      {/* Copy link button / Copied confirmation state */}
-      {copied ? (
-        <span
-          role="status"
-          aria-live="polite"
-          className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-palm-line px-4 py-2.5 text-sm font-bold text-palm"
-        >
+      {/* Copy link button - always remains mounted in DOM to preserve focus */}
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-label={copied ? "Link copied" : "Copy link"}
+        className={`inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-gold-300 ${
+          copied
+            ? "border-palm-line bg-palm-bg/30 text-palm"
+            : "border-gold-500 bg-transparent text-gold-300 hover:bg-gold-500/10"
+        }`}
+      >
+        {copied ? (
           <svg
             width="18"
             height="18"
@@ -166,15 +214,7 @@ export function ShareLinks({ url, title, className = "" }: ShareLinksProps) {
           >
             <path d="M5 12l5 5 9-10" />
           </svg>
-          <span>Link copied</span>
-        </span>
-      ) : (
-        <button
-          type="button"
-          onClick={handleCopy}
-          aria-label="Copy link"
-          className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border border-gold-500 bg-transparent px-4 py-2.5 text-sm font-bold text-gold-300 transition-colors hover:bg-gold-500/10 focus-visible:outline-2 focus-visible:outline-gold-300"
-        >
+        ) : (
           <svg
             width="18"
             height="18"
@@ -186,9 +226,14 @@ export function ShareLinks({ url, title, className = "" }: ShareLinksProps) {
           >
             <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
           </svg>
-          <span>Copy link</span>
-        </button>
-      )}
+        )}
+        <span>{copied ? "Link copied" : "Copy link"}</span>
+      </button>
+
+      {/* Persistent polite live region for screen readers */}
+      <span role="status" aria-live="polite" className="sr-only">
+        {copied ? "Link copied" : ""}
+      </span>
     </div>
   );
 }

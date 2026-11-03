@@ -2,12 +2,14 @@
  * Blog listing and article reader browser tests (Phase 5 Task 5.5b).
  *
  * Implements:
- *   - Seeded published posts across two categories and one draft post (excluded from listing).
- *   - Listing order: newest first, featured card on page 1 without filter.
+ *   - Seeded published posts across categories and one draft post (excluded from listing).
+ *   - Clean-up in afterAll unpublishing seeded posts so lists don't grow across runs.
+ *   - Listing order: newest first (relative order asserted) and featured card on page 1 without filter.
  *   - Category filter: marks active chip with aria-current="page", filters cards correctly.
- *   - Server-rendered pagination works without JavaScript.
- *   - Empty state on empty category and out-of-range page ("Nothing in this category yet").
+ *   - Server-rendered pagination works without JavaScript: pages through multi-post category, asserts aria-current and post changes.
+ *   - Empty state on empty category ("Nothing in this category yet").
  *   - Article reader: single H1 title, author, date, body with *bold* rendered as <strong>, tags.
+ *   - ShareLinks: WhatsApp has absolute URL, copy-link copies clean absolute URL, button remains mounted and focused, polite live announcement.
  *   - Unknown or unpublished slug returns 404.
  *   - Axe accessibility clean on listing and article reader.
  *   - Enforced CSP with zero console violations.
@@ -28,10 +30,13 @@ interface SeededPost {
 
 let catA: string;
 let catB: string;
+let catPaging: string;
 let postA1: SeededPost;
 let postB1: SeededPost;
 let postA2: SeededPost;
 let draftPost: SeededPost;
+const pagingPosts: SeededPost[] = [];
+const allCreatedPostIds: string[] = [];
 
 async function createAndPublishPost(
   page: Page,
@@ -47,6 +52,7 @@ async function createAndPublishPost(
   const res = await apiCall(page, "POST", "/api/v1/admin/posts", input);
   expect(res.status(), await res.text()).toBe(201);
   const data = (await res.json()) as { id: string; slug: string; title: string; category?: string };
+  allCreatedPostIds.push(data.id);
 
   if (publish) {
     const pubRes = await apiCall(page, "POST", `/api/v1/admin/posts/${data.id}/publish`);
@@ -83,11 +89,23 @@ test.describe("Public Blog (Task 5.5b)", () => {
     const id = runId();
     catA = `Guides ${id}`;
     catB = `Legal ${id}`;
+    catPaging = `Paging ${id}`;
 
     const adminContext = await browser.newContext({ storageState: CMS_STATE });
     const adminPage = await adminContext.newPage();
 
-    // 1. Create Post A1 (older post in category A)
+    // 1. Seed 10 posts in a dedicated category for paging test (per_page=9, so 10 spans 2 pages)
+    // Seeded first so subsequent posts are newer
+    for (let i = 1; i <= 10; i++) {
+      const p = await createAndPublishPost(adminPage, {
+        title: `Paging Post ${i} ${id}`,
+        body: `Body content for paging post ${i}`,
+        category: catPaging,
+      });
+      pagingPosts.push(p);
+    }
+
+    // 2. Create Post A1 (older post in category A)
     postA1 = await createAndPublishPost(adminPage, {
       title: `E2E Post A1 ${id}`,
       body: "First post body text with *bold* emphasis and helpful details.",
@@ -96,7 +114,7 @@ test.describe("Public Blog (Task 5.5b)", () => {
       tags: ["guides", "buyer"],
     });
 
-    // 2. Create Post B1 (post in category B)
+    // 3. Create Post B1 (post in category B, newer than A1)
     postB1 = await createAndPublishPost(adminPage, {
       title: `E2E Post B1 ${id}`,
       body: "Legal considerations and *RERA* compliance overview.",
@@ -105,7 +123,7 @@ test.describe("Public Blog (Task 5.5b)", () => {
       tags: ["rera", "compliance"],
     });
 
-    // 3. Create Post A2 (newest post in category A - should be featured on page 1)
+    // 4. Create Post A2 (newest post in this run - newest first, hero featured card on page 1)
     postA2 = await createAndPublishPost(adminPage, {
       title: `E2E Post A2 ${id}`,
       body: "Newest guide on *inspection* checklists and builder handover.",
@@ -114,7 +132,7 @@ test.describe("Public Blog (Task 5.5b)", () => {
       tags: ["inspection", "handover"],
     });
 
-    // 4. Create Draft Post in category A (must not appear on public site)
+    // 5. Create Draft Post in category A (must not appear on public site)
     draftPost = await createAndPublishPost(
       adminPage,
       {
@@ -131,6 +149,28 @@ test.describe("Public Blog (Task 5.5b)", () => {
     await adminContext.close();
   });
 
+  test.afterAll(async ({ browser, request }) => {
+    // Clean up seeded posts: unpublish them so lists and chips don't grow across test runs (Item 9)
+    const adminContext = await browser.newContext({ storageState: CMS_STATE });
+    const adminPage = await adminContext.newPage();
+    const me = await adminPage.request.get("/api/v1/auth/me");
+    if (me.ok()) {
+      const { csrf_token: csrf } = (await me.json()) as { csrf_token: string };
+      await Promise.all(
+        allCreatedPostIds.map((postId) =>
+          adminPage.request
+            .fetch(`/api/v1/admin/posts/${postId}/unpublish`, {
+              method: "POST",
+              headers: { "X-CSRF-Token": csrf },
+            })
+            .catch(() => null),
+        ),
+      );
+    }
+    await drainOutbox(request);
+    await adminContext.close();
+  });
+
   test("listing displays newest first, featured card on page 1, and excludes draft posts", async ({
     page,
   }) => {
@@ -141,11 +181,20 @@ test.describe("Public Blog (Task 5.5b)", () => {
     const h1 = page.getByRole("heading", { level: 1 });
     await expect(h1).toHaveText("News & guides");
 
-    // Featured post is the newest post on page 1 with no category filter
-    // postA2 was created last, so it is the newest
-    await expect(page.getByText(postA2.title)).toBeVisible();
-    await expect(page.getByText(postB1.title)).toBeVisible();
-    await expect(page.getByText(postA1.title)).toBeVisible();
+    // Featured post on page 1: postA2 is the newest in this run and sits in the hero featured card (Item 4)
+    const featuredCard = page.locator("article").first();
+    await expect(featuredCard.getByText(postA2.title)).toBeVisible();
+
+    // Order assertion (Item 4): relative order of this run's posts must be A2 (newest) -> B1 -> A1 (oldest)
+    const articleHeadings = await page.locator("article h2").allTextContents();
+    const idxA2 = articleHeadings.indexOf(postA2.title);
+    const idxB1 = articleHeadings.indexOf(postB1.title);
+    const idxA1 = articleHeadings.indexOf(postA1.title);
+    expect(idxA2).toBeGreaterThanOrEqual(0);
+    expect(idxB1).toBeGreaterThanOrEqual(0);
+    expect(idxA1).toBeGreaterThanOrEqual(0);
+    expect(idxA2).toBeLessThan(idxB1);
+    expect(idxB1).toBeLessThan(idxA1);
 
     // Draft post must NEVER appear
     await expect(page.getByText(draftPost.title)).not.toBeVisible();
@@ -179,18 +228,44 @@ test.describe("Public Blog (Task 5.5b)", () => {
   });
 
   test("pagination works without JavaScript", async ({ browser }) => {
-    // Disable JavaScript entirely
+    // Disable JavaScript entirely to verify server-rendered pagination (Item 3)
     const noJsContext = await browser.newContext({ javaScriptEnabled: false });
     const page = await noJsContext.newPage();
 
-    await page.goto("/blog");
+    // Navigate to page 1 of our dedicated 10-post category
+    await page.goto(`/blog?category=${encodeURIComponent(catPaging)}`);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("News & guides");
-    await expect(page.getByText(postA2.title)).toBeVisible();
 
-    // Navigate to page 2 (even if only 1 page of e2e posts, checking pagination structure without JS)
-    const res = await page.goto("/blog?page=1");
-    expect(res?.status()).toBe(200);
-    await expect(page.getByText(postA2.title)).toBeVisible();
+    // Check page 1 link has aria-current="page"
+    const page1Link = page.getByRole("link", { name: "1", exact: true });
+    await expect(page1Link).toHaveAttribute("aria-current", "page");
+
+    // Page 2 link must exist
+    const page2Link = page.getByRole("link", { name: "2", exact: true });
+    await expect(page2Link).toBeVisible();
+
+    // Follow page 2 link with JavaScript disabled
+    await page2Link.click();
+
+    // URL must reflect page 2 while preserving category
+    await expect(page).toHaveURL(/page=2/);
+    await expect(page).toHaveURL(/category=Paging(\+|%20)/);
+
+    // Check link 2 now has aria-current="page"
+    const activePage2Link = page.getByRole("link", { name: "2", exact: true });
+    await expect(activePage2Link).toHaveAttribute("aria-current", "page");
+
+    // Page 2 shows the 10th post (oldest in category, created first: pagingPosts[0])
+    // and does NOT show the newest post on page 1 (pagingPosts[9])
+    const oldestPagingPost = pagingPosts[0];
+    const newestPagingPost = pagingPosts[9];
+    expect(oldestPagingPost).toBeDefined();
+    expect(newestPagingPost).toBeDefined();
+    if (!oldestPagingPost || !newestPagingPost) {
+      throw new Error("Paging posts not seeded properly");
+    }
+    await expect(page.getByText(oldestPagingPost.title)).toBeVisible();
+    await expect(page.getByText(newestPagingPost.title)).not.toBeVisible();
 
     await noJsContext.close();
   });
@@ -232,10 +307,11 @@ test.describe("Public Blog (Task 5.5b)", () => {
     const h1 = page.getByRole("heading", { level: 1 });
     await expect(h1).toHaveText(postA1.title);
 
-    // Breadcrumbs
+    // Breadcrumbs with 44px min-h touch target
     const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
     await expect(breadcrumb).toBeVisible();
-    await expect(breadcrumb.getByRole("link", { name: "Home" })).toBeVisible();
+    const homeLink = breadcrumb.getByRole("link", { name: "Home" });
+    await expect(homeLink).toBeVisible();
     await expect(breadcrumb.getByRole("link", { name: "Blog" })).toBeVisible();
     await expect(breadcrumb.getByRole("link", { name: catA })).toBeVisible();
 
@@ -258,9 +334,53 @@ test.describe("Public Blog (Task 5.5b)", () => {
     await expect(page.getByText("#guides")).toBeVisible();
     await expect(page.getByText("#buyer")).toBeVisible();
 
-    // Share buttons
-    await expect(page.getByRole("link", { name: "Share on WhatsApp" }).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Copy link" }).first()).toBeVisible();
+    // WhatsApp share link sends absolute URL (Item 1)
+    const waLink = page.getByRole("link", { name: "Share on WhatsApp" }).first();
+    await expect(waLink).toBeVisible();
+    await expect(waLink).toHaveAttribute("href", /https?%3A%2F%2F.+%2Fblog%2F/);
+    await expect(waLink).not.toHaveAttribute("href", /%2Fblog%2Fcheck-rera/);
+
+    // Copy link: stub clipboard.writeText to verify exact value passed (Item 5, Item 7)
+    await page.evaluate(() => {
+      const win = window as unknown as Record<string, unknown>;
+      win.__copiedVal = null;
+      if (!navigator.clipboard) {
+        (
+          navigator as unknown as { clipboard: { writeText: (s: string) => Promise<void> } }
+        ).clipboard = {
+          writeText: async (val: string) => {
+            win.__copiedVal = val;
+          },
+        };
+      } else {
+        navigator.clipboard.writeText = async (val: string) => {
+          win.__copiedVal = val;
+        };
+      }
+    });
+
+    const copyBtn = page.getByRole("button", { name: "Copy link" }).first();
+    await copyBtn.click();
+
+    const copiedVal = await page.evaluate(
+      () => (window as unknown as Record<string, unknown>).__copiedVal as string | null,
+    );
+    expect(copiedVal).toBeTruthy();
+    expect(copiedVal).toMatch(/^https?:\/\/.+\/blog\/.+/);
+    expect(copiedVal).not.toContain("?");
+    expect(copiedVal).not.toContain("#");
+
+    // Button remains mounted and focused (Item 7)
+    const copiedBtn = page.getByRole("button", { name: "Link copied" }).first();
+    await expect(copiedBtn).toBeVisible();
+    const isFocused = await copiedBtn.evaluate((el) => document.activeElement === el);
+    expect(isFocused).toBe(true);
+    const isBodyFocused = await page.evaluate(() => document.activeElement === document.body);
+    expect(isBodyFocused).toBe(false);
+
+    // Polite live region announces Link copied
+    const liveRegion = page.locator("span[role='status'][aria-live='polite']").first();
+    await expect(liveRegion).toHaveText("Link copied");
   });
 
   test("unknown slug shows the 404 page", async ({ page }) => {
