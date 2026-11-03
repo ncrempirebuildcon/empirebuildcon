@@ -3,6 +3,7 @@ import {
   findRedirect,
   hitSignature,
   isRedirectable,
+  locationFor,
   normalisePath,
   reportHit,
   resetRedirectCache,
@@ -28,10 +29,19 @@ function mockApi(ok = true) {
 }
 
 afterEach(() => {
+  resetRedirectCache();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
-  resetRedirectCache();
 });
+
+// The same vector is checked by the API (tests/test_redirect_hits.py), so the two never drift.
+export const SHARED_VECTOR = {
+  secret: "shared-test-secret",
+  ts: 1700000000000,
+  body: '{"from_path":"/old-offer"}',
+  signature: "84c44ffcdc10e4cd77cb2e6f291ae9a3e482b9bfa0ddad80a262a16449456afb",
+};
 
 describe("redirect helpers", () => {
   it("normalises paths like the API", () => {
@@ -39,6 +49,9 @@ describe("redirect helpers", () => {
     expect(normalisePath("/")).toBe("/");
     expect(normalisePath("/%C3%A9v%C3%A8nement")).toBe("/évènement");
     expect(normalisePath("/%E0%A4%A")).toBe("/%E0%A4%A");
+    // An escaped slash stays escaped, so "/a%2Fb" never matches the redirect from "/a/b".
+    expect(normalisePath("/a%2Fb")).toBe("/a%2Fb");
+    expect(normalisePath("/a%2fb")).toBe("/a%2Fb");
   });
 
   it("never sends a visitor to another host", () => {
@@ -53,6 +66,17 @@ describe("redirect helpers", () => {
       expect(isRedirectable(p), p).toBe(false);
     }
     expect(isRedirectable("/old-offer")).toBe(true);
+  });
+});
+
+describe("locationFor", () => {
+  it("puts the visitor's query before the target's fragment and drops _rsc", () => {
+    expect(locationFor("/projects/x#prices", "?utm_source=fb")).toBe(
+      "/projects/x?utm_source=fb#prices",
+    );
+    expect(locationFor("/contact", "?_rsc=abc&utm_source=fb")).toBe("/contact?utm_source=fb");
+    expect(locationFor("/contact", "?_rsc=abc")).toBe("/contact");
+    expect(locationFor("/x?tab=1#a", "?utm_source=fb")).toBe("/x?tab=1#a");
   });
 });
 
@@ -82,9 +106,46 @@ describe("findRedirect", () => {
     mockApi(false);
     expect(await findRedirect("/old-offer", "")).toBeNull();
   });
+
+  it("keeps the last list when the API goes down, and never waits for a refresh", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const fetchMock = mockApi();
+    expect(await findRedirect("/old-offer", "")).not.toBeNull();
+    vi.setSystemTime(Date.now() + 61_000);
+    fetchMock.mockImplementation(async () => new Response("", { status: 503 }));
+    // Stale: answered from the old list at once, while a refresh runs (and fails).
+    expect(await findRedirect("/old-offer", "")).not.toBeNull();
+    await resetRedirectCacheKeepingList();
+    expect(await findRedirect("/old-offer", "")).not.toBeNull();
+    // After a failure the next try waits 10 seconds.
+    const calls = fetchMock.mock.calls.length;
+    await findRedirect("/old-offer", "");
+    expect(fetchMock.mock.calls.length).toBe(calls);
+  });
+
+  it("waits at most 800 ms for a process's first list", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+    const started = Date.now();
+    expect(await findRedirect("/old-offer", "")).toBeNull();
+    expect(Date.now() - started).toBeLessThan(1_400);
+  });
 });
 
+/** Lets a background refresh finish without forgetting the list. */
+async function resetRedirectCacheKeepingList(): Promise<void> {
+  await new Promise((r) => setTimeout(r, 0));
+  await new Promise((r) => setTimeout(r, 0));
+}
+
 describe("reportHit", () => {
+  it("matches the API's signature for the shared vector", () => {
+    const v = SHARED_VECTOR;
+    expect(hitSignature(v.secret, v.ts, v.body)).toBe(v.signature);
+  });
+
   it("signs the hit with the shared secret and a redirect-hit prefix", async () => {
     vi.stubEnv("REVALIDATE_SECRET", "s3cret");
     const fetchMock = mockApi();

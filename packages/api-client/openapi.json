@@ -30326,6 +30326,16 @@
             },
             "description": "Not signed in"
           },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too large"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -30334,7 +30344,7 @@
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Invalid input"
           },
           "429": {
             "content": {

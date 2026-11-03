@@ -55,8 +55,29 @@ class RedirectHit(BaseModel):
     from_path: str = Field(min_length=1, max_length=500)
 
 
-async def _raw_body(request: Request) -> bytes:
-    return await request.body()
+async def _signed_body(
+    request: Request,
+    x_redirect_hit_signature: Annotated[str | None, Header()] = None,
+    x_redirect_hit_timestamp: Annotated[str | None, Header()] = None,
+) -> bytes:
+    """The body of a correctly signed hit; 401/413 before anything large is read.
+
+    SECURITY: the headers are checked first, the declared and the actual size are capped, and
+    only then is the signature computed (seo/hits.py).
+    """
+    if not x_redirect_hit_signature or hits.fresh_timestamp(x_redirect_hit_timestamp) is None:
+        raise ApiProblem(401, "Missing or wrong signature.")
+    declared = request.headers.get("content-length", "")
+    if declared and (not declared.isdigit() or int(declared) > hits.MAX_BODY_BYTES):
+        raise ApiProblem(413, "Too large.")
+    body = b""
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > hits.MAX_BODY_BYTES:
+            raise ApiProblem(413, "Too large.")
+    if not hits.signature_ok(x_redirect_hit_signature, x_redirect_hit_timestamp, body):
+        raise ApiProblem(401, "Missing or wrong signature.")
+    return body
 
 
 @router.post(
@@ -64,17 +85,14 @@ async def _raw_body(request: Request) -> bytes:
     status_code=204,
     operation_id="record_redirect_hit",
     summary="Count one redirect the website answered (signed by the web server)",
+    responses=problem_responses(413, 422),
     **INTERNAL,
 )
 def record_redirect_hit(
-    body: Annotated[bytes, Depends(_raw_body)],
+    body: Annotated[bytes, Depends(_signed_body)],
     db: Annotated[Session, Depends(get_db)],
-    x_redirect_hit_signature: Annotated[str | None, Header()] = None,
-    x_redirect_hit_timestamp: Annotated[str | None, Header()] = None,
 ) -> Response:
     """204 whether or not the address has a redirect (nothing to learn from the answer)."""
-    if not hits.signature_ok(x_redirect_hit_signature, x_redirect_hit_timestamp, body):
-        raise ApiProblem(401, "Missing or wrong signature.")
     try:
         hit = RedirectHit.model_validate_json(body)
     except ValidationError:

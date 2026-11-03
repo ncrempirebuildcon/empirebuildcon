@@ -17,14 +17,17 @@ import {
   type SearchParams,
 } from "@/lib/public/catalogue";
 
-// A filtered list is the same page: its canonical is /properties (ARCHITECTURE §15).
-export const metadata: Metadata = pageMetadata({
-  title: "Properties",
-  path: "/properties",
-  fallbackDescriptions: [
-    "Homes in Empire's projects: carpet area, price and possession for every home on offer.",
-  ],
-});
+// A filtered list is the same page: its canonical is /properties (ARCHITECTURE §16).
+// WHY a function: SITE_URL is read per request, not baked in at build time.
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata({
+    title: "Properties",
+    path: "/properties",
+    fallbackDescriptions: [
+      "Homes in Empire's projects: carpet area, price and possession for every home on offer.",
+    ],
+  });
+}
 
 export default async function PropertiesPage({
   searchParams,

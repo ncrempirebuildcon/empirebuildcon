@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const title = `${configurationTitle(property)} · ${property.project.name}`;
   return pageMetadata({
     title,
-    path: propertyPath(slug, property.slug),
+    path: propertyPath(property.project.slug, property.slug),
     fallbackDescriptions: [
       `${title}: carpet area, price and possession, with the project's UP-RERA number.`,
     ],
@@ -66,8 +66,11 @@ export default async function PropertyPage({ params }: Params) {
 
   return (
     <article className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8">
-      <JsonLd data={propertyLd(property, project, propertyPath(slug, property.slug), title)} />
+      <JsonLd
+        data={propertyLd(property, project, propertyPath(project.slug, property.slug), title)}
+      />
       <Breadcrumbs
+        structuredData={!project.is_sample && !property.is_sample}
         items={[
           { href: "/", label: "Home" },
           { href: "/properties", label: "Properties" },

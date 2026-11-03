@@ -158,7 +158,7 @@ test("a CMS redirect is answered by the website and counted", async ({ page, bro
   const from = `/e2e-old-${id}`;
   const made = await apiCall(page, "POST", "/api/v1/admin/redirects", {
     from_path: from,
-    to_path: "/projects",
+    to_path: "/projects#list",
   });
   expect(made.status(), await made.text()).toBe(201);
   const { id: redirectId } = (await made.json()) as { id: string };
@@ -175,7 +175,15 @@ test("a CMS redirect is answered by the website and counted", async ({ page, bro
       { timeout: 10_000 },
     )
     .toBe(308);
-  expect(response.headers()["location"]).toMatch(/\/projects\?utm_source=e2e$/);
+  // On this site (Next.js sends a same-site Location as a path), the visitor's query before the
+  // target's fragment, kept by browsers an hour.
+  expect(new URL(response.headers()["location"] ?? "", WEB_URL).href).toBe(
+    `${WEB_URL}/projects?utm_source=e2e#list`,
+  );
+  expect(response.headers()["cache-control"]).toBe("public, max-age=3600");
+  // A form post is never sent elsewhere.
+  const posted = await visitor.request.post(from, { maxRedirects: 0, data: {} });
+  expect(posted.status()).not.toBe(308);
 
   // The visit was counted (sent after the answer, so allow a moment).
   await expect

@@ -1,11 +1,11 @@
 /**
  * Metadata, share images and structured data for the public site (task 5.6, D-047).
  *
- * Implements ARCHITECTURE §15 (SEO):
+ * Implements ARCHITECTURE §16 (SEO):
  *   - Every public page's `<title>`, description, canonical URL on SITE_URL (production:
  *     https://empirebuildcon.com), Open Graph and Twitter card, through `pageMetadata`.
  *   - JSON-LD (schema.org) builders: Organization, RealEstateListing (projects and homes),
- *     FAQPage and BreadcrumbList. `JsonLd` (components/seo) writes them with the CSP nonce.
+ *     FAQPage and BreadcrumbList. `JsonLd` (components/JsonLd.tsx) writes them with the CSP nonce.
  *
  * COMPLIANCE (AGENTS.md "Honest content"):
  *   - Structured data says only what the page says: no price when the page shows "price on
@@ -228,22 +228,39 @@ function postalAddress(location: {
   });
 }
 
-/** An Offer for the listing, or nothing when the page shows no number (price on request). */
+/**
+ * An Offer for the listing, or nothing when the page shows no number (price on request).
+ * COMPLIANCE: like the page's note, it says the price excludes GST (and, in its description,
+ * stamp duty and registration).
+ */
 function offers(price: Price, onRequest = false): Ld | null {
   if (onRequest || price.on_request || price.min_inr == null) return null;
   const low = price.min_inr;
   const high = price.max_inr ?? low;
+  const terms = {
+    priceSpecification: {
+      "@type": "PriceSpecification",
+      priceCurrency: "INR",
+      valueAddedTaxIncluded: false,
+    },
+    description: "Price excludes GST, stamp duty and registration.",
+  };
   return low === high
-    ? { "@type": "Offer", priceCurrency: "INR", price: low }
-    : { "@type": "AggregateOffer", priceCurrency: "INR", lowPrice: low, highPrice: high };
+    ? { "@type": "Offer", priceCurrency: "INR", price: low, ...terms }
+    : { "@type": "AggregateOffer", priceCurrency: "INR", lowPrice: low, highPrice: high, ...terms };
 }
 
-/** Carpet area in sq ft, only when the area is a carpet area (the site never relabels areas). */
+/**
+ * Carpet area in sq ft, only when the area is a carpet area (the site never relabels areas); a
+ * range stays a range, as the page shows it.
+ */
 function carpetArea(area: Area | null | undefined): Ld | null {
   if (!area || area.basis !== "carpet" || area.min_sqm == null) return null;
+  const min = Math.round(area.min_sqm * SQFT_PER_SQM);
+  const max = area.max_sqm != null ? Math.round(area.max_sqm * SQFT_PER_SQM) : min;
   return {
     "@type": "QuantitativeValue",
-    value: Math.round(area.min_sqm * SQFT_PER_SQM),
+    ...(max > min ? { minValue: min, maxValue: max } : { value: min }),
     unitCode: "FTK",
     unitText: "sq ft (carpet area)",
   };

@@ -9,12 +9,23 @@ import { PageView } from "@/components/blocks/PageView";
 import { firstImage, firstText } from "@/components/blocks/Blocks";
 import { JsonLd } from "@/components/JsonLd";
 import { fetchPublicPageOrNull, fetchPublicSite } from "@/lib/public/api";
-import { absoluteUrl, organizationLd, pageMetadata } from "@/lib/public/seo";
+import { organizationLd, pageMetadata } from "@/lib/public/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
   const page = await fetchPublicPageOrNull("home");
   // The site layout's default title stays until the home page is published.
-  if (!page || page.blocks.length === 0) return { alternates: { canonical: absoluteUrl("/") } };
+  if (!page || page.blocks.length === 0) {
+    const site = await fetchPublicSite();
+    const meta = pageMetadata({
+      title: site.company.name || "Empire",
+      path: "/",
+      fallbackDescriptions: [site.seo?.default_description, site.company.tagline],
+      siteName: site.company.name || "Empire",
+    });
+    // The layout's default title (the site's own) stays.
+    delete meta.title;
+    return meta;
+  }
   return {
     ...pageMetadata({
       title: page.title,

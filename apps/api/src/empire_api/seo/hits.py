@@ -33,6 +33,9 @@ from empire_api.timeutil import utcnow
 SIGNATURE_HEADER: Final = "x-redirect-hit-signature"
 TIMESTAMP_HEADER: Final = "x-redirect-hit-timestamp"
 MAX_SKEW_MS: Final = 5 * 60 * 1000
+# SECURITY: a hit body is ~60 bytes. Anything over this is refused before it is read in full,
+# because /api/v1/internal/* skips the edge guard (anyone can reach it on the API host).
+MAX_BODY_BYTES: Final = 1024
 _PREFIX: Final = b"redirect-hit."
 
 
@@ -42,14 +45,20 @@ def hit_signature(secret: str, timestamp_ms: int, body: bytes) -> str:
     return hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
 
 
+def fresh_timestamp(timestamp: str | None, *, now_ms: int | None = None) -> int | None:
+    """The timestamp as milliseconds when it is plain ASCII digits within five minutes of now."""
+    if not timestamp or len(timestamp) > 16 or not (timestamp.isascii() and timestamp.isdigit()):
+        return None
+    ts = int(timestamp)
+    now = now_ms if now_ms is not None else int(time.time() * 1000)
+    return ts if abs(now - ts) <= MAX_SKEW_MS else None
+
+
 def signature_ok(
     signature: str | None, timestamp: str | None, body: bytes, *, now_ms: int | None = None
 ) -> bool:
-    if not signature or not timestamp or not timestamp.isdigit():
-        return False
-    ts = int(timestamp)
-    now = now_ms if now_ms is not None else int(time.time() * 1000)
-    if abs(now - ts) > MAX_SKEW_MS:
+    ts = fresh_timestamp(timestamp, now_ms=now_ms)
+    if ts is None or not signature or len(signature) != 64:
         return False
     secret = get_settings().revalidate_secret.get_secret_value()
     return constant_time_equals(signature.lower(), hit_signature(secret, ts, body))

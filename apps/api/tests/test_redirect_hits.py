@@ -89,3 +89,28 @@ def test_a_bad_body_is_a_422(client: TestClient) -> None:
         URL, content=body, headers={hits.SIGNATURE_HEADER: sig, hits.TIMESTAMP_HEADER: str(ts)}
     )
     assert response.status_code == 422
+
+
+def test_the_signature_matches_the_web_apps_shared_vector() -> None:
+    """Same vector as apps/web/test/redirects.test.ts (SHARED_VECTOR), so the two never drift."""
+    body = b'{"from_path":"/old-offer"}'
+    assert (
+        hits.hit_signature("shared-test-secret", 1700000000000, body)
+        == "84c44ffcdc10e4cd77cb2e6f291ae9a3e482b9bfa0ddad80a262a16449456afb"
+    )
+
+
+def test_odd_timestamps_and_large_bodies_are_refused_without_a_500(client: TestClient) -> None:
+    ts = str(int(time.time() * 1000))
+    for odd in ["\u00b2" * 3, "9" * 5000, "-1", ""]:
+        response = client.post(
+            URL,
+            content=b"{}",
+            headers={hits.SIGNATURE_HEADER: "0" * 64, hits.TIMESTAMP_HEADER: odd.encode("utf-8")},
+        )
+        assert response.status_code == 401, odd[:10]
+    big = b'{"from_path":"/' + b"a" * 5000 + b'"}'
+    response = client.post(
+        URL, content=big, headers={hits.SIGNATURE_HEADER: "0" * 64, hits.TIMESTAMP_HEADER: ts}
+    )
+    assert response.status_code == 413

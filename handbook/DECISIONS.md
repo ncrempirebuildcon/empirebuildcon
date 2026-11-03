@@ -835,15 +835,25 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - Next.js streams metadata to browsers and Googlebot, and puts it in `<head>` for crawlers that don't run JavaScript (its default list, including WhatsApp and Facebook).
 - **Structured data:**
   - Types: `Organization` (home page), `RealEstateListing` (projects and homes), `FAQPage` and `BreadcrumbList`.
-  - It says only what the page says: the UP-RERA number as the identifier; no price when the page shows price on request; floor size only for a carpet area, labelled as such; nothing for sample data or placeholders; no ratings.
+  - It says only what the page says:
+    - the UP-RERA number as the identifier;
+    - no price when the page shows price on request, and a price marked as excluding GST, stamp duty and registration;
+    - floor size only for a carpet area, labelled as such, with a range kept as a range;
+    - nothing for sample data or placeholders;
+    - no ratings.
   - It is written by `components/JsonLd.tsx`, the one place allowed raw HTML (escaped JSON, CSP nonce).
 - **Redirects:** `proxy.ts` answers a CMS redirect before anything else on a page request (GET and HEAD only).
   - Targets are site paths only, checked again on the website.
   - The list is cached for 60 s per server process. The revalidation endpoint can't reach the proxy's bundle, so the cache works by time; `REDIRECT_CACHE_SECONDS` changes it.
-  - When the API is down, no redirect applies, rather than an error.
+  - An old list is served while a new one loads, so pages never wait for the API; only a process's first list is awaited, for at most 800 ms.
+  - When the API is down, the last list (or none) applies, rather than an error.
+  - Answers carry `Cache-Control: public, max-age=3600`. A redirect switched off in the CMS can therefore still apply for up to an hour for a returning visitor.
+  - Prefetches and HEAD requests are not counted.
 - **Hit counts:** `POST /api/v1/internal/redirects/hit`, sent after the answer.
   - It is signed with the existing `REVALIDATE_SECRET` over `redirect-hit.{ts}.{body}`. The prefix keeps a hit signature from ever passing as a revalidation signature. This means no new secret, and the web host never holds the internal key.
   - There is no replay cache, because counts are for staff insight only.
+  - `/api/v1/internal/*` skips the edge guard, so the endpoint checks the headers first and refuses bodies over 1 KB before reading them.
+  - Both sides test the same signature vector.
 
 **Verified / assumed:**
 - Verified in Next.js 16.4's source that Googlebot is not in its "HTML-limited bots" list, so it receives streamed metadata.

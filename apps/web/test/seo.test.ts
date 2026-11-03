@@ -126,7 +126,7 @@ describe("structured data", () => {
       propertyID: "UP-RERA",
       value: "UPRERAPRJ123456",
     });
-    expect(ld.offers).toEqual({
+    expect(ld.offers).toMatchObject({
       "@type": "AggregateOffer",
       priceCurrency: "INR",
       lowPrice: 6500000,
@@ -158,7 +158,18 @@ describe("structured data", () => {
       offers?: unknown;
     };
     expect(ld.about.floorSize).toMatchObject({ value: 1076, unitText: "sq ft (carpet area)" });
-    expect(ld.offers).toEqual({ "@type": "Offer", priceCurrency: "INR", price: 7000000 });
+    expect(ld.offers).toMatchObject({ "@type": "Offer", priceCurrency: "INR", price: 7000000 });
+    expect(JSON.stringify(ld.offers)).toContain("excludes GST, stamp duty and registration");
+    expect(ld.offers).toMatchObject({ priceSpecification: { valueAddedTaxIncluded: false } });
+    const range = propertyLd(
+      { ...property, area: { basis: "carpet", min_sqm: 66.9, max_sqm: 104 } } as never,
+      project as never,
+      "/x",
+      "2 BHK",
+    ) as { about: { floorSize: Record<string, unknown> } };
+    // A range stays a range, as the page shows it.
+    expect(range.about.floorSize).toMatchObject({ minValue: 720, maxValue: 1119 });
+    expect(range.about.floorSize).not.toHaveProperty("value");
     const hidden = propertyLd(
       property as never,
       { ...project, price: { on_request: true } } as never,

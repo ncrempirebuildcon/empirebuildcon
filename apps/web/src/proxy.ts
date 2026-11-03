@@ -90,13 +90,27 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   }
 
   // 4a. A redirect from the CMS (task 5.6, D-047). Only GET and HEAD: a form post is never
-  // sent elsewhere. SECURITY: the target is a path on this site (lib/public/redirects.ts).
+  // sent elsewhere. SECURITY: the target is a path on this site (lib/public/redirects.ts), made
+  // absolute on SITE_URL, so `Location` never depends on the Host header the visitor sent.
+  // (Next.js refuses a relative Location here.)
   if (request.method === "GET" || request.method === "HEAD") {
     const found = await findRedirect(pathname, request.nextUrl.search);
     if (found) {
-      event.waitUntil(reportHit(found.redirect.from_path));
-      const status = found.redirect.status_code === 301 ? 301 : 308;
-      return NextResponse.redirect(new URL(found.location, request.nextUrl.origin), status);
+      // A link prefetch is not a visit, so it is not counted.
+      const prefetch =
+        request.headers.has("next-router-prefetch") ||
+        request.headers.get("purpose") === "prefetch" ||
+        request.headers.get("sec-purpose")?.includes("prefetch");
+      if (!prefetch && request.method === "GET") {
+        event.waitUntil(reportHit(found.redirect.from_path));
+      }
+      return new NextResponse(null, {
+        status: found.redirect.status_code === 301 ? 301 : 308,
+        headers: {
+          Location: new URL(found.location, process.env.SITE_URL || request.nextUrl.origin).href,
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
     }
   }
 

@@ -104,8 +104,9 @@ export default async function ProjectPage({ params }: Params) {
   return (
     <article className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-8 sm:px-6 lg:px-8">
       <JsonLd data={projectLd(project, path)} />
-      <JsonLd data={faqLd(project.faqs)} />
+      {project.is_sample ? null : <JsonLd data={faqLd(project.faqs)} />}
       <Breadcrumbs
+        structuredData={!project.is_sample}
         items={[
           { href: "/", label: "Home" },
           { href: "/projects", label: "Projects" },
