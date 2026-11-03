@@ -31,6 +31,20 @@ const display = localFont({
   fallback: ["Georgia", "serif"],
 });
 
+// WHY: the Latin file has no ₹ (U+20B9); it is in the latin-ext file. This face holds only that
+// character (unicode-range) and loads only when a page shows a price, so every price keeps the
+// site's font. No fallback of its own: other characters fall through to Manrope.
+const rupee = localFont({
+  src: "../../node_modules/@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2",
+  weight: "200 800",
+  variable: "--font-rupee",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+  fallback: [],
+  declarations: [{ prop: "unicode-range", value: "U+20B9" }],
+});
+
 const sans = localFont({
   src: "../../node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2",
   weight: "200 800",
@@ -42,7 +56,8 @@ const sans = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL ?? "http://localhost:3000"),
   title: { default: "Empire · Delivering Happiness", template: "%s · Empire" },
-  description: "Empire — Delivering Happiness. Our new website is on its way.",
+  description:
+    "Empire — Delivering Happiness. Projects and homes in Uttar Pradesh, each with its UP-RERA registration.",
   // TODO(phase-9): allow indexing at go-live (Phase 9 gate). Until then nothing is indexed.
   robots: { index: false, follow: false },
 };
@@ -54,7 +69,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable}`}>
+    <html lang="en" className={`${display.variable} ${rupee.variable} ${sans.variable}`}>
       <body className="min-h-dvh bg-noir-900 font-sans text-body antialiased">{children}</body>
     </html>
   );

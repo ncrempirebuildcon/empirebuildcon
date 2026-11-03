@@ -867,12 +867,18 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 - **The Sentry browser SDK loads only with a DSN, after `load`** (`instrumentation-client.ts`). It was ~118 KB gzipped in every page's first bundle.
   - Trade-off: an error in a page's first moments isn't reported from the browser. The server still reports its own errors.
 - **The stylesheet is inlined** (`experimental.inlineCss`). It is ~12 KB gzipped and saves a render-blocking request. CSP already allows inline styles.
-- **Fonts use `next/font/local`** with the same @fontsource files. They are preloaded with metric-matched fallbacks, Latin only. The theme's font tokens point at the next/font variables (`globals.css`).
+- **Fonts use `next/font/local`** with the same @fontsource files. They are preloaded with metric-matched fallbacks, Latin only. The theme's font tokens point at the next/font variables (`globals.css`), with plain fallbacks.
+  - The rupee sign isn't in the Latin file. A face holding only U+20B9 (from the latin-ext file, not preloaded) keeps prices in the site's font.
 - **Touch targets:** every button, control and stand-alone link is 44×44 px. Links in running text are exempt, as WCAG 2.5.8 allows.
+  - A checkbox label grows to 44 px without negative margins, so it never covers a neighbour. The public pass checks that no label covers another element.
+  - "Skip to content" is the first Tab. Main takes focus and keeps clear of the sticky header (`scroll-mt-24`, WCAG 2.4.11).
 - **Budgets in CI:** Lighthouse runs as its own Playwright project and CI job on every push, with the API and real pages, median of 3:
   - performance ≥ 90;
   - accessibility and best practices ≥ 95;
-  - SEO ≥ 90, counted without "is-crawlable" until go-live (the site is `noindex` by design). This replaces the lhci job, which measured `/` with no API.
+  - SEO ≥ 90, counted without "is-crawlable" until go-live (the site is `noindex` by design). An audit that errors counts as 0.
+  - This replaces the lhci job, which measured `/` with no API.
+  - No retries, and JSON and HTML reports as a CI artifact.
+  - The CI build has no Sentry DSN, so the Sentry chunk that production loads after `load` is not in the measurement.
 **Verified / assumed:**
 - Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.
 - Assumed: GitHub's runners score at least as well. If CI scores sit near 90, the budget is the thing to discuss, not a reason to retry.

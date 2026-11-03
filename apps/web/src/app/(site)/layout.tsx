@@ -79,7 +79,7 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
       {site?.offers && <OfferBanner offers={site.offers} />}
       <Header site={site} isProduction={isProd} />
       {/* tabIndex -1: the skip link moves focus here, so the next Tab starts inside main. */}
-      <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
+      <main id="main-content" tabIndex={-1} className="flex-1 scroll-mt-24 outline-none">
         {children}
       </main>
       <Footer site={site} isProduction={isProd} />

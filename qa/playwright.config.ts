@@ -75,6 +75,8 @@ export default defineConfig({
       dependencies: ["setup"],
       testMatch: /\.lighthouse\.spec\.ts$/,
       workers: 1,
+      // A missed budget is a result to look at, not a flake to retry (D-049).
+      retries: 0,
     },
   ],
   webServer: [

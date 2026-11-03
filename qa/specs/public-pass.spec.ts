@@ -92,6 +92,46 @@ async function smallTargets(page: Page): Promise<string[]> {
   });
 }
 
+/**
+ * Checkbox labels whose tap area reaches over a neighbour: a tap just above or below a label
+ * must not land on it (a consent box must never be ticked by a tap meant for something else).
+ */
+async function overreachingLabels(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const found: string[] = [];
+    for (const input of document.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) {
+      const label = input.labels?.[0];
+      if (!label) continue;
+      const box = label.getBoundingClientRect();
+      if (box.height === 0) continue;
+      // Anything else on screen whose box meets the label's: a tap in the shared strip must
+      // reach that element, not the label.
+      const others = label
+        .closest("form, fieldset, section")
+        ?.querySelectorAll<HTMLElement>("a, button, summary, input, label, p, li, span");
+      for (const other of others ?? []) {
+        if (other === input || label.contains(other) || other.contains(label)) continue;
+        // Text inside a closed <details> keeps a layout box but isn't shown.
+        if (!other.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true }))
+          continue;
+        const o = other.getBoundingClientRect();
+        const top = Math.max(box.top, o.top);
+        const bottom = Math.min(box.bottom, o.bottom);
+        const left = Math.max(box.left, o.left);
+        const right = Math.min(box.right, o.right);
+        if (bottom - top < 1 || right - left < 1) continue;
+        const hit = document.elementFromPoint((left + right) / 2, (top + bottom) / 2);
+        if (hit && label.contains(hit) && !other.contains(hit)) {
+          const name = (label.textContent ?? "").trim().slice(0, 30);
+          const what = (other.textContent ?? other.tagName).trim().slice(0, 30);
+          found.push(`label "${name}" covers "${what}"`);
+        }
+      }
+    }
+    return found;
+  });
+}
+
 for (const viewport of VIEWPORTS) {
   test(`every public route passes at ${viewport.name}`, async ({ browser, page }) => {
     test.setTimeout(180_000);
@@ -121,6 +161,15 @@ for (const viewport of VIEWPORTS) {
       );
       if (overflow > 0) problems.push(`${path}: ${overflow}px sideways scroll`);
       for (const small of await smallTargets(visitor)) problems.push(`${path}: small ${small}`);
+      // Labels are checked where they are on screen, one form at a time, with every
+      // disclosure open (an open consent text sits right above the marketing box).
+      await visitor.evaluate(() => {
+        for (const d of document.querySelectorAll("details")) d.open = true;
+      });
+      for (const form of await visitor.locator("form").all()) {
+        await form.scrollIntoViewIfNeeded();
+        for (const over of await overreachingLabels(visitor)) problems.push(`${path}: ${over}`);
+      }
       const h1 = await visitor.getByRole("heading", { level: 1 }).count();
       if (h1 !== 1) problems.push(`${path}: ${h1} h1`);
     }
@@ -129,6 +178,22 @@ for (const viewport of VIEWPORTS) {
     await visitorContext.close();
   });
 }
+
+test("the label check finds a label that reaches over its neighbour", async ({ page }) => {
+  // Negative control for overreachingLabels: two rows 8 px apart, labels padded 12 px into them.
+  await page.setContent(`
+    <form style="display:grid;gap:8px;font:14px/20px sans-serif">
+      <div style="display:flex"><input id="a" type="checkbox"><label for="a" style="margin:-12px 0;padding:12px 0">First</label></div>
+      <div style="display:flex"><input id="b" type="checkbox"><label for="b" style="margin:-12px 0;padding:12px 0">Second</label></div>
+    </form>`);
+  expect((await overreachingLabels(page)).length).toBeGreaterThan(0);
+  await page.setContent(`
+    <form style="display:grid;gap:8px;font:14px/20px sans-serif">
+      <div style="display:flex"><input id="a" type="checkbox"><label for="a" style="padding:12px 0">First</label></div>
+      <div style="display:flex"><input id="b" type="checkbox"><label for="b" style="padding:12px 0">Second</label></div>
+    </form>`);
+  expect(await overreachingLabels(page)).toEqual([]);
+});
 
 test("the skip link moves focus to the main content, with a visible focus ring", async ({
   browser,
@@ -142,12 +207,23 @@ test("the skip link moves focus to the main content, with a visible focus ring",
   await expect(skip).toBeInViewport();
   await visitor.keyboard.press("Enter");
   await expect(visitor).toHaveURL(/#main-content$/);
-  // The next Tab lands inside the main content, not back in the header.
+  // The next Tab lands inside the main content, not back in the header, and the sticky header
+  // doesn't cover it (WCAG 2.4.11).
   await visitor.keyboard.press("Tab");
-  const insideMain = await visitor.evaluate(
-    () => document.getElementById("main-content")?.contains(document.activeElement) ?? false,
+  const focus = await visitor.evaluate(() => {
+    const el = document.activeElement as HTMLElement;
+    const box = el.getBoundingClientRect();
+    const header = document.querySelector("header")?.getBoundingClientRect();
+    return {
+      insideMain: document.getElementById("main-content")?.contains(el) ?? false,
+      top: box.top,
+      headerBottom: header ? header.bottom : 0,
+    };
+  });
+  expect(focus.insideMain).toBe(true);
+  expect(focus.top, "focused element below the sticky header").toBeGreaterThanOrEqual(
+    focus.headerBottom,
   );
-  expect(insideMain).toBe(true);
   const ring = await visitor.evaluate(() => {
     const s = getComputedStyle(document.activeElement as Element);
     return `${s.outlineStyle} ${s.outlineWidth} ${s.boxShadow}`;

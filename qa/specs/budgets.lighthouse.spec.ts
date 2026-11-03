@@ -40,8 +40,9 @@ function categoryScore(lhr: Lhr, name: Category): number {
   let total = 0;
   let weight = 0;
   for (const ref of category.auditRefs) {
-    const score = lhr.audits[ref.id]?.score;
-    if (ref.id === "is-crawlable" || ref.weight === 0 || score == null) continue;
+    if (ref.id === "is-crawlable" || ref.weight === 0) continue;
+    // An audit that errored scores 0 (Lighthouse fails the whole category in that case).
+    const score = lhr.audits[ref.id]?.score ?? 0;
     total += score * ref.weight;
     weight += ref.weight;
   }
@@ -82,10 +83,11 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
       for (let run = 0; run < RUNS; run += 1) {
         const result = await lighthouse(`${WEB_URL}${path}`, {
           port: chrome.port,
-          output: "json",
+          output: ["json", "html"],
           logLevel: "error",
         });
         const lhr = result?.lhr as unknown as Lhr | undefined;
+        const html = Array.isArray(result?.report) ? result.report[1] : undefined;
         expect(lhr, `${path}: Lighthouse ran`).toBeTruthy();
         if (!lhr) continue;
         for (const name of Object.keys(BUDGET) as Category[]) {
@@ -93,6 +95,8 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
         }
         const file = `${path.replace(/[^a-z0-9]+/gi, "_") || "home"}-${run + 1}.json`;
         writeFileSync(resolve(OUT, file), JSON.stringify(lhr));
+        if (typeof html === "string")
+          writeFileSync(resolve(OUT, file.replace(/json$/, "html")), html);
       }
       const line = (Object.keys(BUDGET) as Category[]).map((name) => {
         const value = median(scores[name]);
