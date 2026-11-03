@@ -34,6 +34,8 @@ export interface LeadInput {
   marketingTicked: boolean;
   /** The honeypot as the browser filled it (people never see it, so it's normally ""). */
   website: string;
+  /** A page-builder form's own source (e.g. "campaign"); otherwise chosen from the intent. */
+  source?: "project_form" | "contact_form" | "campaign" | "site_visit" | "brochure";
 }
 
 export interface Attribution {
@@ -151,7 +153,9 @@ export function leadBody(
     message: input.message?.trim() || null,
     project_slug: input.projectSlug || null,
     configuration_id: input.configurationId || null,
-    source: intent === "enquiry" && !input.projectSlug ? "contact_form" : SOURCE[intent],
+    source:
+      input.source ??
+      (intent === "enquiry" && !input.projectSlug ? "contact_form" : SOURCE[intent]),
     page_url: pagePath(context.pathname),
     referrer: cleanReferrer(context.referrer),
     utm: context.attribution.utm,

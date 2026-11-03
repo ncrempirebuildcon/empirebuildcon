@@ -2,12 +2,13 @@
 
 The Empire public website and the CMS user interface (Next.js 16 App Router, TypeScript, Tailwind CSS 4).
 
-## What is here (Phase 3, Phase 4 parts 1–5, Phase 5 tasks 5.1–5.4)
+## What is here (Phase 3, Phase 4 parts 1–5, Phase 5 tasks 5.1–5.5a)
 
 | Route | What |
 |---|---|
 | `/(site)/*` | Public website shell (board NoirComponents, NoirHome, NoirMobileHome): Header (navigation from `/public/site`, CTA, keyboard-accessible menu drawer with focus trap), Footer (RERA registration disclaimer, official channels, UP-RERA link, legal links), sticky MobileActionBar (`md:hidden`, Call, WhatsApp with `{page}` replacement, Enquire), dismissible OfferBanner, and SampleDataRibbon |
-| `/` | Public home page shell (`app/(site)/page.tsx`) |
+| `/` | Home: the CMS's "home" page and its blocks (task 5.5a); the holding content until that page is published with blocks |
+| `/<slug>` | Any other published page-builder page (About, legal pages with a DRAFT notice while their text is draft, standard and campaign landing pages, `noindex` for landing pages); all 17 block types (`components/blocks/`); unknown or draft → 404 |
 | `/projects` | Projects list (board NoirProjects, task 5.3): search, city, status, type, BHK, budget band and sort as URL parameters (`?q=&status=&city=&locality=&type=&bhk=&budget=under-75l|75l-1.5cr|above-1.5cr&sort=&page=`), a plain GET form that works without JavaScript; cards with honest image label, status chips, price with the tax note, possession and the RERA number with "Verify"; honest empty state; paging |
 | `/projects/<slug>` | Project page (boards NoirProject, NoirMobileProject): hero, key facts, RERA block (QR on an ivory tile, number per tower or phase, up-rera.in), in-page navigation, overview (formatted text), home types table (carpet area first, both units), gallery and videos with labels, amenities and specifications, location with directions and the map on tap (Leaflet + OpenStreetMap), construction progress (tower bars, dated updates), payment plans, documents and brochure, FAQs, the enquiry form in the sidebar, the site-visit form (`#visit`) and, for a gated brochure, the brochure form (`#brochure`). Off-market, draft or unknown → 404 |
 | `/projects/<slug>/<config-slug>` | Property (home type) page (boards NoirProperty, NoirMobileProperty): area, price, possession, availability, the project's RERA block, floor plan on an ivory tile (or the PDF), the project's other homes (available first); a sold-out home says so and takes no enquiries |

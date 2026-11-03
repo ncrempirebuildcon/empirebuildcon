@@ -12,7 +12,8 @@
 import type { Metadata } from "next";
 import { Breadcrumbs } from "@/components/catalogue/ListControls";
 import { LeadPanel } from "@/components/leads/LeadPanel";
-import { fetchPublicProjects, fetchPublicSite } from "@/lib/public/api";
+import { fetchPublicPageOrNull, fetchPublicProjects, fetchPublicSite } from "@/lib/public/api";
+import { BlockList } from "@/components/blocks/Blocks";
 import {
   buildTelLink,
   buildWhatsAppLink,
@@ -30,9 +31,10 @@ export default async function ContactPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  const [site, projects] = await Promise.all([
+  const [site, projects, cmsPage] = await Promise.all([
     fetchPublicSite(),
     fetchPublicProjects({ per_page: 100, page: 1 }),
+    fetchPublicPageOrNull("contact"),
   ]);
   const prod = isProductionEnv();
   const company = site.company;
@@ -158,6 +160,12 @@ export default async function ContactPage({
           projectChoices={choices}
         />
       </section>
+
+      {/* The CMS's "contact" page adds its own blocks here once published (task 5.5a). A hero
+          block there doesn't take over the h1: this page already has one. */}
+      {cmsPage && cmsPage.blocks.length > 0 ? (
+        <BlockList blocks={cmsPage.blocks.filter((b) => b.type !== "hero")} path="/contact" />
+      ) : null}
     </div>
   );
 }

@@ -1,10 +1,19 @@
 /**
- * Home: holding content inside the new public shell until 5.5 builds the full home page.
+ * Home: the CMS's "home" page and its blocks (task 5.5a, D-045). Until that page is published
+ * the holding content below stays, so the site never shows an empty home page.
  * Restyled with the approved Black & gold theme (D-033, D-038).
  */
 import Image from "next/image";
+import { PageView } from "@/components/blocks/PageView";
+import { fetchPublicPageOrNull } from "@/lib/public/api";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const page = await fetchPublicPageOrNull("home");
+  if (page && page.blocks.length > 0) return <PageView page={page} path="/" />;
+  return <HoldingPage />;
+}
+
+function HoldingPage() {
   return (
     <section className="grid min-h-[60vh] place-items-center px-4 py-16">
       <div className="flex max-w-xl flex-col items-center gap-5 text-center">

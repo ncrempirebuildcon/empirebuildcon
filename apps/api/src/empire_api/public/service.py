@@ -1920,16 +1920,18 @@ def _resolve_single_block(
     elif b_type == "lead_form":
         if data.get("project_id"):
             pid = uuid.UUID(str(data["project_id"]))
-            form_p_stmt = select(Project.id).where(
+            form_p_stmt = select(Project.slug).where(
                 Project.id == pid,
                 Project.publish_state == "published",
                 Project.sales_status != "off_market",
             )
             if prod:
                 form_p_stmt = form_p_stmt.where(Project.is_sample.is_(False))
-            p_vis = db.scalar(form_p_stmt)
-            if not p_vis:
+            p_slug = db.scalar(form_p_stmt)
+            if not p_slug:
                 return None, False
+            # The website's form sends the project by slug (public intake, task 5.5a).
+            data["project_slug"] = p_slug
         ct_lead = current_text(db, "lead_form")
         if ct_lead:
             data["consent"] = schemas.PublicConsentText(
