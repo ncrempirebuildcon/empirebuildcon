@@ -85,6 +85,16 @@ describe("metadata", () => {
     expect(meta.robots).toEqual({ index: false, follow: false });
   });
 
+  it("always has a description, ending with the site's own", () => {
+    expect(pageMetadata({ title: "X", path: "/x" }).description).toMatch(
+      /^Empire — Delivering Happiness/,
+    );
+    expect(
+      pageMetadata({ title: "X", path: "/x", fallbackDescriptions: [null, "[Tagline]"] })
+        .description,
+    ).toMatch(/^Empire — Delivering Happiness/);
+  });
+
   it("falls back to plain text descriptions, never placeholders", () => {
     const meta = pageMetadata({
       title: "X",

@@ -61,7 +61,7 @@ export function Footer({
           <div className="flex flex-col gap-3 md:col-span-1">
             <Link
               href="/"
-              className="font-display text-xl font-bold tracking-[0.16em] text-sand-100 uppercase hover:text-gold-300"
+              className="inline-flex min-h-11 items-center self-start font-display text-xl font-bold tracking-[0.16em] text-sand-100 uppercase hover:text-gold-300"
             >
               EMPIRE
             </Link>
@@ -96,39 +96,54 @@ export function Footer({
           </div>
 
           {/* Navigation - Explore */}
-          <nav aria-label="Explore" className="flex flex-col gap-2.5 text-sm">
+          <nav aria-label="Explore" className="flex flex-col text-sm">
             <strong className="font-display text-xs font-semibold tracking-wider text-gold-400">
               EXPLORE
             </strong>
-            <Link href="/projects" className="hover:text-gold-300">
+            <Link
+              href="/projects"
+              className="inline-flex min-h-11 items-center hover:text-gold-300"
+            >
               All projects
             </Link>
-            <Link href="/properties" className="hover:text-gold-300">
+            <Link
+              href="/properties"
+              className="inline-flex min-h-11 items-center hover:text-gold-300"
+            >
               Properties
             </Link>
-            <Link href="/projects?city=lucknow" className="hover:text-gold-300">
+            <Link
+              href="/projects?city=lucknow"
+              className="inline-flex min-h-11 items-center hover:text-gold-300"
+            >
               Lucknow projects
             </Link>
-            <Link href="/projects?city=noida" className="hover:text-gold-300">
+            <Link
+              href="/projects?city=noida"
+              className="inline-flex min-h-11 items-center hover:text-gold-300"
+            >
               Noida projects
             </Link>
           </nav>
 
           {/* Navigation - Company */}
-          <nav aria-label="Company" className="flex flex-col gap-2.5 text-sm">
+          <nav aria-label="Company" className="flex flex-col text-sm">
             <strong className="font-display text-xs font-semibold tracking-wider text-gold-400">
               COMPANY
             </strong>
-            <Link href="/about" className="hover:text-gold-300">
+            <Link href="/about" className="inline-flex min-h-11 items-center hover:text-gold-300">
               About Empire
             </Link>
-            <Link href="/contact" className="hover:text-gold-300">
+            <Link href="/contact" className="inline-flex min-h-11 items-center hover:text-gold-300">
               Contact us
             </Link>
-            <Link href="/contact#visit" className="hover:text-gold-300">
+            <Link
+              href="/contact#visit"
+              className="inline-flex min-h-11 items-center hover:text-gold-300"
+            >
               Book a site visit
             </Link>
-            <Link href="/blog" className="hover:text-gold-300">
+            <Link href="/blog" className="inline-flex min-h-11 items-center hover:text-gold-300">
               News & updates
             </Link>
           </nav>
@@ -147,13 +162,21 @@ export function Footer({
             {phones.map((phone) => {
               const tel = buildTelLink(phone, isProduction);
               return tel ? (
-                <a key={phone} href={tel} className="hover:text-gold-300">
+                <a
+                  key={phone}
+                  href={tel}
+                  className="inline-flex min-h-11 items-center hover:text-gold-300"
+                >
                   {phone}
                 </a>
               ) : null;
             })}
             {emails.map((email) => (
-              <a key={email} href={`mailto:${email}`} className="hover:text-gold-300">
+              <a
+                key={email}
+                href={`mailto:${email}`}
+                className="inline-flex min-h-11 items-center hover:text-gold-300"
+              >
                 {email}
               </a>
             ))}
@@ -191,14 +214,23 @@ export function Footer({
         {/* Bottom Bar: Copyright & Legal */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-noir-800 pt-5 text-xs text-sand-400">
           <span>© {currentYear} Empire</span>
-          <div className="flex flex-wrap gap-4 sm:gap-6">
-            <Link href="/privacy" className="hover:text-sand-200">
+          <div className="flex flex-wrap gap-x-4 sm:gap-x-6">
+            <Link
+              href="/privacy"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-sand-200"
+            >
               Privacy policy
             </Link>
-            <Link href="/terms" className="hover:text-sand-200">
+            <Link
+              href="/terms"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-sand-200"
+            >
               Terms
             </Link>
-            <Link href="/disclaimer" className="hover:text-sand-200">
+            <Link
+              href="/disclaimer"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-sand-200"
+            >
               Disclaimer
             </Link>
           </div>

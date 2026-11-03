@@ -11,7 +11,7 @@ Design canvas: https://claude.ai/artifact/7cA6o6WyALwUfb17n6W7zY. It has three p
 1. **Gold on black, like the logo.** The page is a warm near-black, never pure black. Text is ivory, never pure white. Gold marks what matters: the logo, the main headline, prices, buttons and active states.
 2. **Facts before decoration.** Every project or property block shows the UP-RERA number, QR code, carpet area (sq ft and sq m), price and possession together.
 3. **Calm, not pushy.** There are no pop-ups, countdowns, "only N left" messages or auto-playing sound. Motion is limited to fades.
-4. **Readable at night on a phone.** Body text is warm ivory at 16 px or larger with high contrast, and every touch target is at least 44 px.
+4. **Readable at night on a phone.** Body text is warm ivory at 16 px or larger with high contrast, and every touch target is at least 44 px. Links inside running text are the one exception (WCAG 2.5.8); short links get `min-w-11` as well, and a link that must not move the layout uses `-my-2.5 py-2.5` (card titles) or the label's own padding (checkboxes). `qa/specs/public-pass.spec.ts` checks every public route.
 
 ## 2. Colour tokens
 

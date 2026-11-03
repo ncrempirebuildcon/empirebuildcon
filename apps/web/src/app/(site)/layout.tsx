@@ -66,11 +66,20 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
 
   return (
     <div className="flex min-h-dvh flex-col bg-noir-900 text-body">
+      {/* WHY first: the sample ribbon and offer banner above the header can hold links, and
+          keyboard users must reach "Skip to content" with their first Tab (task 5.7). */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 inline-flex min-h-11 items-center focus:rounded-full focus:bg-gold-500 focus:px-4 focus:text-sm focus:font-extrabold focus:text-noir-900 focus:shadow-lg focus:outline-2 focus:outline-gold-200"
+      >
+        Skip to content
+      </a>
       <AttributionCapture />
       <SampleDataRibbon hasSampleData={hasSample} />
       {site?.offers && <OfferBanner offers={site.offers} />}
       <Header site={site} isProduction={isProd} />
-      <main id="main-content" className="flex-1">
+      {/* tabIndex -1: the skip link moves focus here, so the next Tab starts inside main. */}
+      <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
         {children}
       </main>
       <Footer site={site} isProduction={isProd} />

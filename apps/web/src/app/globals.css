@@ -9,6 +9,11 @@
 @source "../../../../packages/ui/src";
 
 @layer base {
+  /* The self-hosted fonts from next/font (app/layout.tsx, task 5.7) replace the theme's names. */
+  :root {
+    --font-display: var(--font-cinzel);
+    --font-sans: var(--font-manrope);
+  }
   html {
     color-scheme: dark;
     background-color: var(--color-noir-900);

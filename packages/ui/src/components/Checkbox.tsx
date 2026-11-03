@@ -46,7 +46,9 @@ export function Checkbox({
           aria-describedby={describedBy}
           className="mt-0.5 size-5 shrink-0 accent-gold-500"
         />
-        <label htmlFor={fieldId} className="text-caption text-ivory">
+        {/* WHY -my-3 py-3: the label is the tap target (44 px tall, DESIGN_SYSTEM touch targets,
+            task 5.7) without moving the text. */}
+        <label htmlFor={fieldId} className="-my-3 py-3 text-caption text-ivory">
           {label}
           {required ? " (Required)" : null}
         </label>

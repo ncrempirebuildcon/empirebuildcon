@@ -46,25 +46,25 @@ export default function NotFound() {
         <nav aria-label="Quick links" className="flex flex-wrap justify-center gap-2.5 pt-2">
           <Link
             href="/projects"
-            className="rounded-full border border-gold-500 px-5 py-2 text-sm font-bold text-gold-300 hover:bg-gold-500/10"
+            className="rounded-full border border-gold-500 inline-flex min-h-11 items-center px-5 text-sm font-bold text-gold-300 hover:bg-gold-500/10"
           >
             Projects
           </Link>
           <Link
             href="/properties"
-            className="rounded-full border border-gold-500 px-5 py-2 text-sm font-bold text-gold-300 hover:bg-gold-500/10"
+            className="rounded-full border border-gold-500 inline-flex min-h-11 items-center px-5 text-sm font-bold text-gold-300 hover:bg-gold-500/10"
           >
             Properties
           </Link>
           <Link
             href="/contact"
-            className="rounded-full border border-gold-500 px-5 py-2 text-sm font-bold text-gold-300 hover:bg-gold-500/10"
+            className="rounded-full border border-gold-500 inline-flex min-h-11 items-center px-5 text-sm font-bold text-gold-300 hover:bg-gold-500/10"
           >
             Contact
           </Link>
           <Link
             href="/"
-            className="rounded-full bg-gold-500 px-5 py-2 text-sm font-extrabold text-noir-900 hover:bg-gold-400"
+            className="rounded-full bg-gold-500 inline-flex min-h-11 items-center px-5 text-sm font-extrabold text-noir-900 hover:bg-gold-400"
           >
             Home
           </Link>

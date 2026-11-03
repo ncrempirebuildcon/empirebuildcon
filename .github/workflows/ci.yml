@@ -6,7 +6,7 @@
 #   web       prettier, eslint, tsc, unit tests, production build, pnpm audit
 #   contract  the committed OpenAPI file and generated TS client match the API code (D-020)
 #   e2e       Playwright smoke, login journey and axe accessibility checks against the built app
-#   lighthouse  mobile Lighthouse on main only (scores ≥ 0.9; see qa/README.md for the noindex exception)
+#   lighthouse  mobile Lighthouse budgets on every PR and on main (task 5.7; see qa/README.md)
 #
 # DO NOT CHANGE: the PostgreSQL major version must match production (Neon, PostgreSQL 18; D-006/D-007).
 # WHY: astral-sh/setup-uv publishes only full version tags (there is no moving `v10` tag), so it is
@@ -181,17 +181,44 @@ jobs:
           path: qa/playwright-report
           retention-days: 7
 
+  # Lighthouse budgets on a phone (task 5.7, D-049): its own job, so the scores are measured on
+  # a quiet runner, not one running the whole browser suite (qa/specs/budgets.lighthouse.spec.ts).
   lighthouse:
-    if: github.ref == 'refs/heads/main'
     needs: [web]
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: empire
+          POSTGRES_PASSWORD: empire
+          POSTGRES_DB: empire_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U empire -d empire_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: uv --directory apps/api sync --locked
+      - run: uv --directory apps/api run alembic upgrade head
+      - run: uv --directory apps/api run empire-api seed
       - run: pnpm --filter @empire/web build
-      - run: pnpm --filter @empire/qa exec lhci autorun --config=lighthouserc.json
+      - run: pnpm --filter @empire/qa exec playwright install --with-deps chromium
+      - run: pnpm --filter @empire/qa lighthouse
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: lighthouse-reports
+          path: qa/test-results/lighthouse
+          retention-days: 14

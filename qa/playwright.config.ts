@@ -55,7 +55,7 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["setup"],
-      testIgnore: /\.serial\.spec\.ts$/,
+      testIgnore: [/\.serial\.spec\.ts$/, /\.lighthouse\.spec\.ts$/],
     },
     // WHY a separate project: these specs need the outbox to themselves (no other spec draining
     // it), so they run after "chromium" has finished (task 5.3).
@@ -65,6 +65,15 @@ export default defineConfig({
       dependencies: ["chromium"],
       testMatch: /\.serial\.spec\.ts$/,
       // One at a time, so two serial specs never drain the outbox under each other.
+      workers: 1,
+    },
+    // Lighthouse budgets (task 5.7, D-049): run on their own (`pnpm --filter @empire/qa
+    // lighthouse`, CI job "lighthouse"), because scores need a quiet machine, not one running the
+    // whole suite. `pnpm e2e` names its projects, so it never runs this one.
+    {
+      name: "lighthouse",
+      dependencies: ["setup"],
+      testMatch: /\.lighthouse\.spec\.ts$/,
       workers: 1,
     },
   ],

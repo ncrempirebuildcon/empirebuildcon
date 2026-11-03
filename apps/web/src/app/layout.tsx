@@ -1,16 +1,43 @@
 /**
  * Root layout: fonts, global styles and site-wide metadata.
  *
- * Fonts are self-hosted from npm (@fontsource), so pages make no requests to Google Fonts
- * (privacy, and a simpler Content-Security-Policy in Phase 5).
+ * Fonts are self-hosted from npm (@fontsource files), so pages make no requests to Google Fonts
+ * (privacy, and a simpler Content-Security-Policy).
+ *
+ * PERF (task 5.7, D-049): the files go through next/font/local, which preloads them and gives
+ * the fallback font the same size (no layout shift). Before, the headings waited for a CSS
+ * file to discover the font, which made the project page's h1 the slow LCP element on phones.
+ * Only the Latin subset is loaded; other characters fall back to the system font.
  */
-import "@fontsource/cinzel/600.css";
-import "@fontsource/cinzel/700.css";
-import "@fontsource-variable/manrope";
+import localFont from "next/font/local";
 import "./globals.css";
 
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+
+const display = localFont({
+  src: [
+    {
+      path: "../../node_modules/@fontsource/cinzel/files/cinzel-latin-600-normal.woff2",
+      weight: "600",
+    },
+    {
+      path: "../../node_modules/@fontsource/cinzel/files/cinzel-latin-700-normal.woff2",
+      weight: "700",
+    },
+  ],
+  variable: "--font-cinzel",
+  display: "swap",
+  fallback: ["Georgia", "serif"],
+});
+
+const sans = localFont({
+  src: "../../node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2",
+  weight: "200 800",
+  variable: "--font-manrope",
+  display: "swap",
+  fallback: ["Segoe UI", "system-ui", "sans-serif"],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL ?? "http://localhost:3000"),
@@ -27,7 +54,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${display.variable} ${sans.variable}`}>
       <body className="min-h-dvh bg-noir-900 font-sans text-body antialiased">{children}</body>
     </html>
   );

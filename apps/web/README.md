@@ -2,7 +2,7 @@
 
 The Empire public website and the CMS user interface (Next.js 16 App Router, TypeScript, Tailwind CSS 4).
 
-## What is here (Phase 3, Phase 4 parts 1–5, Phase 5 tasks 5.1–5.6)
+## What is here (Phase 3, Phase 4 parts 1–5, Phase 5 tasks 5.1–5.7)
 
 | Route | What |
 |---|---|
@@ -16,6 +16,7 @@ The Empire public website and the CMS user interface (Next.js 16 App Router, Typ
 | `/properties` | Every home type across projects (board NoirProperties): the same filters as projects, without text search, plus "Carpet area: largest first" |
 | `/cities/<slug>` | One city's projects; a city with no listed project is a 404 |
 | SEO on every public route (task 5.6) | `pageMetadata` (`lib/public/seo.ts`): title, description, canonical on `SITE_URL`, Open Graph and Twitter card (share image: CMS, cover or first image, else `public/brand/share-default.png`); JSON-LD through `components/JsonLd.tsx` (Organization on `/`, RealEstateListing on project and home pages, FAQPage, BreadcrumbList from `Breadcrumbs`); CMS redirects answered in `proxy.ts` (`lib/public/redirects.ts`, 60 s cache, `REDIRECT_CACHE_SECONDS`) and counted through the signed `/api/v1/internal/redirects/hit` |
+| Speed and the 390 px pass (task 5.7) | Sentry's browser SDK loads only with `NEXT_PUBLIC_SENTRY_DSN` and after `load` (`src/instrumentation-client.ts`); the stylesheet is inlined (`experimental.inlineCss`); fonts through `next/font/local` (preloaded, Latin only); 44 px touch targets across the shell; "Skip to content" is the first Tab and main takes focus. Budgets: `pnpm --filter @empire/qa lighthouse` |
 | `/_internal/revalidate` | Signed Next.js cache tag invalidator: accepts `{ "tags": [...] }`, verified via HMAC-SHA256 signature and timestamp with `REVALIDATE_SECRET`, 5-minute replay window cache (D-039) |
 | `/admin/login` | Staff sign-in (board NoirCmsLogin): email + password (generic error, lockout message, Show/Hide), "Forgot password?", then for accounts with two-factor the **Two-factor check** step (6-digit code with `autocomplete="one-time-code"`, "Use a recovery code", Back), or, when the `admin_2fa` flag makes it required, the forced **set-up** (QR code with the typed key as its alternative, a code to confirm, recovery codes shown once with Copy, Download as text and "I've saved them"). `?done=setup|reset` confirms a used link |
 | `/admin/forgot` | Ask for a reset link: always the same message, whatever the email |

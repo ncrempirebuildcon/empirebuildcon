@@ -383,7 +383,7 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 | Contract | Schemathesis against the OpenAPI spec; "no 3xx on any API path" test | Every push |
 | Browser journeys | Playwright: lead form, CMS login, project edit → publish → visible on site, media upload | Every push (smoke), full nightly |
 | Accessibility | axe via Playwright on every template | Every push |
-| Performance | Lighthouse CI (mobile) ≥ 90 for performance, accessibility, best practices, SEO | On main |
+| Performance | Lighthouse (mobile, median of 3) on six public pages: performance ≥ 90, accessibility and best practices ≥ 95, SEO ≥ 90 without "is-crawlable" until go-live (`qa/specs/budgets.lighthouse.spec.ts`, task 5.7) | Every push (CI job "lighthouse") |
 | Visual | Playwright screenshots, mobile + desktop | Before each gate |
 
 The browser suite signs in as few times as possible: a Playwright setup project signs in the super-admin and a sales user once each and saves their sessions to `qa/.auth/` (git-ignored); the journeys reuse them. With the sign-in tests and the account journeys (an invited admin's first sign-in and a two-factor sign-in), a run uses 6 sign-ins, because the API allows 10 per network in 15 minutes, successful ones included (D-027). Locally that is one full run per 15 minutes. The two-factor code step doesn't count toward that limit. Emails go to the dev mailbox, which the journeys read through `/api/v1/dev-mail/latest` (development and test only); password-reset requests use a fresh address each run. Public lead intake is limited too (5 per 10 minutes per network), so a run makes four public submissions (one API call and three through the website forms) and adds other test leads through the staff API (`qa/README.md`).

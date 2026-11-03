@@ -859,3 +859,20 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 **Verified / assumed:**
 - Verified in Next.js 16.4's source that Googlebot is not in its "HTML-limited bots" list, so it receives streamed metadata.
 - Assumed: Google reads that metadata after rendering, which Google documents for JavaScript sites.
+
+## D-049 · Performance budgets and the 390 px pass (Proposed, 2026-11-03)
+
+**Context:** Task 5.7 holds the public site to Lighthouse ≥ 90 on mobile and to a full accessibility and 390 px pass (PLAN). The first measurement (mobile Lighthouse, six pages) gave performance 85–94.
+**Decision:**
+- **The Sentry browser SDK loads only with a DSN, after `load`** (`instrumentation-client.ts`). It was ~118 KB gzipped in every page's first bundle.
+  - Trade-off: an error in a page's first moments isn't reported from the browser. The server still reports its own errors.
+- **The stylesheet is inlined** (`experimental.inlineCss`). It is ~12 KB gzipped and saves a render-blocking request. CSP already allows inline styles.
+- **Fonts use `next/font/local`** with the same @fontsource files. They are preloaded with metric-matched fallbacks, Latin only. The theme's font tokens point at the next/font variables (`globals.css`).
+- **Touch targets:** every button, control and stand-alone link is 44×44 px. Links in running text are exempt, as WCAG 2.5.8 allows.
+- **Budgets in CI:** Lighthouse runs as its own Playwright project and CI job on every push, with the API and real pages, median of 3:
+  - performance ≥ 90;
+  - accessibility and best practices ≥ 95;
+  - SEO ≥ 90, counted without "is-crawlable" until go-live (the site is `noindex` by design). This replaces the lhci job, which measured `/` with no API.
+**Verified / assumed:**
+- Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.
+- Assumed: GitHub's runners score at least as well. If CI scores sit near 90, the budget is the thing to discuss, not a reason to retry.
