@@ -336,6 +336,9 @@ importers:
       lighthouse:
         specifier: 13.4.0
         version: 13.4.0(supports-color@10.2.2)
+      puppeteer-core:
+        specifier: 25.16.0
+        version: 25.16.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
