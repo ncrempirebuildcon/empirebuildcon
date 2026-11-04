@@ -209,7 +209,8 @@ export function OffersScreen() {
               // WHY first, and with history.replaceState: the address must name the saved offer
               // at once. Before (task 5.8 fix), it changed only after the list had reloaded, and
               // a filter changed in between built its address from the stale "new" selection.
-              // Next.js keeps useSearchParams in step with history.replaceState. WHY not leave():
+              // Next.js follows history.replaceState (useSearchParams updates in the next
+              // transition, one frame later; back and forward keep working). WHY not leave():
               // the editor's "no unsaved changes" report reaches this screen only on the next
               // render, so leave() would still ask.
               window.history.replaceState(null, "", hrefFor(saved?.id ?? null, state, page));

@@ -228,14 +228,14 @@ test("a page built from blocks shows every block on the website", async ({ page,
   } finally {
     await cleanup(failed, async () => {
       // Leave nothing live for other specs or later runs, even when a check above failed.
-      const cleanup = await Promise.all([
+      const responses = await Promise.all([
         apiCall(page, "PATCH", `/api/v1/admin/offers/${offerId}`, { is_active: false }),
         apiCall(page, "PATCH", `/api/v1/admin/faqs/${faqId}`, { is_visible: false }),
         apiCall(page, "PATCH", `/api/v1/admin/testimonials/${testimonialId}`, {
           is_visible: false,
         }),
       ]);
-      for (const response of cleanup) expect(response.status(), await response.text()).toBe(200);
+      for (const response of responses) expect(response.status(), await response.text()).toBe(200);
       await drainOutbox(page);
     });
   }

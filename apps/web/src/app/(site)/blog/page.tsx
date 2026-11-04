@@ -20,13 +20,19 @@ import PostCard from "@/components/blog/PostCard";
 import BlogPagination from "@/components/blog/BlogPagination";
 import BlogEmptyState from "@/components/blog/BlogEmptyState";
 
-// Task 5.8: the shared SEO helper (D-047). A filtered or paged list's canonical is /blog.
-export async function generateMetadata(): Promise<Metadata> {
-  return pageMetadata({
-    title: "News & guides",
-    path: "/blog",
-    fallbackDescriptions: ["News from Empire and guides to buying a home in Uttar Pradesh."],
-  });
+const BLOG_INTRO =
+  "Plain-language guides for home buyers, dated construction updates from our sites, and company news.";
+
+/**
+ * Task 5.8: the shared SEO helper (D-047). The canonical drops the category filter; a later page
+ * keeps its own number (`/blog?page=2`), as Google advises for paginated lists, so older articles
+ * stay reachable.
+ */
+export async function generateMetadata({ searchParams }: BlogPageProps): Promise<Metadata> {
+  const raw = (await searchParams).page;
+  const page = Number.parseInt(Array.isArray(raw) ? (raw[0] ?? "") : (raw ?? ""), 10);
+  const path = Number.isFinite(page) && page > 1 && page <= 1000 ? `/blog?page=${page}` : "/blog";
+  return pageMetadata({ title: "News & guides", path, fallbackDescriptions: [BLOG_INTRO] });
 }
 
 interface BlogPageProps {
@@ -96,10 +102,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
             News &amp; guides
           </h1>
         </div>
-        <p className="max-w-[34em] text-base leading-relaxed text-body">
-          Plain-language guides for home buyers, dated construction updates from our sites, and
-          company news.
-        </p>
+        <p className="max-w-[34em] text-base leading-relaxed text-body">{BLOG_INTRO}</p>
       </div>
 
       {/* Featured post (Page 1 without filter only) */}

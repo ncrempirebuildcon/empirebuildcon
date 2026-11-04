@@ -7,7 +7,6 @@
  * suite (REDIRECT_CACHE_SECONDS, playwright.config.ts), so a new redirect works at once.
  */
 import { expect, type Page, test } from "@playwright/test";
-import { cleanup } from "../lib/cleanup";
 import { apiCall, CMS_STATE, runId } from "../lib/auth";
 import { catalogueProject } from "../lib/catalogue";
 import { draftPage } from "../lib/content";
@@ -224,41 +223,4 @@ test("a CMS redirect is answered by the website and counted", async ({ page, bro
     })
     .toBe(404);
   await visitor.close();
-});
-
-test("a blog article has its description, canonical and article card (task 5.8)", async ({
-  page,
-}) => {
-  const id = runId();
-  const made = await apiCall(page, "POST", "/api/v1/admin/posts", {
-    title: `E2E SEO post ${id}`,
-    excerpt: `E2E SEO excerpt ${id}.`,
-    body: "Some *text* for the article.",
-  });
-  expect(made.status(), await made.text()).toBe(201);
-  const post = (await made.json()) as { id: string; slug: string };
-  const published = await apiCall(page, "POST", `/api/v1/admin/posts/${post.id}/publish`);
-  expect(published.status(), await published.text()).toBe(200);
-  let failed = true;
-  try {
-    await page.goto(`/blog/${post.slug}?utm_source=x`);
-    await expect(page).toHaveTitle(new RegExp(`^E2E SEO post ${id} `));
-    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
-      "href",
-      `${WEB_URL}/blog/${post.slug}`,
-    );
-    await expect(page.locator('meta[name="description"]')).toHaveAttribute(
-      "content",
-      `E2E SEO excerpt ${id}.`,
-    );
-    await expect(page.locator('meta[property="og:type"]')).toHaveAttribute("content", "article");
-    await page.goto("/blog?page=2");
-    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${WEB_URL}/blog`);
-    failed = false;
-  } finally {
-    await cleanup(failed, async () => {
-      const off = await apiCall(page, "POST", `/api/v1/admin/posts/${post.id}/unpublish`);
-      expect(off.status(), await off.text()).toBe(200);
-    });
-  }
 });

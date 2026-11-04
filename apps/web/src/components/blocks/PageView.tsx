@@ -19,7 +19,7 @@ export function PageView({ page, path }: { page: PublicPage; path: string }) {
       // WHY -mt-10 under a hero (task 5.8): the block list's 56 px gap would otherwise part the
       // version from the hero it belongs to.
       <p
-        className={`text-caption text-muted ${heroTitle ? "-mt-10" : ""}`}
+        className={heroTitle ? "-mt-10 text-caption text-muted" : "text-caption text-muted"}
         data-testid="legal-version"
       >
         Version {page.legal_version}

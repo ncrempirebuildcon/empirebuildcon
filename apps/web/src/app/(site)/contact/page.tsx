@@ -12,6 +12,7 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/public/seo";
 import { Breadcrumbs } from "@/components/catalogue/ListControls";
+import { VisitUnavailable } from "@/components/leads/VisitUnavailable";
 import { LeadPanel } from "@/components/leads/LeadPanel";
 import { fetchPublicPageOrNull, fetchPublicProjects, fetchPublicSite } from "@/lib/public/api";
 import { BlockList } from "@/components/blocks/Blocks";
@@ -157,13 +158,7 @@ export default async function ContactPage({
           ) : (
             // WHY (task 5.8): a site visit is always for a project (the API requires one). With
             // no project open for visits, the form could never be sent, so it isn't shown.
-            <div className="flex flex-col gap-2" data-testid="visit-unavailable">
-              <h2 className="font-display text-h3 font-semibold">Book a site visit</h2>
-              <p className="text-body">
-                Site visits can be booked here once our projects are listed. Until then, call or
-                WhatsApp us, or send a question below.
-              </p>
-            </div>
+            <VisitUnavailable canCall={phones.length > 0 || Boolean(wa)} />
           )}
         </section>
       </div>

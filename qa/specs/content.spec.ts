@@ -239,12 +239,20 @@ test("offers show their state from their dates", async ({ page }) => {
   await editor.getByRole("group", { name: "Starts" }).getByLabel("Date").fill(istDate(-1));
   await editor.getByRole("group", { name: "Ends" }).getByLabel("Date").fill(istDate(10));
   await editor.getByRole("checkbox", { name: /Switched on/ }).check();
+  // Hold the list's reload after the save for 3 s: the address must name the new offer while
+  // the reload is still under way (task 5.8; before, it waited for the reload).
+  const slowList = async (route: import("@playwright/test").Route) => {
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    await route.continue();
+  };
+  await page.route(/\/api\/v1\/admin\/offers\?/, slowList);
   await editor.getByRole("button", { name: "Add offer" }).click();
   await expect(status(page, `Added “E2E Offer live ${id}”: live.`)).toBeVisible();
   // The address names the saved offer as soon as the message shows (task 5.8: it used to wait
   // for the list to reload, and a filter changed in between kept the stale "new" selection).
   await expect(page).toHaveURL(/[?&]offer=[0-9a-f-]{36}/, { timeout: 1_000 });
   await expect(page.getByRole("button", { name: "+ New offer" })).toBeEnabled();
+  await page.unroute(/\/api\/v1\/admin\/offers\?/, slowList);
   // The list is paged (25 a page, review L10) and earlier runs leave offers behind, so the row is
   // looked for under its state filter, where the newest sort near the top.
   const list = page.getByRole("region", { name: "All offers" });
