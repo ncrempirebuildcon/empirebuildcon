@@ -17,6 +17,32 @@
 | **5.6** SEO | Being found, correctly | Metadata and share images, structured data (`Organization`, `RealEstateListing`/`Residence`, `FAQPage`, `BreadcrumbList`), `sitemap.xml`, `robots.txt`, canonical `.com` URLs, breadcrumbs, the redirects middleware with hit counting | 5.5 |
 | **5.7** Performance and extras | Fast and finished | Lighthouse ≥ 90 on mobile in all four scores, Core Web Vitals, EMI calculator, share buttons, saved properties (browser only, no account), a full accessibility and 390 px pass | 5.6 |
 
+## Status (updated 4 Nov 2026)
+
+| Task | Track | State | Pull request / notes |
+|---|---|---|---|
+| 5.1 Public API | — | Merged 1 Nov | D-038 |
+| 5.2 Website shell | — | Merged 2 Nov | #16, D-039 |
+| 5.3 Projects and properties | A | Merged 3 Nov | #20, D-041 |
+| 5.4 Lead forms | A | Merged 3 Nov | D-043 |
+| 5.5a Page-builder pages | A | Merged 3 Nov | D-045 |
+| 5.5b Blog | B | Merged 4 Nov | three review rounds |
+| 5.6 SEO (metadata, structured data, redirects) | A | Merged 3 Nov | #23, D-047 |
+| 5.7 Performance and the 390 px pass | A | Merged 4 Nov | D-049; performance is a CI warning for now (owner's decision) |
+| **5.7b** EMI calculator, saved homes | B | **Ready**, next for the developer agent | [5.7b-tools.md](5.7b-tools.md) |
+| **5.6b** `sitemap.xml`, `robots.txt` | B | **Ready**, after 5.7b | [5.6b-sitemap-robots.md](5.6b-sitemap-robots.md) |
+| **5.8** Phase 5 finish | A | **Next for Claude** | See below |
+
+**5.8 · Phase 5 finish (Claude, one branch).** These are the loose ends kept from the reviews:
+- the blog's metadata through `pageMetadata`;
+- performance made a hard CI budget again, once the runner's long task is explained from the saved traces;
+- the CMS offers screen's save/selection race;
+- the contact page when no project can be chosen;
+- "hits are approximate" on the redirects screen;
+- the 5.5a nits: cleanup that hides the first error, the legal-version gap, and the RERA panel inside the form block.
+
+**Phase 5 is done when** 5.7b, 5.6b and 5.8 are merged and the Phase 5 checks below are green on `main`. Owner inputs (below) are needed for go-live, not to finish Phase 5.
+
 ## Tracks and order (from 2 Nov 2026, D-040)
 
 | Track | Builder | Order | Reserved decision numbers |
