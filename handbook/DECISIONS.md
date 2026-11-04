@@ -886,7 +886,13 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - **Owner's decision (4 Nov 2026):** until its cause is found, performance below 90 is reported as a **warning** (summary, `warnings.txt` and the test annotation). Accessibility, best practices and SEO still fail the job.
     - Runs with more than 500 ms of blocking time keep their trace (at most two per job) for the follow-up.
     - Performance becomes a hard budget again once the cause is fixed (`TODO(phase-5)` in the spec).
-  - The CI build has no Sentry DSN, so the Sentry chunk that production loads after `load` is not in the measurement.
+  - **Cause found (5.8 traces, 4 Nov 2026):** on GitHub's runner (Chrome 156) each Lighthouse run's new tab landed on the previous run's localhost renderer (both saved traces of `/`: the same process, older each run). While committing the document, that process spent 165–245 ms on leftover garbage collection, before the page's own work started. Lighthouse's 4× CPU simulation made that one task ~700–1000 ms of blocking time at ~915 ms. A real visitor's first visit has no leftover page; Chrome 141 in the workspace gave each run a new renderer, which is why local scores were fine.
+    - First try: Chrome started with `ProcessPerSiteUpToMainFrameThreshold` off (as Puppeteer does). The CI run still reused the renderer (performance 70–92), so that change was dropped.
+    - **Fix:** each run (and the warm-up) gets its own browser context, closed afterwards. Chrome never shares a renderer between browser contexts, so every run starts in a new process, like a first visit. The spec drives Lighthouse through `puppeteer-core` (the version Lighthouse itself uses).
+    - The summary prints the browser version and how many runs still landed on an earlier run's process (expected: 0).
+    - **CI result with the fix (4 Nov 2026):** 0 of 18 runs reused a process. The ~800 ms task is gone, and CI now matches the workspace: performance 85–91 (median per page), the other three 100.
+    - What is left is the site's own work: React hydration (react-dom, ~73 KB; ~250–430 ms of simulated blocking time) and, on localhost, Lighthouse counting the LCP after the scripts, because they arrive before the first paint (simulated LCP ~2.5–3.4 s against FCP ~1.1 s).
+    - **Owner's decision (4 Nov 2026):** merge the fix and keep performance as a **warning** (`WARN_ONLY`, `warnings.txt`). Cutting client JavaScript is its own task, **5.7c**. Performance becomes a hard budget again when 5.7c lands (`TODO(phase-5)` in the spec).
 **Verified / assumed:**
 - Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.
 - Assumed: GitHub's runners score at least as well. If CI scores sit near 90, the budget is the thing to discuss, not a reason to retry.
