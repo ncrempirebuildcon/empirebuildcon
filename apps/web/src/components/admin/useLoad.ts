@@ -11,7 +11,9 @@
  *   3. `reload()` retries with the same key (the "Try again" button). `replace()` swaps in data the
  *      screen already has, e.g. the saved project returned by a PATCH, without a new request.
  *   4. `refresh()` fetches again quietly: `loading` stays false, so the screen is not replaced by
- *      a skeleton and unsaved form fields stay as they are.
+ *      a skeleton and unsaved form fields stay as they are. Like step 1, its answer is dropped if
+ *      the key has moved on meanwhile (task 5.8: a filter changed during a refresh used to be
+ *      overwritten by the refresh's older, unfiltered list).
  *   5. `reload`, `replace` and `refresh` keep their identity until the key changes, so a screen
  *      can pass them on (e.g. through a context) without re-rendering everything that uses them.
  */
@@ -31,8 +33,11 @@ export function useLoad<T>(key: string, loader: () => Promise<T>) {
   // WHY a ref: refresh() runs from event handlers, where an effect event may not be called; the
   // ref always holds the loader from the latest render.
   const latestLoader = useRef(loader);
+  // The key of the latest render: a refresh that ends after the key changed must not land.
+  const currentKey = useRef(fullKey);
   useEffect(() => {
     latestLoader.current = loader;
+    currentKey.current = fullKey;
   });
 
   useEffect(() => {
@@ -54,7 +59,7 @@ export function useLoad<T>(key: string, loader: () => Promise<T>) {
   const replace = useCallback((data: T) => setResult({ key: fullKey, data }), [fullKey]);
   const refresh = useCallback(async () => {
     const data = await latestLoader.current();
-    setResult({ key: fullKey, data });
+    if (currentKey.current === fullKey) setResult({ key: fullKey, data });
     return data;
   }, [fullKey]);
 

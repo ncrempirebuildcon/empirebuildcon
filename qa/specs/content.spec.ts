@@ -6,7 +6,7 @@
 //
 // No new sign-ins and no public submissions: the saved super-admin and sales sessions are reused
 // and test data is made through the staff API (qa/README.md).
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 import { CMS_STATE, SALES_STATE, apiCall, runId } from "../lib/auth";
 import { draftPage, libraryPhoto, seededLegalPage } from "../lib/content";
 import { samplePhoto } from "../lib/files";
@@ -241,8 +241,14 @@ test("offers show their state from their dates", async ({ page }) => {
   await editor.getByRole("checkbox", { name: /Switched on/ }).check();
   // Hold the list's reload after the save for 3 s: the address must name the new offer while
   // the reload is still under way (task 5.8; before, it waited for the reload).
-  const slowList = async (route: import("@playwright/test").Route) => {
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
+  // Only the first list request after the save is held; the route stays until it is done (an
+  // unroute would release it at once).
+  let held = false;
+  const slowList = async (route: Route) => {
+    if (!held) {
+      held = true;
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+    }
     await route.continue();
   };
   await page.route(/\/api\/v1\/admin\/offers\?/, slowList);
@@ -252,16 +258,23 @@ test("offers show their state from their dates", async ({ page }) => {
   // for the list to reload, and a filter changed in between kept the stale "new" selection).
   await expect(page).toHaveURL(/[?&]offer=[0-9a-f-]{36}/, { timeout: 1_000 });
   await expect(page.getByRole("button", { name: "+ New offer" })).toBeEnabled();
-  await page.unroute(/\/api\/v1\/admin\/offers\?/, slowList);
   // The list is paged (25 a page, review L10) and earlier runs leave offers behind, so the row is
   // looked for under its state filter, where the newest sort near the top.
   const list = page.getByRole("region", { name: "All offers" });
   await expect(page.getByRole("navigation", { name: "Pages of offers" })).toBeVisible();
+  // The save's (held) refresh of the unfiltered list is still on its way: it must not replace
+  // the "Live" list when it lands (task 5.8, useLoad).
+  const staleRefresh = page.waitForResponse(
+    (r) => /\/api\/v1\/admin\/offers\?/.test(r.url()) && !r.url().includes("state="),
+  );
   await list.getByRole("combobox", { name: "Status" }).selectOption({ label: "Live" });
   await expect(page).toHaveURL(/state=live/);
   await expect(page.getByRole("row", { name: new RegExp(`E2E Offer live ${id}`) })).toContainText(
     "Live",
   );
+  await staleRefresh;
+  await expect(list.getByRole("cell", { name: /^(Scheduled|Ended|Inactive)$/ })).toHaveCount(0);
+  await page.unroute(/\/api\/v1\/admin\/offers\?/, slowList);
 
   // A price without terms is stopped before saving (and by the API).
   await page.getByRole("button", { name: "+ New offer" }).click();

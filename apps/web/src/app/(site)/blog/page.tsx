@@ -20,6 +20,13 @@ import PostCard from "@/components/blog/PostCard";
 import BlogPagination from "@/components/blog/BlogPagination";
 import BlogEmptyState from "@/components/blog/BlogEmptyState";
 
+/** The page number the list shows: digits only, 1–1000 (also used by the metadata). */
+function blogPage(raw: string | string[] | undefined): number {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value || !/^\d{1,4}$/.test(value)) return 1;
+  return Math.min(1000, Math.max(1, Number(value)));
+}
+
 const BLOG_INTRO =
   "Plain-language guides for home buyers, dated construction updates from our sites, and company news.";
 
@@ -30,8 +37,8 @@ const BLOG_INTRO =
  */
 export async function generateMetadata({ searchParams }: BlogPageProps): Promise<Metadata> {
   const raw = (await searchParams).page;
-  const page = Number.parseInt(Array.isArray(raw) ? (raw[0] ?? "") : (raw ?? ""), 10);
-  const path = Number.isFinite(page) && page > 1 && page <= 1000 ? `/blog?page=${page}` : "/blog";
+  const page = blogPage(raw);
+  const path = page > 1 ? `/blog?page=${page}` : "/blog";
   return pageMetadata({ title: "News & guides", path, fallbackDescriptions: [BLOG_INTRO] });
 }
 
@@ -43,9 +50,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
   const resolvedParams = await searchParams;
 
   // Parse page number: clamp to 1-1000 before calling API (Item 6)
-  const rawPage = Array.isArray(resolvedParams.page) ? resolvedParams.page[0] : resolvedParams.page;
-  const parsedPage = parseInt(rawPage || "1", 10);
-  const pageNum = Number.isFinite(parsedPage) ? Math.min(1000, Math.max(1, parsedPage)) : 1;
+  const pageNum = blogPage(resolvedParams.page);
 
   // Parse category filter
   const rawCat = Array.isArray(resolvedParams.category)
