@@ -4,13 +4,20 @@
  * Verifies:
  * - known values: ₹ 50,00,000 at 8.5% for 20 years ≈ ₹ 43,391 a month (verified against
  *   SBI and HDFC Bank Home Loan EMI calculators: P=50,00,000, r=8.5%, n=240 => 43,391.16).
- * - 0% interest rate => P / n.
+ * - 0% interest rate => P / n with totalPaid = monthlyEmi * n.
  * - 1 month tenure.
  * - proper whole-rupee rounding.
  * - refusal of inputs outside valid limits (throws RangeError / TypeError).
+ * - infinitesimal rates (< 1e-9 % / mo) falling back to 0% branch safely.
+ * - 0.05% step validation refusing off-step values like 8.53%.
  */
 import { describe, expect, it } from "vitest";
-import { calculateEmi, isRateValid, isTenureYearsValid } from "../src/lib/tools/emi";
+import {
+  calculateEmi,
+  isRateStepValid,
+  isRateValid,
+  isTenureYearsValid,
+} from "../src/lib/tools/emi";
 
 describe("EMI calculation (Task 5.7b)", () => {
   it("calculates known values: ₹ 50,00,000 at 8.5% for 20 years ≈ ₹ 43,391/month", () => {
@@ -39,6 +46,35 @@ describe("EMI calculation (Task 5.7b)", () => {
     expect(res.monthlyEmi).toBe(1_00_000);
     expect(res.totalInterest).toBe(0);
     expect(res.totalPaid).toBe(60_00_000);
+  });
+
+  it("handles rounded totalPaid for non-divisible 0% interest tenure", () => {
+    // ₹ 1,00,000 over 360 months (30 years) at 0%:
+    // raw = 277.777... => rounded to 278
+    // totalPaid = 278 * 360 = 1,00,080
+    const res = calculateEmi({
+      principal: 1_00_000,
+      annualRatePercent: 0,
+      tenureYears: 30,
+    });
+
+    expect(res.months).toBe(360);
+    expect(res.monthlyEmi).toBe(278);
+    expect(res.totalPaid).toBe(1_00_000);
+    expect(res.totalInterest).toBe(0);
+  });
+
+  it("falls back to 0% branch on infinitesimal rates below 1e-9 % per month", () => {
+    const res = calculateEmi({
+      principal: 12_00_000,
+      annualRatePercent: 1e-12,
+      tenureYears: 1,
+    });
+
+    expect(res.months).toBe(12);
+    expect(res.monthlyEmi).toBe(1_00_000);
+    expect(res.totalInterest).toBe(0);
+    expect(res.totalPaid).toBe(12_00_000);
   });
 
   it("calculates 1 month tenure correctly", () => {
@@ -103,22 +139,41 @@ describe("EMI calculation (Task 5.7b)", () => {
     expect(() =>
       calculateEmi({ principal: 50_00_000, annualRatePercent: 8.5, tenureYears: 0 }),
     ).toThrow(RangeError);
+    expect(() =>
+      calculateEmi({ principal: 50_00_000, annualRatePercent: 8.5, tenureYears: 0.01 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      calculateEmi({ principal: 50_00_000, annualRatePercent: 8.5, tenureYears: 10.5 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      calculateEmi({ principal: 50_00_000, annualRatePercent: 8.5, tenureYears: 51 }),
+    ).toThrow(RangeError);
 
     // Missing tenure
     expect(() => calculateEmi({ principal: 50_00_000, annualRatePercent: 8.5 })).toThrow(TypeError);
   });
 
-  it("validates UI range helpers", () => {
+  it("validates UI range helpers and 0.05 step refusal", () => {
     expect(isTenureYearsValid(5)).toBe(true);
     expect(isTenureYearsValid(20)).toBe(true);
     expect(isTenureYearsValid(30)).toBe(true);
     expect(isTenureYearsValid(4)).toBe(false);
     expect(isTenureYearsValid(31)).toBe(false);
+    expect(isTenureYearsValid(5.5)).toBe(false);
 
     expect(isRateValid(6.0)).toBe(true);
     expect(isRateValid(8.5)).toBe(true);
+    expect(isRateValid(8.55)).toBe(true);
     expect(isRateValid(15.0)).toBe(true);
+
+    // Out of bounds rates
     expect(isRateValid(5.95)).toBe(false);
     expect(isRateValid(15.05)).toBe(false);
+    expect(isRateValid(20.0)).toBe(false);
+
+    // Off-step rates refused (Must 1)
+    expect(isRateStepValid(8.53)).toBe(false);
+    expect(isRateValid(8.53)).toBe(false);
+    expect(isRateStepValid(8.55)).toBe(true);
   });
 });

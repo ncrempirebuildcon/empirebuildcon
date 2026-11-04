@@ -1,15 +1,17 @@
 /**
  * EMI calculation helpers for property pages (handbook/tasks/phase-5/5.7b-tools.md).
  *
- * Standard reducing-balance formula:
- *   EMI = P · r · (1 + r)^n / ((1 + r)^n − 1)
+ * How it works (CODE_STYLE §2.3 money logic):
+ *   1. Loan amount P in whole rupees, annual interest rate, and tenure in years (or months) are provided.
+ *   2. Standard reducing-balance formula:
+ *        EMI = P · r · (1 + r)^n / ((1 + r)^n − 1)
+ *      where r = annualRate / 12 / 100 is the monthly rate, and n is the total number of monthly instalments.
+ *   3. Edge cases: for 0% interest rate (or infinitesimal rate < 1e-9 % per month), EMI = P / n.
+ *   4. Total paid is the sum of rounded monthly instalments (monthlyEmi * n); total interest is max(0, totalPaid - P).
+ *   5. All monetary outputs are formatted in whole rupees with Indian number grouping.
+ *   6. Out-of-bounds inputs are strictly refused with descriptive errors (no silent clamping).
  *
- * where:
- *   P = Principal loan amount in whole rupees
- *   r = Monthly interest rate (annualRatePercent / 12 / 100)
- *   n = Number of monthly instalments (tenureYears * 12 or tenureMonths)
- *
- * For a 0% interest rate, EMI = P / n.
+ * Collaborators: Antigravity <noreply@google.com>, Claude (review 1). Decisions: D-040, D-049.
  */
 
 export const EMI_LIMITS = {
@@ -52,7 +54,7 @@ export interface EmiResult {
 
 /**
  * Calculates reducing-balance EMI, total interest, and total payment.
- * Throws RangeError if inputs are outside permissible limits.
+ * Throws RangeError / TypeError if inputs are outside permissible limits.
  */
 export function calculateEmi({
   principal,
@@ -96,23 +98,32 @@ export function calculateEmi({
     n = tenureMonths;
     yrs = tenureMonths / 12;
   } else if (tenureYears !== undefined) {
-    if (!Number.isFinite(tenureYears) || tenureYears <= 0 || tenureYears > 50) {
+    if (
+      !Number.isFinite(tenureYears) ||
+      !Number.isInteger(tenureYears) ||
+      tenureYears < 1 ||
+      tenureYears > 50
+    ) {
       throw new RangeError(
-        `calculateEmi: tenureYears must be between 1 and 50, got ${tenureYears}`,
+        `calculateEmi: tenureYears must be an integer between 1 and 50, got ${tenureYears}`,
       );
     }
-    n = Math.round(tenureYears * 12);
+    n = tenureYears * 12;
     yrs = tenureYears;
   } else {
     throw new TypeError("calculateEmi: either tenureYears or tenureMonths must be provided");
   }
 
   const P = principal;
+  const r = annualRatePercent / 100 / 12;
 
-  // Zero interest rate edge-case
-  if (annualRatePercent === 0) {
+  // Zero interest rate or infinitesimal rate (< 1e-11 monthly, ~1e-9 % per month)
+  // WHY: avoids catastrophic cancellation / division by zero in floating point exponentiation.
+  if (annualRatePercent === 0 || r < 1e-11) {
     const rawMonthly = P / n;
     const monthlyEmi = Math.round(rawMonthly);
+    // WHY: for 0% loans, total interest is strictly 0 and total paid is the principal P,
+    // avoiding rounding artifacts (e.g. ₹278 × 360 = ₹1,00,080 for a ₹1,00,000 loan).
     const totalPaid = P;
     const totalInterest = 0;
     return {
@@ -125,8 +136,7 @@ export function calculateEmi({
     };
   }
 
-  // Monthly interest rate r
-  const r = annualRatePercent / 100 / 12;
+  // Monthly interest rate reducing-balance formula
   const factor = Math.pow(1 + r, n);
   const rawMonthly = (P * r * factor) / (factor - 1);
   const monthlyEmi = Math.round(rawMonthly);
@@ -156,21 +166,23 @@ export function isTenureYearsValid(years: number): boolean {
 }
 
 /**
- * Validates whether an interest rate is within the allowed UI limits (6.00% to 15.00%).
+ * Validates whether an interest rate is an exact multiple of the 0.05% step.
+ */
+export function isRateStepValid(rate: number): boolean {
+  if (!Number.isFinite(rate)) return false;
+  const steps = Math.round(rate / EMI_LIMITS.RATE_STEP);
+  return Math.abs(steps * EMI_LIMITS.RATE_STEP - rate) < 1e-4;
+}
+
+/**
+ * Validates whether an interest rate is within the allowed UI limits (6.00% to 15.00%)
+ * and respects the 0.05% step (values off the step are refused).
  */
 export function isRateValid(rate: number): boolean {
-  return Number.isFinite(rate) && rate >= EMI_LIMITS.MIN_RATE && rate <= EMI_LIMITS.MAX_RATE;
-}
-
-export function clampTenureYears(years: number): number {
-  if (!Number.isFinite(years)) return EMI_LIMITS.DEFAULT_TENURE_YEARS;
-  return Math.min(
-    EMI_LIMITS.MAX_TENURE_YEARS,
-    Math.max(EMI_LIMITS.MIN_TENURE_YEARS, Math.round(years)),
+  return (
+    Number.isFinite(rate) &&
+    rate >= EMI_LIMITS.MIN_RATE &&
+    rate <= EMI_LIMITS.MAX_RATE &&
+    isRateStepValid(rate)
   );
-}
-
-export function clampRate(rate: number): number {
-  if (!Number.isFinite(rate)) return EMI_LIMITS.DEFAULT_RATE;
-  return Math.min(EMI_LIMITS.MAX_RATE, Math.max(EMI_LIMITS.MIN_RATE, rate));
 }

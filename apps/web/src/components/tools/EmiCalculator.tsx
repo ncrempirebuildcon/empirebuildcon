@@ -9,47 +9,37 @@
  *          Prefilled from the home's lowest price when shown, empty when price is on request.
  *       2. Tenure: 5 to 30 years (Select with all options).
  *       3. Interest rate: 6.00 to 15.00 % a year, steps of 0.05, defaulting to 8.50 %.
+ *          Out of bounds or off-step rates are refused with visible error (not clamped).
  *   - Outputs:
  *       Monthly EMI, total interest, total paid, and number of months.
  *       Reducing-balance formula: EMI = P · r · (1+r)^n / ((1+r)^n − 1), with 0% giving P/n.
- *       Amounts formatted in ₹ with Indian grouping, rounded to whole rupees.
+ *       Amounts formatted in ₹ with Indian grouping, rounded to whole rupees (formatInrFull).
  *   - Honesty:
- *       - Rate field says "Sample rate, check with your bank".
+ *       - Rate field says "sample rate, check with your bank".
+ *       - Prefilled loan amount notes price exclusions and that banks lend less.
  *       - Note: "Indicative only, not a loan offer. Your bank decides the amount, rate and tenure."
  *       - No bank names, no fake urgency or lowest-EMI claims.
- *   - Without JavaScript: renders the formula and note instead.
+ *   - Progressive enhancement: renders formula and note when JavaScript is disabled.
+ *
+ * Collaborators: Antigravity <noreply@google.com>, Claude (review 1). Decisions: D-040, D-049.
  */
-import { useId, useState, useSyncExternalStore } from "react";
-import { NumberField } from "@empire/ui";
-import { Select } from "@empire/ui";
-import { formatInrFull } from "@empire/ui";
+import { useEffect, useId, useState } from "react";
+import { formatInrFull, NumberField, Select } from "@empire/ui";
 import {
   calculateEmi,
-  clampRate,
-  clampTenureYears,
   EMI_LIMITS,
+  isRateStepValid,
   isRateValid,
   isTenureYearsValid,
   type EmiResult,
 } from "@/lib/tools/emi";
+import { useMounted } from "@/lib/tools/mounted";
 
 export interface EmiCalculatorProps {
   /** Pre-filled price in whole rupees, or null/undefined when on request. */
   defaultPriceInr?: number | null;
   /** Whether the price is on request. */
   priceOnRequest?: boolean;
-}
-
-function noopSubscribe() {
-  return () => {};
-}
-
-function getClientMounted() {
-  return true;
-}
-
-function getServerMounted() {
-  return false;
 }
 
 const TENURE_OPTIONS = Array.from(
@@ -64,37 +54,93 @@ const TENURE_OPTIONS = Array.from(
 );
 
 export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculatorProps) {
-  const isMounted = useSyncExternalStore(noopSubscribe, getClientMounted, getServerMounted);
+  const isMounted = useMounted();
 
-  const initialPrincipal =
-    !priceOnRequest && defaultPriceInr && defaultPriceInr > 0 ? Math.round(defaultPriceInr) : null;
+  const isPrefilled =
+    !priceOnRequest &&
+    defaultPriceInr !== undefined &&
+    defaultPriceInr !== null &&
+    defaultPriceInr > 0;
+  const initialPrincipal = isPrefilled ? Math.round(defaultPriceInr) : null;
 
   const [loanAmount, setLoanAmount] = useState<number | null>(initialPrincipal);
   const [tenureYears, setTenureYears] = useState<number>(EMI_LIMITS.DEFAULT_TENURE_YEARS);
-  const [ratePercent, setRatePercent] = useState<number>(EMI_LIMITS.DEFAULT_RATE);
+  const [ratePercent, setRatePercent] = useState<number | null>(EMI_LIMITS.DEFAULT_RATE);
+  const [liveAnnouncement, setLiveAnnouncement] = useState<string>("");
 
   const tenureId = useId();
   const rateId = useId();
   const loanId = useId();
+
+  // Validate loan amount
+  let loanError: string | undefined;
+  if (loanAmount !== null) {
+    if (loanAmount < EMI_LIMITS.MIN_PRINCIPAL) {
+      loanError = "Enter a loan amount greater than ₹ 0";
+    } else if (loanAmount > EMI_LIMITS.MAX_PRINCIPAL) {
+      loanError = "Enter an amount up to ₹ 100 crore";
+    }
+  }
+
+  // Validate rate: strictly refuse out-of-bounds or off-step rates without silent clamping (Must 1)
+  let rateError: string | undefined;
+  if (ratePercent !== null) {
+    if (ratePercent < EMI_LIMITS.MIN_RATE || ratePercent > EMI_LIMITS.MAX_RATE) {
+      rateError = `Enter a rate between ${EMI_LIMITS.MIN_RATE.toFixed(2)}% and ${EMI_LIMITS.MAX_RATE.toFixed(2)}%`;
+    } else if (!isRateStepValid(ratePercent)) {
+      rateError = "Rate must be in steps of 0.05% (e.g. 8.50%)";
+    }
+  }
+
+  // Calculate EMI only when both inputs are valid and have no errors
+  let emiResult: EmiResult | null = null;
+  const isInputValid =
+    loanAmount !== null &&
+    !loanError &&
+    ratePercent !== null &&
+    !rateError &&
+    isTenureYearsValid(tenureYears) &&
+    isRateValid(ratePercent);
+
+  if (isInputValid) {
+    try {
+      emiResult = calculateEmi({
+        principal: loanAmount,
+        annualRatePercent: ratePercent,
+        tenureYears,
+      });
+    } catch {
+      emiResult = null;
+    }
+  }
+
+  // Debounced screen reader live announcement for monthly EMI (Must 9)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (emiResult) {
+        setLiveAnnouncement(`Monthly EMI ${formatInrFull(emiResult.monthlyEmi)}`);
+      } else {
+        setLiveAnnouncement("");
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [emiResult]);
 
   if (!isMounted) {
     // Progressive enhancement: when JavaScript is disabled, render formula and note instead
     return (
       <section id="emi" aria-labelledby="emi-heading" className="flex flex-col gap-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2
-            id="emi-heading"
-            className="font-display text-[clamp(24px,4vw,34px)] leading-tight font-semibold text-metallic"
-          >
+          <h2 id="emi-heading" className="font-display text-h2 font-semibold text-body">
             EMI calculator
           </h2>
-          <span className="text-caption font-semibold text-gold-400 uppercase tracking-[0.08em]">
+          <span className="text-caption font-semibold uppercase tracking-[0.08em] text-gold-400">
             Sample rates · check with your bank
           </span>
         </div>
 
         <div
-          className="rounded-card border border-gold-line bg-noir-800 p-6 flex flex-col gap-3 text-body"
+          className="flex flex-col gap-3 rounded-card border border-gold-line bg-noir-800 p-6 text-body"
           data-testid="emi-nojs-fallback"
         >
           <p className="font-semibold text-gold-300">Standard reducing-balance formula:</p>
@@ -106,7 +152,7 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
             rate (annual rate / 12 / 100), and <strong>n</strong> is the tenure in months. For 0%
             interest rate, EMI = P / n.
           </p>
-          <p className="text-caption text-muted border-t border-gold-line/30 pt-3">
+          <p className="border-t border-gold-line/30 pt-3 text-caption text-muted">
             Sample rates, check with your bank. Indicative only, not a loan offer. Your bank decides
             the amount, rate and tenure.
           </p>
@@ -115,37 +161,29 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
     );
   }
 
-  let emiResult: EmiResult | null = null;
-  let calculationError: string | null = null;
-
-  if (loanAmount !== null && loanAmount > 0) {
-    try {
-      const validTenure = isTenureYearsValid(tenureYears)
-        ? tenureYears
-        : clampTenureYears(tenureYears);
-      const validRate = isRateValid(ratePercent) ? ratePercent : clampRate(ratePercent);
-      emiResult = calculateEmi({
-        principal: loanAmount,
-        annualRatePercent: validRate,
-        tenureYears: validTenure,
-      });
-    } catch (err) {
-      calculationError = err instanceof Error ? err.message : "Calculation error";
-    }
+  // Loan amount hint: prefilled price note (Must 12)
+  let loanHint = "Whole rupees with Indian digit grouping";
+  if (isPrefilled && loanAmount === initialPrincipal) {
+    loanHint =
+      "Prefilled with the lowest listed price, which excludes GST, stamp duty and registration. Banks usually lend less than the full price.";
+  } else if (priceOnRequest && (loanAmount === null || loanAmount <= 0)) {
+    loanHint = "Enter a loan amount to calculate estimated EMI";
   }
 
   return (
     <section id="emi" aria-labelledby="emi-heading" className="flex flex-col gap-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2
-          id="emi-heading"
-          className="font-display text-[clamp(24px,4vw,34px)] leading-tight font-semibold text-metallic"
-        >
+        <h2 id="emi-heading" className="font-display text-h2 font-semibold text-body">
           EMI calculator
         </h2>
-        <span className="text-caption font-semibold text-gold-400 uppercase tracking-[0.08em]">
+        <span className="text-caption font-semibold uppercase tracking-[0.08em] text-gold-400">
           Sample rates · check with your bank
         </span>
+      </div>
+
+      {/* Screen reader polite live region for debounced EMI result (Must 9) */}
+      <div aria-live="polite" className="sr-only">
+        {liveAnnouncement}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.3fr_1fr]">
@@ -157,11 +195,8 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
             value={loanAmount}
             onValueChange={setLoanAmount}
             prefix={priceOnRequest && (!loanAmount || loanAmount <= 0) ? undefined : "₹"}
-            hint={
-              priceOnRequest && (loanAmount === null || loanAmount <= 0)
-                ? "Enter a loan amount to calculate estimated EMI"
-                : "Whole rupees with Indian digit grouping"
-            }
+            error={loanError}
+            hint={loanHint}
           />
 
           <Select
@@ -187,23 +222,22 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
               </span>
             }
             value={ratePercent}
-            onValueChange={(val) => {
-              if (val !== null) setRatePercent(val);
-            }}
+            onValueChange={setRatePercent}
             decimals={2}
             suffix="%"
-            hint="Sample rate between 6.00% and 15.00% (defaults to 8.50%)"
+            error={rateError}
+            hint="Sample rate between 6.00% and 15.00% in 0.05% steps (defaults to 8.50%)"
           />
         </div>
 
-        {/* Calculation Output */}
+        {/* Calculation Output (no aria-live on the whole block, Must 9) */}
         <div
-          aria-live="polite"
+          data-testid="emi-output"
           className="flex flex-col justify-between gap-5 rounded-card border border-gold-line-strong bg-noir-900 p-5 md:p-6"
         >
           {emiResult ? (
             <div className="flex flex-col gap-4">
-              <span className="text-caption font-bold tracking-[0.08em] text-gold-400 uppercase">
+              <span className="text-caption font-bold uppercase tracking-[0.08em] text-gold-400">
                 MONTHLY EMI
               </span>
               <strong
@@ -237,7 +271,7 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
             </div>
           ) : (
             <div className="flex flex-col gap-2 py-4">
-              <span className="text-caption font-bold tracking-[0.08em] text-gold-400 uppercase">
+              <span className="text-caption font-bold uppercase tracking-[0.08em] text-gold-400">
                 MONTHLY EMI
               </span>
               <p className="text-body text-muted">
@@ -245,9 +279,6 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
                   ? "Enter a loan amount to see the estimated EMI breakdown."
                   : "Type a loan amount above to calculate your estimated monthly EMI."}
               </p>
-              {calculationError ? (
-                <p className="text-small text-danger">{calculationError}</p>
-              ) : null}
             </div>
           )}
 

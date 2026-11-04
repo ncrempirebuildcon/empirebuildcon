@@ -7,17 +7,21 @@
  *   - Displays no prices, only names and links.
  *   - Verifies if item is still listed via public API; 404 displays "No longer listed" with Remove.
  *   - Empty state links to /projects.
- *   - noindex.
+ *   - Metadata through pageMetadata with noindex (D-047).
+ *
+ * Collaborators: Antigravity <noreply@google.com>, Claude (review 1). Decisions: D-040, D-047, D-049.
  */
 import type { Metadata } from "next";
 import { Breadcrumbs } from "@/components/catalogue/ListControls";
 import { SavedHomesClient } from "@/components/tools/SavedHomesClient";
+import { pageMetadata } from "@/lib/public/seo";
 
-export const metadata: Metadata = {
-  title: "Saved homes · Empire",
-  description: "Homes and projects saved in this browser.",
-  robots: { index: false, follow: true },
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Saved homes",
+  path: "/saved",
+  noindex: true,
+  fallbackDescriptions: ["Saved only in this browser."],
+});
 
 export default function SavedHomesPage() {
   return (

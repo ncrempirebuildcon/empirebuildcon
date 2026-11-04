@@ -3,12 +3,15 @@
  *
  * Requirements:
  *   - Stored in localStorage under one key ("empire_saved_homes").
+ *   - Stored as versioned schema: `{ v: 1, items: [...] }` (also supports reading bare v0 arrays).
  *   - List of `{ kind: "project" | "property", path, name, savedAt }`.
  *   - At most 50 items, newest first.
  *   - Duplicates collapse to one (updating position to newest).
- *   - Every read and write wrapped in try/catch so blocked or quota-exceeded storage fails safely.
- *   - Garbage / invalid entries in storage are discarded.
+ *   - Every read and write wrapped in safeLocalStorage / try-catch so blocked or quota-exceeded storage fails safely.
+ *   - Paths strictly validated: `/projects/<slug>` for projects, `/projects/<slug>/<config>` for properties.
  *   - Browser only: no cookies, no accounts, nothing sent to the server.
+ *
+ * Collaborators: Antigravity <noreply@google.com>, Claude (review 1). Decisions: D-040, D-049.
  */
 
 export const SAVED_HOMES_STORAGE_KEY = "empire_saved_homes";
@@ -27,39 +30,69 @@ export interface SavedItem {
   savedAt: string;
 }
 
+export interface StoredSavedPayload {
+  v: 1;
+  items: SavedItem[];
+}
+
 export interface SaveOperationResult {
   success: boolean;
   items: SavedItem[];
   error?: string;
 }
 
+const PROJECT_PATH_REGEX = /^\/projects\/[a-z0-9-]+$/;
+const PROPERTY_PATH_REGEX = /^\/projects\/[a-z0-9-]+\/[a-z0-9-]+$/;
+
 /**
- * Validates whether an unknown value conforms to the SavedItem interface.
+ * Accesses window.localStorage safely without throwing when site data or cookies are blocked.
+ * (Must 2: Chrome / Safari private browsing throws SecurityError on window.localStorage access).
+ */
+export function safeLocalStorage(): Storage | null {
+  try {
+    if (typeof window === "undefined") return null;
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validates whether an unknown value conforms to the SavedItem interface
+ * with valid path format and matching kind.
  */
 export function isValidSavedItem(val: unknown): val is SavedItem {
   if (!val || typeof val !== "object") return false;
   const item = val as Record<string, unknown>;
+
   const validKind = item.kind === "project" || item.kind === "property";
-  const validPath = typeof item.path === "string" && item.path.startsWith("/");
+  if (!validKind) return false;
+
+  const rawPath = item.path;
+  if (typeof rawPath !== "string") return false;
+
+  // Strict path format and kind matching (Nit: prevent protocol-relative '//evil.example' or mismatched kind)
+  if (item.kind === "project" && !PROJECT_PATH_REGEX.test(rawPath)) return false;
+  if (item.kind === "property" && !PROPERTY_PATH_REGEX.test(rawPath)) return false;
+
   const validName = typeof item.name === "string" && item.name.trim().length > 0;
   const validSavedAt =
     typeof item.savedAt === "string" &&
     item.savedAt.length > 0 &&
     !Number.isNaN(Date.parse(item.savedAt));
-  return validKind && validPath && validName && validSavedAt;
+
+  return validName && validSavedAt;
 }
 
 function resolveStorage(customStorage?: Storage): Storage | null {
   if (customStorage) return customStorage;
-  if (typeof window !== "undefined" && window.localStorage) {
-    return window.localStorage;
-  }
-  return null;
+  return safeLocalStorage();
 }
 
 /**
  * Reads all saved items from localStorage.
- * Discards malformed items and caps list at MAX_SAVED_ITEMS.
+ * Handles both v1 (`{ v: 1, items }`) and v0 (`[...]`) storage payloads.
+ * Discards malformed items, collapses duplicates, and caps list at MAX_SAVED_ITEMS.
  * Returns empty array if storage is blocked, throws, or is unavailable.
  */
 export function getSavedItems(storage?: Storage): SavedItem[] {
@@ -69,10 +102,26 @@ export function getSavedItems(storage?: Storage): SavedItem[] {
     const raw = s.getItem(SAVED_HOMES_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+
+    let rawList: unknown[] = [];
+    if (Array.isArray(parsed)) {
+      rawList = parsed;
+    } else if (
+      parsed &&
+      typeof parsed === "object" &&
+      Array.isArray((parsed as Record<string, unknown>).items)
+    ) {
+      rawList = (parsed as Record<string, unknown>).items as unknown[];
+    } else {
+      return [];
+    }
+
     const validItems: SavedItem[] = [];
-    for (const item of parsed) {
-      if (isValidSavedItem(item)) {
+    const seenPaths = new Set<string>();
+
+    for (const item of rawList) {
+      if (isValidSavedItem(item) && !seenPaths.has(item.path)) {
+        seenPaths.add(item.path);
         validItems.push(item);
         if (validItems.length >= MAX_SAVED_ITEMS) break;
       }
@@ -81,6 +130,14 @@ export function getSavedItems(storage?: Storage): SavedItem[] {
   } catch {
     return [];
   }
+}
+
+function serializePayload(items: SavedItem[]): string {
+  const payload: StoredSavedPayload = {
+    v: 1,
+    items,
+  };
+  return JSON.stringify(payload);
 }
 
 /**
@@ -97,8 +154,14 @@ export function addSavedItem(
       return { success: false, items: [], error: "Storage unavailable" };
     }
 
-    if (!item.path || typeof item.path !== "string" || !item.path.startsWith("/")) {
+    if (!item.path || typeof item.path !== "string") {
       throw new RangeError(`addSavedItem: invalid path ${item.path}`);
+    }
+    if (item.kind === "project" && !PROJECT_PATH_REGEX.test(item.path)) {
+      throw new RangeError(`addSavedItem: invalid project path ${item.path}`);
+    }
+    if (item.kind === "property" && !PROPERTY_PATH_REGEX.test(item.path)) {
+      throw new RangeError(`addSavedItem: invalid property path ${item.path}`);
     }
     if (!item.name || typeof item.name !== "string" || !item.name.trim()) {
       throw new RangeError(`addSavedItem: invalid name ${item.name}`);
@@ -120,7 +183,7 @@ export function addSavedItem(
 
     // Newest first, capped at 50 items
     const updated = [newItem, ...remaining].slice(0, MAX_SAVED_ITEMS);
-    s.setItem(SAVED_HOMES_STORAGE_KEY, JSON.stringify(updated));
+    s.setItem(SAVED_HOMES_STORAGE_KEY, serializePayload(updated));
     notifySavedHomesChanged();
     return { success: true, items: updated };
   } catch (err) {
@@ -140,7 +203,7 @@ export function removeSavedItem(path: string, storage?: Storage): SaveOperationR
     }
     const currentItems = getSavedItems(s);
     const updated = currentItems.filter((i) => i.path !== path);
-    s.setItem(SAVED_HOMES_STORAGE_KEY, JSON.stringify(updated));
+    s.setItem(SAVED_HOMES_STORAGE_KEY, serializePayload(updated));
     notifySavedHomesChanged();
     return { success: true, items: updated };
   } catch (err) {
@@ -198,10 +261,15 @@ export function notifySavedHomesChanged(): void {
   }
 }
 
+/**
+ * Retrieves snapshot string for useSyncExternalStore safely without throwing when site data is blocked.
+ * (Must 2: Chrome / Safari private browsing throws SecurityError on window.localStorage access).
+ */
 export function getSavedHomesSnapshot(): string {
-  if (typeof window === "undefined" || !window.localStorage) return "[]";
+  const s = safeLocalStorage();
+  if (!s) return "[]";
   try {
-    return window.localStorage.getItem(SAVED_HOMES_STORAGE_KEY) || "[]";
+    return s.getItem(SAVED_HOMES_STORAGE_KEY) || "[]";
   } catch {
     return "[]";
   }

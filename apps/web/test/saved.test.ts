@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Unit tests for saved homes storage (handbook/tasks/phase-5/5.7b-tools.md).
  *
@@ -8,16 +9,21 @@
  * - newest first order
  * - duplicates collapse to one
  * - rubbish in storage discarded safely
+ * - strict path validation and kind matching (prevents protocol-relative '//evil' or malformed paths)
+ * - versioned payload `{ v: 1, items }` with v0 array backwards compatibility
  * - storage throwing handled gracefully without crashing
+ * - window.localStorage getter throwing SecurityError handled gracefully (Must 2)
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   addSavedItem,
+  getSavedHomesSnapshot,
   getSavedItems,
   isItemSaved,
   isStorageAvailable,
   MAX_SAVED_ITEMS,
   removeSavedItem,
+  safeLocalStorage,
   SAVED_HOMES_STORAGE_KEY,
 } from "../src/lib/tools/saved";
 
@@ -60,6 +66,11 @@ describe("Saved homes storage (Task 5.7b)", () => {
 
   beforeEach(() => {
     mockStorage = new MockStorage();
+  });
+
+  afterEach(() => {
+    // Restore window.localStorage if modified in any test
+    delete (window as unknown as Record<string, unknown>).localStorage;
   });
 
   it("adds items to storage and retrieves them", () => {
@@ -135,7 +146,32 @@ describe("Saved homes storage (Task 5.7b)", () => {
     expect(isItemSaved("/projects/p-1", mockStorage)).toBe(false);
   });
 
-  it("safely discards rubbish and malformed entries in storage", () => {
+  it("supports both v1 { v: 1, items } schema and v0 bare array payload", () => {
+    // v0 bare array in storage
+    const v0List = [
+      {
+        kind: "project",
+        path: "/projects/legacy-proj",
+        name: "Legacy Proj",
+        savedAt: new Date().toISOString(),
+      },
+    ];
+    mockStorage.setItem(SAVED_HOMES_STORAGE_KEY, JSON.stringify(v0List));
+
+    const retrievedV0 = getSavedItems(mockStorage);
+    expect(retrievedV0).toHaveLength(1);
+    expect(retrievedV0[0]!.path).toBe("/projects/legacy-proj");
+
+    // Saving an item upgrades storage to v1 schema
+    addSavedItem({ kind: "property", path: "/projects/p/2-bhk", name: "2 BHK" }, mockStorage);
+    const rawStored = mockStorage.getItem(SAVED_HOMES_STORAGE_KEY);
+    expect(rawStored).toContain('"v":1');
+    const parsed = JSON.parse(rawStored!);
+    expect(parsed.v).toBe(1);
+    expect(parsed.items).toHaveLength(2);
+  });
+
+  it("safely discards rubbish, tampered paths, and malformed entries in storage", () => {
     const rubbish = [
       null,
       123,
@@ -151,6 +187,27 @@ describe("Saved homes storage (Task 5.7b)", () => {
         kind: "project",
         path: "no-leading-slash",
         name: "No Slash",
+        savedAt: new Date().toISOString(),
+      },
+      // Protocol-relative injection attempt (tampered storage)
+      {
+        kind: "project",
+        path: "//evil.example/projects/p",
+        name: "Evil Phish",
+        savedAt: new Date().toISOString(),
+      },
+      // Kind mismatch (project with 2 slugs)
+      {
+        kind: "project",
+        path: "/projects/p/extra-slug",
+        name: "Mismatched",
+        savedAt: new Date().toISOString(),
+      },
+      // Kind mismatch (property with only 1 slug)
+      {
+        kind: "property",
+        path: "/projects/single-slug",
+        name: "Mismatched Property",
         savedAt: new Date().toISOString(),
       },
       { kind: "project", path: "/projects/valid", name: "   ", savedAt: new Date().toISOString() },
@@ -187,5 +244,29 @@ describe("Saved homes storage (Task 5.7b)", () => {
     const rmRes = removeSavedItem("/projects/p", mockStorage);
     expect(rmRes.success).toBe(false);
     expect(rmRes.error).toBeDefined();
+  });
+
+  it("handles window.localStorage throwing SecurityError when site data is blocked (Must 2)", () => {
+    // Stub window.localStorage getter to throw SecurityError (simulates Chrome/Safari with blocked cookies/storage)
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("The user denied permission to use Storage.", "SecurityError");
+      },
+    });
+
+    expect(safeLocalStorage()).toBeNull();
+    expect(getSavedHomesSnapshot()).toBe("[]");
+    expect(isStorageAvailable()).toBe(false);
+    expect(getSavedItems()).toEqual([]);
+    expect(isItemSaved("/projects/anything")).toBe(false);
+
+    const addRes = addSavedItem({ kind: "project", path: "/projects/p", name: "P" });
+    expect(addRes.success).toBe(false);
+    expect(addRes.error).toBe("Storage unavailable");
+
+    const rmRes = removeSavedItem("/projects/p");
+    expect(rmRes.success).toBe(false);
+    expect(rmRes.error).toBe("Storage unavailable");
   });
 });

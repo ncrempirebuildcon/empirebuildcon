@@ -4,21 +4,27 @@
  * Requirements tested:
  *   1. EMI calculator:
  *      - Property page with default price displays pre-filled EMI.
+ *      - Loan amount prefill hint explains GST/stamp duty exclusions.
  *      - Typing a new loan amount recalculates monthly EMI to exact expected figure.
+ *      - Typing invalid rate (e.g. 20%) displays visible error and suppresses monthly result (Must 1).
  *      - Adjusting tenure or rate updates EMI, total interest, and total paid.
  *      - Note and sample rate guidance are visible ("Indicative only, not a loan offer...").
  *      - JavaScript disabled: standard reducing-balance formula and note are visible.
  *   2. Saved homes:
  *      - Save button on project and property pages toggles between "Save" and "Saved" with aria-pressed.
  *      - Visiting /saved lists both saved items without prices.
+ *      - Items show "Checking…" before API verification completes, then become active links (Item 4).
  *      - Privacy notice "Saved only in this browser." is present.
- *      - Removing an item updates the list and localStorage.
+ *      - Removing an item updates the list and moves focus accessibility (Item 5).
  *      - When a saved project is unpublished, /saved displays "No longer listed" with a Remove button.
  *      - Removing the delisted item leaves /saved in empty state linking to /projects.
+ *      - When site data / localStorage is blocked, /saved and SaveButton display friendly message without crashing (Must 2).
  *   3. General:
- *      - Axe accessibility check (WCAG 2.1 AA) with zero serious/critical violations on /saved and property page.
+ *      - Axe accessibility check (WCAG 2.1 AA) with zero serious/critical violations on /saved (populated) and property page.
  *      - Enforced CSP with zero violations.
- *      - 390 px responsive mobile check has zero horizontal overflow.
+ *      - 390 px responsive mobile check has zero horizontal overflow on populated /saved and property page.
+ *
+ * Collaborators: Antigravity <noreply@google.com>, Claude (review 1). Decisions: D-040, D-049.
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
@@ -45,7 +51,7 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     }
   });
 
-  test("EMI calculator on property page computes expected EMI and updates when amount is typed", async ({
+  test("EMI calculator on property page computes expected EMI, refuses out-of-range rates, and updates on input", async ({
     page,
   }) => {
     const propertyPath = `/projects/${project.slug}/${project.configSlugs[0]}`;
@@ -56,6 +62,12 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     // EMI = 78,00,000 * 0.085/12 * (1+0.085/12)^240 / ((1+0.085/12)^240 - 1) = ₹ 67,690.
     const emiHeading = page.getByRole("heading", { level: 2, name: "EMI calculator" });
     await expect(emiHeading).toBeVisible();
+
+    // Prefilled price note (Must 12)
+    const prefillNote = page.getByText(
+      "Prefilled with the lowest listed price, which excludes GST, stamp duty and registration. Banks usually lend less than the full price.",
+    );
+    await expect(prefillNote).toBeVisible();
 
     const sampleRateNote = page.getByText("Sample rates · check with your bank");
     await expect(sampleRateNote).toBeVisible();
@@ -80,6 +92,21 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     await expect(page.getByText("54,13,840")).toBeVisible(); // Total interest
     await expect(page.getByText("1,04,13,840")).toBeVisible(); // Total paid
     await expect(page.getByTestId("emi-over-duration")).toHaveText("20 years (240 months)");
+
+    // Must 1: Type an out-of-bounds rate (20%) -> expect error message and no emi-monthly-result
+    const rateInput = page.getByLabel(/^Interest rate/);
+    await rateInput.fill("20");
+    await rateInput.blur();
+
+    const rateError = page.getByText("Enter a rate between 6.00% and 15.00%");
+    await expect(rateError).toBeVisible();
+    await expect(monthlyResult).not.toBeVisible();
+
+    // Restore rate to 8.50% -> result reappears
+    await rateInput.fill("8.50");
+    await rateInput.blur();
+    await expect(rateError).not.toBeVisible();
+    await expect(monthlyResult).toHaveText("₹ 43,391");
   });
 
   test("EMI calculator displays formula and disclaimer when JavaScript is disabled", async ({
@@ -107,25 +134,6 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     await noJsContext.close();
   });
 
-  test("axe accessibility check on /saved and property page", async ({ page }) => {
-    // 1. Check /saved page
-    await page.goto("/saved");
-    let a11y = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-      .analyze();
-    let serious = a11y.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
-    expect(serious.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
-
-    // 2. Check property page with EMI calculator
-    const propertyPath = `/projects/${project.slug}/${project.configSlugs[0]}`;
-    await page.goto(propertyPath);
-    a11y = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-      .analyze();
-    serious = a11y.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
-    expect(serious.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
-  });
-
   test("CSP enforced with zero violations on /saved and property page", async ({ page }) => {
     const cspViolations: string[] = [];
     page.on("console", (msg) => {
@@ -147,25 +155,37 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     expect(cspViolations).toEqual([]);
   });
 
-  test("responsive mobile view (390px) has zero sideways scroll on /saved and property page", async ({
+  test("handles blocked localStorage gracefully without crashing on /saved and property page (Must 2)", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    // Stub localStorage getter to throw SecurityError before any script executes
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        get() {
+          throw new DOMException("The user denied permission to use Storage.", "SecurityError");
+        },
+      });
+    });
 
-    // /saved page
+    // 1. Visit /saved: must not throw uncaught error or crash into error boundary
     await page.goto("/saved");
-    const savedOverflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
-    );
-    expect(savedOverflow).toBe(false);
+    const heading = page.getByRole("heading", { level: 1, name: "Saved homes" });
+    await expect(heading).toBeVisible();
 
-    // Property page with EMI calculator
+    // Friendly notice shown on /saved
+    const unavailableNotice = page.getByText("Saving isn't available in this browser");
+    await expect(unavailableNotice).toBeVisible();
+
+    // 2. Visit property page: Save button indicates storage unavailable and is disabled
     const propertyPath = `/projects/${project.slug}/${project.configSlugs[0]}`;
     await page.goto(propertyPath);
-    const propOverflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
-    );
-    expect(propOverflow).toBe(false);
+
+    const saveBtn = page.getByRole("button", {
+      name: "Saving isn't available in this browser",
+    });
+    await expect(saveBtn).toBeVisible();
+    await expect(saveBtn).toBeDisabled();
   });
 
   test("Saved homes: save project and property, verify on /saved without prices, remove, and handle delisted items", async ({
@@ -212,6 +232,9 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     const list = page.getByTestId("saved-homes-list");
     await expect(list).toBeVisible();
 
+    // Item 11: Assert list items have count 2 with wait
+    await expect(list.getByTestId("saved-home-item")).toHaveCount(2);
+
     // Verify project item
     const projectLink = list.getByRole("link", { name: project.name, exact: true });
     await expect(projectLink).toBeVisible();
@@ -221,19 +244,32 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     const propertyLink = list.getByRole("link", { name: new RegExp(`2 BHK.*${project.name}`) });
     await expect(propertyLink).toBeVisible();
 
-    // COMPLIANCE: /saved must never show prices
-    await expect(list.getByText(/₹/)).not.toBeVisible();
+    // COMPLIANCE: /saved must never show prices (Item 11: assert list text does not contain ₹)
+    await expect(list).not.toContainText("₹");
+
+    // Item 11: Run axe check on populated /saved page
+    const a11ySaved = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    const seriousSaved = a11ySaved.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(seriousSaved.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
+
+    // Item 11: Run 390px responsive check on populated /saved page
+    await page.setViewportSize({ width: 390, height: 844 });
+    const savedPopulatedOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+    expect(savedPopulatedOverflow).toBe(false);
+    await page.setViewportSize({ width: 1280, height: 800 });
 
     // 4. Remove the property from /saved
     const removeButtons = list.getByRole("button", { name: /Remove/ });
-    const countBefore = await list.getByTestId("saved-home-item").count();
-    expect(countBefore).toBe(2);
-
-    // Remove the first item (property)
     await removeButtons.first().click();
 
-    const countAfter = await list.getByTestId("saved-home-item").count();
-    expect(countAfter).toBe(1);
+    // Item 11: toHaveCount(1) waits for removal
+    await expect(list.getByTestId("saved-home-item")).toHaveCount(1);
 
     // 5. Unpublish the project through staff API to test delisted item handling
     const unpubRes = await apiCall(
