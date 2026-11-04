@@ -8,7 +8,9 @@
  *
  * The API refuses loops (A → B → A) and never stores a chain: adding A → B while B → C exists
  * stores A → C, and the reply's `notices` say so; both messages are shown as they come.
- * Hits and the last hit are counted by the website from Phase 5, so they stay empty for now.
+ * Hits and the last hit are counted by the website (task 5.6, D-047). They are approximate: a
+ * visitor whose browser kept the redirect (up to an hour) isn't counted again, and a link
+ * prefetch on the site itself may be counted.
  * SECURITY: the API refuses redirects from /admin, /api and other internal paths, and to hosts
  * other than our own domains; the form only explains early.
  */
@@ -137,7 +139,7 @@ export function RedirectsScreen() {
     <>
       <ContentHeader
         current="redirects"
-        description="Old web addresses that send visitors on to the right page. Hits are counted once the public site is live (Phase 5)."
+        description="Old web addresses that send visitors on to the right page. Hits are approximate: a visitor's browser may remember a redirect for up to an hour, and the site's own link prefetches can be counted."
         action={
           <Button onClick={() => go({ redirect: "new" })} disabled={filters.redirect === "new"}>
             + New redirect

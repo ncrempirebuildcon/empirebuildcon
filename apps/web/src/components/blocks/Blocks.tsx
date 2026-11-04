@@ -420,16 +420,20 @@ export function BlockView({
     case "lead_form": {
       const { intent, source } = leadFormSetup(d.source, d.project_slug);
       return (
-        <section className="flex flex-col gap-4 rounded-card border border-gold-line-strong bg-noir-800 p-5 lg:max-w-2xl">
-          <LeadPanel
-            intent={intent}
-            title={d.heading || (intent === "visit" ? "Book a site visit" : "Talk to us")}
-            intro={d.intro ?? undefined}
-            submitLabel={intent === "visit" ? "Request a site visit" : "Send"}
-            path={path}
-            projectSlug={d.project_slug ?? null}
-            source={source}
-          />
+        // WHY the RERA panel sits under the form's frame, not inside it (task 5.8): a framed
+        // panel inside a framed form read as a heavy double border on phones.
+        <section className="flex flex-col gap-4 lg:max-w-2xl">
+          <div className="rounded-card border border-gold-line-strong bg-noir-800 p-5">
+            <LeadPanel
+              intent={intent}
+              title={d.heading || (intent === "visit" ? "Book a site visit" : "Talk to us")}
+              intro={d.intro ?? undefined}
+              submitLabel={intent === "visit" ? "Request a site visit" : "Send"}
+              path={path}
+              projectSlug={d.project_slug ?? null}
+              source={source}
+            />
+          </div>
           {d.rera ? (
             // COMPLIANCE: a form about a project shows the project's RERA block (D-045).
             <ReraBlock rera={d.rera as Rera} projectName={d.project_name ?? "this project"} />

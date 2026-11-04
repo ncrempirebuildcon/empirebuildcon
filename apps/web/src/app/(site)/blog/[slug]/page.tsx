@@ -12,6 +12,7 @@
  *   - Accessible and responsive without horizontal scroll at 390px.
  */
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/public/seo";
 import { fetchPublicPost } from "@/lib/public/api";
 import { FormattedText } from "@empire/ui";
 import PublicImage from "@/components/media/PublicImage";
@@ -25,10 +26,16 @@ interface BlogSlugPageProps {
 export async function generateMetadata({ params }: BlogSlugPageProps): Promise<Metadata> {
   const { slug } = await params;
   const post = await fetchPublicPost(slug);
-  const title = post.seo?.title || post.title;
-  return {
-    title: { absolute: `${title} · Empire` },
-  };
+  // Task 5.8: the shared SEO helper (D-047): the CMS's SEO fields first, then the excerpt or the
+  // body's first words, the cover as the share image, and `og:type` article.
+  return pageMetadata({
+    title: post.title,
+    path: `/blog/${post.slug}`,
+    seo: post.seo,
+    fallbackDescriptions: [post.excerpt, post.body],
+    image: post.cover,
+    type: "article",
+  });
 }
 
 export default async function BlogSlugPage({ params }: BlogSlugPageProps) {

@@ -12,6 +12,7 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/public/seo";
 import { Breadcrumbs } from "@/components/catalogue/ListControls";
+import { VisitUnavailable } from "@/components/leads/VisitUnavailable";
 import { LeadPanel } from "@/components/leads/LeadPanel";
 import { fetchPublicPageOrNull, fetchPublicProjects, fetchPublicSite } from "@/lib/public/api";
 import { BlockList } from "@/components/blocks/Blocks";
@@ -144,15 +145,21 @@ export default async function ContactPage({
           id="visit"
           className="scroll-mt-24 rounded-card border border-gold-line-strong bg-noir-800 p-5"
         >
-          <LeadPanel
-            intent="visit"
-            title="Book a site visit"
-            intro="Pick a project, a day and a time of day. We confirm the exact time by phone."
-            submitLabel="Request a site visit"
-            path="/contact"
-            projectSlug={preselect}
-            projectChoices={choices}
-          />
+          {choices.length > 0 ? (
+            <LeadPanel
+              intent="visit"
+              title="Book a site visit"
+              intro="Pick a project, a day and a time of day. We confirm the exact time by phone."
+              submitLabel="Request a site visit"
+              path="/contact"
+              projectSlug={preselect}
+              projectChoices={choices}
+            />
+          ) : (
+            // WHY (task 5.8): a site visit is always for a project (the API requires one). With
+            // no project open for visits, the form could never be sent, so it isn't shown.
+            <VisitUnavailable canCall={phones.length > 0 || Boolean(wa)} />
+          )}
         </section>
       </div>
 

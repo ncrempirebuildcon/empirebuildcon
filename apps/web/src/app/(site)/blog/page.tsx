@@ -13,15 +13,34 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchPublicPosts } from "@/lib/public/api";
+import { pageMetadata } from "@/lib/public/seo";
 import CategoryChips from "@/components/blog/CategoryChips";
 import FeaturedPostCard from "@/components/blog/FeaturedPostCard";
 import PostCard from "@/components/blog/PostCard";
 import BlogPagination from "@/components/blog/BlogPagination";
 import BlogEmptyState from "@/components/blog/BlogEmptyState";
 
-export const metadata: Metadata = {
-  title: { absolute: "News & guides · Empire" },
-};
+/** The page number the list shows: digits only, 1–1000 (also used by the metadata). */
+function blogPage(raw: string | string[] | undefined): number {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value || !/^\d{1,4}$/.test(value)) return 1;
+  return Math.min(1000, Math.max(1, Number(value)));
+}
+
+const BLOG_INTRO =
+  "Plain-language guides for home buyers, dated construction updates from our sites, and company news.";
+
+/**
+ * Task 5.8: the shared SEO helper (D-047). The canonical drops the category filter; a later page
+ * keeps its own number (`/blog?page=2`), as Google advises for paginated lists, so older articles
+ * stay reachable.
+ */
+export async function generateMetadata({ searchParams }: BlogPageProps): Promise<Metadata> {
+  const raw = (await searchParams).page;
+  const page = blogPage(raw);
+  const path = page > 1 ? `/blog?page=${page}` : "/blog";
+  return pageMetadata({ title: "News & guides", path, fallbackDescriptions: [BLOG_INTRO] });
+}
 
 interface BlogPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -31,9 +50,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
   const resolvedParams = await searchParams;
 
   // Parse page number: clamp to 1-1000 before calling API (Item 6)
-  const rawPage = Array.isArray(resolvedParams.page) ? resolvedParams.page[0] : resolvedParams.page;
-  const parsedPage = parseInt(rawPage || "1", 10);
-  const pageNum = Number.isFinite(parsedPage) ? Math.min(1000, Math.max(1, parsedPage)) : 1;
+  const pageNum = blogPage(resolvedParams.page);
 
   // Parse category filter
   const rawCat = Array.isArray(resolvedParams.category)
@@ -90,10 +107,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
             News &amp; guides
           </h1>
         </div>
-        <p className="max-w-[34em] text-base leading-relaxed text-body">
-          Plain-language guides for home buyers, dated construction updates from our sites, and
-          company news.
-        </p>
+        <p className="max-w-[34em] text-base leading-relaxed text-body">{BLOG_INTRO}</p>
       </div>
 
       {/* Featured post (Page 1 without filter only) */}

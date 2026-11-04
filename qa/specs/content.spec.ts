@@ -6,7 +6,7 @@
 //
 // No new sign-ins and no public submissions: the saved super-admin and sales sessions are reused
 // and test data is made through the staff API (qa/README.md).
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 import { CMS_STATE, SALES_STATE, apiCall, runId } from "../lib/auth";
 import { draftPage, libraryPhoto, seededLegalPage } from "../lib/content";
 import { samplePhoto } from "../lib/files";
@@ -239,13 +239,30 @@ test("offers show their state from their dates", async ({ page }) => {
   await editor.getByRole("group", { name: "Starts" }).getByLabel("Date").fill(istDate(-1));
   await editor.getByRole("group", { name: "Ends" }).getByLabel("Date").fill(istDate(10));
   await editor.getByRole("checkbox", { name: /Switched on/ }).check();
+  // Hold the list's reload after the save for 3 s: the address must name the new offer while
+  // the reload is still under way (task 5.8; before, it waited for the reload).
+  // Only the first list request after the save is held; the route stays until it is done (an
+  // unroute would release it at once).
+  let held = false;
+  const slowList = async (route: Route) => {
+    if (!held) {
+      held = true;
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+    }
+    await route.continue();
+  };
+  await page.route(/\/api\/v1\/admin\/offers\?/, slowList);
+  // The save's held refresh of the unfiltered list: it lands after the "Live" filter below and
+  // must not replace that list (task 5.8, useLoad). Registered now, so it can't be missed.
+  const staleRefresh = page.waitForResponse(
+    (r) => /\/api\/v1\/admin\/offers\?/.test(r.url()) && !r.url().includes("state="),
+  );
   await editor.getByRole("button", { name: "Add offer" }).click();
   await expect(status(page, `Added “E2E Offer live ${id}”: live.`)).toBeVisible();
-  // WHY wait for the address: after saving, the screen reloads the list and then opens the new
-  // offer (?offer=<id>). Changing the filter before that lands builds the next address from the
-  // stale "new" selection, and "+ New offer" stays disabled. A person waits for the editor to
-  // show the saved offer; so does the test (it timed out this way on a busy machine).
-  await expect(page).toHaveURL(/[?&]offer=[0-9a-f-]{36}/, { timeout: 15_000 });
+  // The address names the saved offer as soon as the message shows (task 5.8: it used to wait
+  // for the list to reload, and a filter changed in between kept the stale "new" selection).
+  await expect(page).toHaveURL(/[?&]offer=[0-9a-f-]{36}/, { timeout: 1_000 });
+  await expect(page.getByRole("button", { name: "+ New offer" })).toBeEnabled();
   // The list is paged (25 a page, review L10) and earlier runs leave offers behind, so the row is
   // looked for under its state filter, where the newest sort near the top.
   const list = page.getByRole("region", { name: "All offers" });
@@ -255,6 +272,16 @@ test("offers show their state from their dates", async ({ page }) => {
   await expect(page.getByRole("row", { name: new RegExp(`E2E Offer live ${id}`) })).toContainText(
     "Live",
   );
+  const late = await staleRefresh;
+  await late.finished();
+  // Two frames for the late answer to render (if it were applied), then one look, no retrying.
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+  );
+  await expect(list.getByRole("cell", { name: /^(Scheduled|Ended|Inactive)$/ })).toHaveCount(0, {
+    timeout: 0,
+  });
+  await page.unroute(/\/api\/v1\/admin\/offers\?/, slowList);
 
   // A price without terms is stopped before saving (and by the API).
   await page.getByRole("button", { name: "+ New offer" }).click();
