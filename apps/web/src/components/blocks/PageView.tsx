@@ -16,7 +16,12 @@ export function PageView({ page, path }: { page: PublicPage; path: string }) {
   // Readers must know which version of the terms they read: under the title, or under the hero.
   const version =
     page.kind === "legal" && page.legal_version ? (
-      <p className="text-caption text-muted" data-testid="legal-version">
+      // WHY -mt-10 under a hero (task 5.8): the block list's 56 px gap would otherwise part the
+      // version from the hero it belongs to.
+      <p
+        className={`text-caption text-muted ${heroTitle ? "-mt-10" : ""}`}
+        data-testid="legal-version"
+      >
         Version {page.legal_version}
       </p>
     ) : null;

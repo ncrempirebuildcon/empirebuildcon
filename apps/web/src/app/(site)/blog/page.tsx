@@ -13,15 +13,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchPublicPosts } from "@/lib/public/api";
+import { pageMetadata } from "@/lib/public/seo";
 import CategoryChips from "@/components/blog/CategoryChips";
 import FeaturedPostCard from "@/components/blog/FeaturedPostCard";
 import PostCard from "@/components/blog/PostCard";
 import BlogPagination from "@/components/blog/BlogPagination";
 import BlogEmptyState from "@/components/blog/BlogEmptyState";
 
-export const metadata: Metadata = {
-  title: { absolute: "News & guides · Empire" },
-};
+// Task 5.8: the shared SEO helper (D-047). A filtered or paged list's canonical is /blog.
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata({
+    title: "News & guides",
+    path: "/blog",
+    fallbackDescriptions: ["News from Empire and guides to buying a home in Uttar Pradesh."],
+  });
+}
 
 interface BlogPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

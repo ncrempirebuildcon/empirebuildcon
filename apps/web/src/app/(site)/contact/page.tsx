@@ -144,15 +144,27 @@ export default async function ContactPage({
           id="visit"
           className="scroll-mt-24 rounded-card border border-gold-line-strong bg-noir-800 p-5"
         >
-          <LeadPanel
-            intent="visit"
-            title="Book a site visit"
-            intro="Pick a project, a day and a time of day. We confirm the exact time by phone."
-            submitLabel="Request a site visit"
-            path="/contact"
-            projectSlug={preselect}
-            projectChoices={choices}
-          />
+          {choices.length > 0 ? (
+            <LeadPanel
+              intent="visit"
+              title="Book a site visit"
+              intro="Pick a project, a day and a time of day. We confirm the exact time by phone."
+              submitLabel="Request a site visit"
+              path="/contact"
+              projectSlug={preselect}
+              projectChoices={choices}
+            />
+          ) : (
+            // WHY (task 5.8): a site visit is always for a project (the API requires one). With
+            // no project open for visits, the form could never be sent, so it isn't shown.
+            <div className="flex flex-col gap-2" data-testid="visit-unavailable">
+              <h2 className="font-display text-h3 font-semibold">Book a site visit</h2>
+              <p className="text-body">
+                Site visits can be booked here once our projects are listed. Until then, call or
+                WhatsApp us, or send a question below.
+              </p>
+            </div>
+          )}
         </section>
       </div>
 

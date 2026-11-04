@@ -8,6 +8,7 @@
  * them as seeded, so this runs only after the main project has finished.
  */
 import { expect, type Page, test } from "@playwright/test";
+import { cleanup } from "../lib/cleanup";
 import { apiCall, CMS_STATE, runId } from "../lib/auth";
 import { drainOutbox } from "../lib/catalogue";
 
@@ -66,15 +67,19 @@ async function withBlocks(
     before.blocks.some((b) => JSON.stringify(b.data).includes("E2E")),
     `"${slug}" still holds blocks from an earlier failed run`,
   ).toBe(false);
+  let failed = true;
   try {
     await putBlocks(page, before.id, blocks);
     await setPublished(page, before.id, true);
     await drainOutbox(page);
     await check();
+    failed = false;
   } finally {
-    await putBlocks(page, before.id, before.blocks);
-    await setPublished(page, before.id, before.publish_state === "published");
-    await drainOutbox(page);
+    await cleanup(failed, async () => {
+      await putBlocks(page, before.id, before.blocks);
+      await setPublished(page, before.id, before.publish_state === "published");
+      await drainOutbox(page);
+    });
   }
 }
 

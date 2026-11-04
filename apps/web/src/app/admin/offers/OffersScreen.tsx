@@ -12,7 +12,7 @@
  * SECURITY: the screen needs `offers.manage`; the API checks it on every call.
  */
 import { useCallback, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Alert, Button, Chip, Select, Table, type TableColumn } from "@empire/ui";
 import { api, call } from "@/lib/api";
 import { formatDateTime } from "@/lib/dates";
@@ -49,7 +49,6 @@ function hrefFor(selected: string | null, state: OfferState | "", page = 1): str
 
 export function OffersScreen() {
   const params = useSearchParams();
-  const router = useRouter();
   const { can } = useAdminSession();
   const state = keyOf(OFFER_STATE, params.get("state") ?? "", "" as const);
   const rawOffer = params.get("offer") ?? "";
@@ -205,12 +204,16 @@ export function OffersScreen() {
             offer={current ?? null}
             onDirtyChange={onDirtyChange}
             onSaved={async (saved, message) => {
-              await list.refresh().catch(() => undefined);
               setLastSaved(saved ?? null);
               setNotice(message);
-              // WHY not leave(): the editor has just saved, but its "no unsaved changes" report
-              // reaches this screen only on the next render, so leave() would still ask.
-              router.replace(hrefFor(saved?.id ?? null, state, page), { scroll: false });
+              // WHY first, and with history.replaceState: the address must name the saved offer
+              // at once. Before (task 5.8 fix), it changed only after the list had reloaded, and
+              // a filter changed in between built its address from the stale "new" selection.
+              // Next.js keeps useSearchParams in step with history.replaceState. WHY not leave():
+              // the editor's "no unsaved changes" report reaches this screen only on the next
+              // render, so leave() would still ask.
+              window.history.replaceState(null, "", hrefFor(saved?.id ?? null, state, page));
+              await list.refresh().catch(() => undefined);
             }}
             onClose={() => select(null)}
           />

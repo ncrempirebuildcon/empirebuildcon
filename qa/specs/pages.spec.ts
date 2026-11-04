@@ -9,6 +9,7 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
+import { cleanup } from "../lib/cleanup";
 import { apiCall, CMS_STATE, runId } from "../lib/auth";
 import { catalogueProject, drainOutbox } from "../lib/catalogue";
 import { draftPage, libraryPhoto } from "../lib/content";
@@ -73,6 +74,7 @@ test("a page built from blocks shows every block on the website", async ({ page,
     project_id: project.id,
     is_active: true,
   });
+  let failed = true;
   try {
     const created = await draftPage(page);
     await saveAndPublish(page, created.id, [
@@ -222,15 +224,20 @@ test("a page built from blocks shows every block on the website", async ({ page,
     await expect(main.getByTestId("lead-success")).toContainText("E2E-MOCK-1");
     expect(sent).toMatchObject({ project_slug: project.slug, source: "project_form" });
     await visitorContext.close();
+    failed = false;
   } finally {
-    // Leave nothing live for other specs or later runs, even when a check above failed.
-    const cleanup = await Promise.all([
-      apiCall(page, "PATCH", `/api/v1/admin/offers/${offerId}`, { is_active: false }),
-      apiCall(page, "PATCH", `/api/v1/admin/faqs/${faqId}`, { is_visible: false }),
-      apiCall(page, "PATCH", `/api/v1/admin/testimonials/${testimonialId}`, { is_visible: false }),
-    ]);
-    for (const response of cleanup) expect(response.status(), await response.text()).toBe(200);
-    await drainOutbox(page);
+    await cleanup(failed, async () => {
+      // Leave nothing live for other specs or later runs, even when a check above failed.
+      const cleanup = await Promise.all([
+        apiCall(page, "PATCH", `/api/v1/admin/offers/${offerId}`, { is_active: false }),
+        apiCall(page, "PATCH", `/api/v1/admin/faqs/${faqId}`, { is_visible: false }),
+        apiCall(page, "PATCH", `/api/v1/admin/testimonials/${testimonialId}`, {
+          is_visible: false,
+        }),
+      ]);
+      for (const response of cleanup) expect(response.status(), await response.text()).toBe(200);
+      await drainOutbox(page);
+    });
   }
 });
 
