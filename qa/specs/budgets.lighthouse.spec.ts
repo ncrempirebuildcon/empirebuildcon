@@ -25,12 +25,23 @@ test.use({ storageState: CMS_STATE });
 const RUNS = 3;
 const BUDGET = { performance: 90, accessibility: 95, "best-practices": 95, seo: 90 } as const;
 /**
- * TODO(phase-5): make performance a hard budget again (owner's decision, 4 Nov 2026, D-049).
- * On GitHub's runner two runs in three show a ~800 ms "unattributable" main-thread task (browser
- * work, not the page's code) that drops performance from ~93 to ~74; until its cause is found,
- * a miss is reported as a warning. The other three budgets fail the job.
+ * WHY a fresh renderer process per run: newer Chrome (156 on GitHub's runner) puts a new tab on
+ * an existing same-site renderer ("ProcessPerSiteUpToMainFrameThreshold"). Each Lighthouse run
+ * opens and closes its own tab, so run N then landed on run N-1's renderer and, before the
+ * document request, spent ~165 ms finishing that page's garbage collection: one "unattributable"
+ * task that Lighthouse's 4× CPU simulation turns into ~660 ms of blocking time (performance
+ * ~93 → ~80, D-049). A real visitor's first visit has no such leftover page. Puppeteer turns the
+ * same feature off for the same reason.
+ *
+ * Chrome reads only the last --disable-features, so the list repeats chrome-launcher's own.
  */
-const WARN_ONLY: ReadonlySet<string> = new Set(["performance"]);
+function chromeFlags(): string[] {
+  const defaults = chromeLauncher.Launcher.defaultFlags()
+    .filter((flag) => flag.startsWith("--disable-features="))
+    .flatMap((flag) => flag.slice("--disable-features=".length).split(","));
+  const disabled = [...new Set([...defaults, "ProcessPerSiteUpToMainFrameThreshold"])];
+  return ["--headless=new", "--no-sandbox", `--disable-features=${disabled.join(",")}`];
+}
 /** A run with more blocking time than this keeps its trace for diagnosis (at most 2 per job). */
 const TRACE_OVER_MS = 500;
 type Category = keyof typeof BUDGET;
@@ -89,10 +100,9 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
   mkdirSync(OUT, { recursive: true });
   const chrome = await chromeLauncher.launch({
     chromePath: process.env.PW_CHROMIUM_PATH || chromium.executablePath(),
-    chromeFlags: ["--headless=new", "--no-sandbox"],
+    chromeFlags: chromeFlags(),
   });
   const misses: string[] = [];
-  const warnings: string[] = [];
   let tracesKept = 0;
   const table: string[] = [];
   try {
@@ -103,7 +113,10 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
     const benchmark = (probe?.lhr as unknown as { environment?: { benchmarkIndex?: number } })
       ?.environment?.benchmarkIndex;
     const cpu = cpuMultiplier(benchmark);
+    const agent = (probe?.lhr as unknown as { environment?: { hostUserAgent?: string } })
+      ?.environment?.hostUserAgent;
     table.push(`host benchmarkIndex ${Math.round(benchmark ?? 0)} → CPU slowdown ${cpu}×`);
+    table.push(`browser ${agent?.match(/(?:Headless)?Chrome\/[\d.]+/)?.[0] ?? "unknown"}`);
     for (const path of paths) {
       const scores: Record<Category, number[]> = {
         performance: [],
@@ -145,11 +158,7 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
       }
       const line = (Object.keys(BUDGET) as Category[]).map((name) => {
         const value = median(scores[name]);
-        if (value < BUDGET[name]) {
-          const miss = `${path}: ${name} ${value} < ${BUDGET[name]}`;
-          if (WARN_ONLY.has(name)) warnings.push(miss);
-          else misses.push(miss);
-        }
+        if (value < BUDGET[name]) misses.push(`${path}: ${name} ${value} < ${BUDGET[name]}`);
         return `${name} ${value}`;
       });
       table.push(`${path}  ${line.join(" · ")}`);
@@ -159,11 +168,5 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
   }
   writeFileSync(resolve(OUT, "summary.txt"), `${table.join("\n")}\n`);
   console.log(table.join("\n"));
-  if (warnings.length > 0) {
-    // Shown in the report and in the CI log; it doesn't fail the job (WARN_ONLY above).
-    test.info().annotations.push({ type: "warning", description: warnings.join("; ") });
-    console.warn(`Lighthouse budget warnings (not failing):\n${warnings.join("\n")}`);
-    writeFileSync(resolve(OUT, "warnings.txt"), `${warnings.join("\n")}\n`);
-  }
   expect(misses, misses.join("\n")).toEqual([]);
 });

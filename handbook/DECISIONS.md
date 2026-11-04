@@ -886,6 +886,9 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - **Owner's decision (4 Nov 2026):** until its cause is found, performance below 90 is reported as a **warning** (summary, `warnings.txt` and the test annotation). Accessibility, best practices and SEO still fail the job.
     - Runs with more than 500 ms of blocking time keep their trace (at most two per job) for the follow-up.
     - Performance becomes a hard budget again once the cause is fixed (`TODO(phase-5)` in the spec).
+  - **Cause found (5.8 traces, 4 Nov 2026):** GitHub's runner uses Chrome 156, which puts a new tab on an existing same-site renderer (`ProcessPerSiteUpToMainFrameThreshold`, crbug.com/1492053). Lighthouse opens and closes a tab for each run, so a run landed on the previous run's renderer (both saved traces of `/`: the same process, 10 s old) and, before the document request, spent ~165 ms finishing that page's garbage collection. Lighthouse's 4× CPU simulation made that one task ~660 ms of blocking time at ~915 ms. A real visitor's first visit has no leftover page; Chrome 141 in the workspace gave each run a new renderer, which is why local scores were fine.
+    - **Fix:** the spec starts Chrome with that feature off, as Puppeteer does by default, repeating chrome-launcher's own `--disable-features` list (Chrome reads one). The summary prints the browser version.
+    - Performance is a hard budget again: `WARN_ONLY` and `warnings.txt` are gone. If CI still scores under 90, the job is red and the new traces say why.
   - The CI build has no Sentry DSN, so the Sentry chunk that production loads after `load` is not in the measurement.
 **Verified / assumed:**
 - Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.

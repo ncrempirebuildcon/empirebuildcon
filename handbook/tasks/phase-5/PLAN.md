@@ -28,7 +28,7 @@
 | 5.5a Page-builder pages | A | Merged 3 Nov | D-045 |
 | 5.5b Blog | B | Merged 4 Nov | three review rounds |
 | 5.6 SEO (metadata, structured data, redirects) | A | Merged 3 Nov | #23, D-047 |
-| 5.7 Performance and the 390 px pass | A | Merged 4 Nov | D-049; performance is a CI warning for now (owner's decision) |
+| 5.7 Performance and the 390 px pass | A | Merged 4 Nov | D-049; performance was a CI warning until `fix/p5-lh-perf` (hard budget again) |
 | **5.7b** EMI calculator, saved homes | B | **Ready**, next for the developer agent | [5.7b-tools.md](5.7b-tools.md) |
 | **5.6b** `sitemap.xml`, `robots.txt` | B | **Ready**, after 5.7b | [5.6b-sitemap-robots.md](5.6b-sitemap-robots.md) |
 | **5.8** Phase 5 finish | A | **Next for Claude** | See below |
