@@ -890,7 +890,9 @@ Building part 1 against the design contract (D-020) needed some choices the cont
     - First try: Chrome started with `ProcessPerSiteUpToMainFrameThreshold` off (as Puppeteer does). The CI run still reused the renderer (performance 70–92), so that change was dropped.
     - **Fix:** each run (and the warm-up) gets its own browser context, closed afterwards. Chrome never shares a renderer between browser contexts, so every run starts in a new process, like a first visit. The spec drives Lighthouse through `puppeteer-core` (the version Lighthouse itself uses).
     - The summary prints the browser version and how many runs still landed on an earlier run's process (expected: 0).
-    - Performance is a hard budget again: `WARN_ONLY` and `warnings.txt` are gone. If CI still scores under 90, the job is red, and the summary and traces say whether the process was reused.
+    - **CI result with the fix (4 Nov 2026):** 0 of 18 runs reused a process. The ~800 ms task is gone, and CI now matches the workspace: performance 85–91 (median per page), the other three 100.
+    - What is left is the site's own work: React hydration (react-dom, ~73 KB; ~250–430 ms of simulated blocking time) and, on localhost, Lighthouse counting the LCP after the scripts, because they arrive before the first paint (simulated LCP ~2.5–3.4 s against FCP ~1.1 s).
+    - **Owner's decision (4 Nov 2026):** merge the fix and keep performance as a **warning** (`WARN_ONLY`, `warnings.txt`). Cutting client JavaScript is its own task, **5.7c**. Performance becomes a hard budget again when 5.7c lands (`TODO(phase-5)` in the spec).
 **Verified / assumed:**
 - Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.
 - Assumed: GitHub's runners score at least as well. If CI scores sit near 90, the budget is the thing to discuss, not a reason to retry.

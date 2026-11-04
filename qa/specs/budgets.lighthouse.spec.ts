@@ -66,6 +66,13 @@ function rendererOf(trace: unknown): number | undefined {
 }
 /** A run with more blocking time than this keeps its trace for diagnosis (at most 2 per job). */
 const TRACE_OVER_MS = 500;
+/**
+ * TODO(phase-5): make performance a hard budget again once 5.7c lands (owner, 4 Nov 2026, D-049).
+ * With the renderer reuse fixed, CI and the workspace both score 85–91: React hydration
+ * (react-dom, ~73 KB) and, on localhost, Lighthouse timing the LCP after the scripts. Until the
+ * client JavaScript is cut, a performance miss is a warning; the other three budgets fail the job.
+ */
+const WARN_ONLY: ReadonlySet<string> = new Set(["performance"]);
 type Category = keyof typeof BUDGET;
 const OUT = resolve(import.meta.dirname, "..", "test-results", "lighthouse");
 
@@ -129,6 +136,7 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
     defaultViewport: null,
   });
   const misses: string[] = [];
+  const warnings: string[] = [];
   let tracesKept = 0;
   const table: string[] = [];
   const renderers = new Set<number>();
@@ -203,7 +211,11 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
       }
       const line = (Object.keys(BUDGET) as Category[]).map((name) => {
         const value = median(scores[name]);
-        if (value < BUDGET[name]) misses.push(`${path}: ${name} ${value} < ${BUDGET[name]}`);
+        if (value < BUDGET[name]) {
+          const miss = `${path}: ${name} ${value} < ${BUDGET[name]}`;
+          if (WARN_ONLY.has(name)) warnings.push(miss);
+          else misses.push(miss);
+        }
         return `${name} ${value}`;
       });
       table.push(`${path}  ${line.join(" · ")}`);
@@ -215,5 +227,11 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
   }
   writeFileSync(resolve(OUT, "summary.txt"), `${table.join("\n")}\n`);
   console.log(table.join("\n"));
+  if (warnings.length > 0) {
+    // Shown in the report and in the CI log; it doesn't fail the job (WARN_ONLY above).
+    test.info().annotations.push({ type: "warning", description: warnings.join("; ") });
+    console.warn(`Lighthouse budget warnings (not failing):\n${warnings.join("\n")}`);
+    writeFileSync(resolve(OUT, "warnings.txt"), `${warnings.join("\n")}\n`);
+  }
   expect(misses, misses.join("\n")).toEqual([]);
 });
