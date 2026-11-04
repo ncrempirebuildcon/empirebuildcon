@@ -882,6 +882,10 @@ Building part 1 against the design contract (D-020) needed some choices the cont
     - The spec now reads the host's `benchmarkIndex` from a warm-up run and uses `benchmarkIndex / 375` as the slowdown, between 1× and 4×. That is 4× on a high-end desktop (≥ 1500) and about 2.7× on a low-end desktop (1000), following the table's "host → mid-tier mobile" row.
     - It never goes above Lighthouse's default 4×, which is what PageSpeed Insights uses.
     - The summary prints the benchmark and the slowdown used.
+  - **CI finding, 4 Nov 2026:** the runner's benchmark was 2391, so calibration didn't change anything (4×). The reports showed two runs in three with a ~800 ms "unattributable" main-thread task: browser work, not the page's code. That task alone moved a page from ~93 to ~74.
+  - **Owner's decision (4 Nov 2026):** until its cause is found, performance below 90 is reported as a **warning** (summary, `warnings.txt` and the test annotation). Accessibility, best practices and SEO still fail the job.
+    - Runs with more than 500 ms of blocking time keep their trace (at most two per job) for the follow-up.
+    - Performance becomes a hard budget again once the cause is fixed (`TODO(phase-5)` in the spec).
   - The CI build has no Sentry DSN, so the Sentry chunk that production loads after `load` is not in the measurement.
 **Verified / assumed:**
 - Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.

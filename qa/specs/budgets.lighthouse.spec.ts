@@ -24,6 +24,15 @@ test.use({ storageState: CMS_STATE });
 
 const RUNS = 3;
 const BUDGET = { performance: 90, accessibility: 95, "best-practices": 95, seo: 90 } as const;
+/**
+ * TODO(phase-5): make performance a hard budget again (owner's decision, 4 Nov 2026, D-049).
+ * On GitHub's runner two runs in three show a ~800 ms "unattributable" main-thread task (browser
+ * work, not the page's code) that drops performance from ~93 to ~74; until its cause is found,
+ * a miss is reported as a warning. The other three budgets fail the job.
+ */
+const WARN_ONLY: ReadonlySet<string> = new Set(["performance"]);
+/** A run with more blocking time than this keeps its trace for diagnosis (at most 2 per job). */
+const TRACE_OVER_MS = 500;
 type Category = keyof typeof BUDGET;
 const OUT = resolve(import.meta.dirname, "..", "test-results", "lighthouse");
 
@@ -83,6 +92,8 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
     chromeFlags: ["--headless=new", "--no-sandbox"],
   });
   const misses: string[] = [];
+  const warnings: string[] = [];
+  let tracesKept = 0;
   const table: string[] = [];
   try {
     // Calibration (Lighthouse docs/throttling.md): the default 4× CPU slowdown assumes a
@@ -115,13 +126,30 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
           scores[name].push(categoryScore(lhr, name));
         }
         const file = `${path.replace(/[^a-z0-9]+/gi, "_") || "home"}-${run + 1}.json`;
+        const blocking = Number(
+          (lhr.audits["total-blocking-time"] as { numericValue?: number } | undefined)
+            ?.numericValue ?? 0,
+        );
+        const trace = (result?.artifacts as { Trace?: unknown } | undefined)?.Trace;
+        if (blocking > TRACE_OVER_MS && trace && tracesKept < 2) {
+          // Opens in Chrome DevTools → Performance → Load profile.
+          writeFileSync(
+            resolve(OUT, file.replace(/\.json$/, ".trace.json")),
+            JSON.stringify(trace),
+          );
+          tracesKept += 1;
+        }
         writeFileSync(resolve(OUT, file), JSON.stringify(lhr));
         if (typeof html === "string")
           writeFileSync(resolve(OUT, file.replace(/json$/, "html")), html);
       }
       const line = (Object.keys(BUDGET) as Category[]).map((name) => {
         const value = median(scores[name]);
-        if (value < BUDGET[name]) misses.push(`${path}: ${name} ${value} < ${BUDGET[name]}`);
+        if (value < BUDGET[name]) {
+          const miss = `${path}: ${name} ${value} < ${BUDGET[name]}`;
+          if (WARN_ONLY.has(name)) warnings.push(miss);
+          else misses.push(miss);
+        }
         return `${name} ${value}`;
       });
       table.push(`${path}  ${line.join(" · ")}`);
@@ -131,5 +159,11 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
   }
   writeFileSync(resolve(OUT, "summary.txt"), `${table.join("\n")}\n`);
   console.log(table.join("\n"));
+  if (warnings.length > 0) {
+    // Shown in the report and in the CI log; it doesn't fail the job (WARN_ONLY above).
+    test.info().annotations.push({ type: "warning", description: warnings.join("; ") });
+    console.warn(`Lighthouse budget warnings (not failing):\n${warnings.join("\n")}`);
+    writeFileSync(resolve(OUT, "warnings.txt"), `${warnings.join("\n")}\n`);
+  }
   expect(misses, misses.join("\n")).toEqual([]);
 });
