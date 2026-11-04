@@ -13,6 +13,7 @@ import type { Metadata } from "next";
 import { FormattedText } from "@empire/ui";
 import { PublicImage } from "@/components/media/PublicImage";
 import { Breadcrumbs } from "@/components/catalogue/ListControls";
+import { SaveButton } from "@/components/tools/SaveButton";
 import { ReraBlock } from "@/components/catalogue/ReraBlock";
 import {
   PriceText,
@@ -138,6 +139,7 @@ export default async function ProjectPage({ params }: Params) {
             <ProjectStatusChip status={project.status} />
             <SoldOutChip salesStatus={project.sales_status} />
             <SampleChip isSample={project.is_sample} />
+            <SaveButton kind="project" path={path} name={project.name} />
           </div>
           <h1 className="font-display text-[clamp(36px,6vw,64px)] leading-tight font-semibold text-balance text-metallic">
             {project.name}
