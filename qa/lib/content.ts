@@ -45,12 +45,22 @@ export async function libraryPhoto(page: Page, title = `E2E photo ${runId()}`): 
 
 /** A seeded legal page (privacy, terms or disclaimer), marked DRAFT until the owner approves. */
 export async function seededLegalPage(page: Page): Promise<PageRef & { is_draft_text: boolean }> {
-  const response = await apiCall(page, "GET", "/api/v1/admin/pages?kind=legal&per_page=50");
-  expect(response.status()).toBe(200);
-  const { items } = (await response.json()) as {
-    items: Array<PageRef & { is_draft_text: boolean; is_sample: boolean }>;
-  };
-  const seeded = items.find((item) => item.is_draft_text && !item.title.startsWith("E2E"));
+  // WHY by slug: runs leave many "E2E" legal pages behind, which can push the seeded ones off
+  // the first page of a plain list (task 5.8).
+  let seeded: (PageRef & { is_draft_text: boolean }) | undefined;
+  for (const slug of ["privacy", "terms", "disclaimer"]) {
+    const response = await apiCall(
+      page,
+      "GET",
+      `/api/v1/admin/pages?kind=legal&q=${slug}&per_page=50`,
+    );
+    expect(response.status()).toBe(200);
+    const { items } = (await response.json()) as {
+      items: Array<PageRef & { is_draft_text: boolean }>;
+    };
+    seeded = items.find((item) => item.slug === slug && item.is_draft_text);
+    if (seeded) break;
+  }
   expect(seeded, "a seeded legal page marked DRAFT (empire-api seed)").toBeTruthy();
   return seeded as PageRef & { is_draft_text: boolean };
 }

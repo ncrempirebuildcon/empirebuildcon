@@ -252,6 +252,11 @@ test("offers show their state from their dates", async ({ page }) => {
     await route.continue();
   };
   await page.route(/\/api\/v1\/admin\/offers\?/, slowList);
+  // The save's held refresh of the unfiltered list: it lands after the "Live" filter below and
+  // must not replace that list (task 5.8, useLoad). Registered now, so it can't be missed.
+  const staleRefresh = page.waitForResponse(
+    (r) => /\/api\/v1\/admin\/offers\?/.test(r.url()) && !r.url().includes("state="),
+  );
   await editor.getByRole("button", { name: "Add offer" }).click();
   await expect(status(page, `Added “E2E Offer live ${id}”: live.`)).toBeVisible();
   // The address names the saved offer as soon as the message shows (task 5.8: it used to wait
@@ -262,18 +267,20 @@ test("offers show their state from their dates", async ({ page }) => {
   // looked for under its state filter, where the newest sort near the top.
   const list = page.getByRole("region", { name: "All offers" });
   await expect(page.getByRole("navigation", { name: "Pages of offers" })).toBeVisible();
-  // The save's (held) refresh of the unfiltered list is still on its way: it must not replace
-  // the "Live" list when it lands (task 5.8, useLoad).
-  const staleRefresh = page.waitForResponse(
-    (r) => /\/api\/v1\/admin\/offers\?/.test(r.url()) && !r.url().includes("state="),
-  );
   await list.getByRole("combobox", { name: "Status" }).selectOption({ label: "Live" });
   await expect(page).toHaveURL(/state=live/);
   await expect(page.getByRole("row", { name: new RegExp(`E2E Offer live ${id}`) })).toContainText(
     "Live",
   );
-  await staleRefresh;
-  await expect(list.getByRole("cell", { name: /^(Scheduled|Ended|Inactive)$/ })).toHaveCount(0);
+  const late = await staleRefresh;
+  await late.finished();
+  // Two frames for the late answer to render (if it were applied), then one look, no retrying.
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+  );
+  await expect(list.getByRole("cell", { name: /^(Scheduled|Ended|Inactive)$/ })).toHaveCount(0, {
+    timeout: 0,
+  });
   await page.unroute(/\/api\/v1\/admin\/offers\?/, slowList);
 
   // A price without terms is stopped before saving (and by the API).
