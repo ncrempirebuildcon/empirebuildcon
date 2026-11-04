@@ -4,6 +4,7 @@
  * number on every card.
  */
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/public/seo";
 import Link from "next/link";
 import { PropertyCard } from "@/components/catalogue/Cards";
 import { Breadcrumbs, FilterForm, Pager, ResultCount } from "@/components/catalogue/ListControls";
@@ -16,7 +17,17 @@ import {
   type SearchParams,
 } from "@/lib/public/catalogue";
 
-export const metadata: Metadata = { title: "Properties" };
+// A filtered list is the same page: its canonical is /properties (ARCHITECTURE §16).
+// WHY a function: SITE_URL is read per request, not baked in at build time.
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata({
+    title: "Properties",
+    path: "/properties",
+    fallbackDescriptions: [
+      "Homes in Empire's projects: carpet area, price and possession for every home on offer.",
+    ],
+  });
+}
 
 export default async function PropertiesPage({
   searchParams,

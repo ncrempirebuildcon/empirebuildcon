@@ -10,8 +10,9 @@
  *        X-Empire-Client-IP — the visitor's address as seen by the hosting platform, read from
  *                             the header named in CLIENT_IP_SOURCE_HEADER.
  *      Locally (no key) nothing is added and the API uses the socket address.
- *   4. For page requests: generates a per-request cryptographically random nonce and sets
- *      Content-Security-Policy (report-only by default; enforced when CSP_ENFORCE=true).
+ *   4. For page requests: a redirect made in the CMS answers first (301/308, counted; task 5.6,
+ *      lib/public/redirects.ts). Otherwise a per-request cryptographically random nonce is made
+ *      and Content-Security-Policy is set (report-only by default; enforced when CSP_ENFORCE=true).
  *
  * SECURITY / DO NOT CHANGE without owner approval:
  *   - The API trusts X-Empire-Client-IP only because this file is the only thing that can set it.
@@ -20,8 +21,9 @@
  *   TODO(phase-9): confirm on Netlify staging which header carries the client IP for the proxy
  *   (x-nf-client-connection-ip by default) and record it in handbook/RUNBOOK.md.
  */
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { edgeHeaders } from "./lib/edge";
+import { findRedirect, reportHit } from "./lib/public/redirects";
 
 function buildCsp(options: { nonce?: string }): string {
   const isDev = process.env.NODE_ENV !== "production";
@@ -58,7 +60,7 @@ function buildCsp(options: { nonce?: string }): string {
   return directives.join("; ");
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest, event: NextFetchEvent) {
   // Bypass proxy for internal routes (M1)
   const pathname = request.nextUrl.pathname;
   if (pathname.startsWith("/_internal/")) {
@@ -87,7 +89,33 @@ export function proxy(request: NextRequest) {
     return NextResponse.next({ request: { headers } });
   }
 
-  // 4. For page requests: attach CSP (MM2, S3, S4, R2-M3)
+  // 4a. A redirect from the CMS (task 5.6, D-047). Only GET and HEAD: a form post is never
+  // sent elsewhere. SECURITY: the target is a path on this site (lib/public/redirects.ts), made
+  // absolute on SITE_URL, so `Location` never depends on the Host header the visitor sent.
+  // (Next.js refuses a relative Location here.)
+  if (request.method === "GET" || request.method === "HEAD") {
+    const found = await findRedirect(pathname, request.nextUrl.search);
+    if (found) {
+      // A browser prefetch is not a visit, so it is not counted. WHY only the browser's own
+      // headers: Next.js removes its router headers (next-router-prefetch, rsc) before the proxy
+      // runs, so a <Link> prefetch of an old address can't be told apart and may be counted.
+      const prefetch =
+        request.headers.get("purpose") === "prefetch" ||
+        request.headers.get("sec-purpose")?.includes("prefetch");
+      if (!prefetch && request.method === "GET") {
+        event.waitUntil(reportHit(found.redirect.from_path));
+      }
+      return new NextResponse(null, {
+        status: found.redirect.status_code === 301 ? 301 : 308,
+        headers: {
+          Location: new URL(found.location, process.env.SITE_URL || request.nextUrl.origin).href,
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    }
+  }
+
+  // 4b. For page requests: attach CSP (MM2, S3, S4, R2-M3)
   const isStaticAuth =
     pathname === "/admin/setup" || pathname === "/admin/reset" || pathname === "/admin/forgot";
 

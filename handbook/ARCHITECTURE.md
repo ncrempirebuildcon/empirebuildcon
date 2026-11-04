@@ -322,10 +322,18 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 
 ## 16. SEO
 
-- Metadata and Open Graph images per page (generated OG image using the logo mark and project cover when none is set).
-- Structured data: `Organization` (site-wide), `RealEstateListing` / `Residence` for projects and configurations (no price when on request), `FAQPage`, `BreadcrumbList`.
-- `sitemap.xml` (split by type), `robots.txt`; canonical URLs always on `https://empirebuildcon.com`; clean slugs; breadcrumbs on every inner page.
-- A redirects manager in the CMS (301/308) feeds the web app's middleware (Phase 5). Redirects are one hop, never loop, and are created automatically on slug changes (§6, D-035).
+- Metadata per page (`lib/public/seo.ts` `pageMetadata`, task 5.6, D-047):
+  - Title, description and canonical URL on `https://empirebuildcon.com` (`SITE_URL`). The CMS's SEO fields come first; a filtered list's canonical is the list itself.
+  - Open Graph and Twitter card. The share image is the CMS's share image, else the cover or first image (Cloudinary crop to 1200×630), else the logo on black (`public/brand/share-default.png`).
+  - Nothing is indexed until go-live (Phase 9).
+- Structured data (`components/JsonLd.tsx`, with the CSP nonce):
+  - Types: `Organization` (home page), `RealEstateListing` for projects and homes, `FAQPage`, `BreadcrumbList`.
+  - The RERA number is the identifier. There is no price when the price is on request, and no data for samples or placeholders.
+- `sitemap.xml` (split by type) and `robots.txt` (task 5.6b). Clean slugs; breadcrumbs on every inner page.
+- Redirects:
+  - A redirects manager in the CMS (301/308). Redirects are one hop, never loop, and are created automatically on slug changes (§6, D-035).
+  - The web app's proxy (`proxy.ts`, `lib/public/redirects.ts`) answers them for GET and HEAD, with the list cached 60 s per server process.
+  - Each redirect served is counted through the signed `POST /api/v1/internal/redirects/hit` (`seo/hits.py`).
 - Pages, posts and projects carry a `seo` JSON; the CMS shows the API's `seo_warnings` as a checklist.
 
 ## 17. Marketing and consent hooks (Phase 6, structure now)

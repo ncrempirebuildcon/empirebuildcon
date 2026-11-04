@@ -10,6 +10,7 @@
  *   - Main content wrapped with landmark (`#main-content`) for keyboard skip link.
  *   - Shell padded at bottom for mobile action bar: `pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0` (S6).
  */
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Header from "@/components/shell/Header";
 import Footer from "@/components/shell/Footer";
@@ -20,6 +21,29 @@ import AttributionCapture from "@/components/leads/AttributionCapture";
 import { fetchPublicSite, type PublicSite } from "@/lib/public/api";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Site-wide title and description from the CMS's SEO defaults (task 5.6, D-047). Pages set their
+ * own title; the suffix ("· Empire") comes from here.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  let site: PublicSite | undefined;
+  try {
+    site = await fetchPublicSite();
+  } catch {
+    return {};
+  }
+  const name = site.company.name || "Empire";
+  const suffix = site.seo?.title_suffix?.trim();
+  const fallbackTitle = site.company.tagline ? `${name} · ${site.company.tagline}` : name;
+  return {
+    title: {
+      default: site.seo?.default_title?.trim() || fallbackTitle,
+      template: suffix ? `%s ${suffix}` : `%s · ${name}`,
+    },
+    description: site.seo?.default_description?.trim() || site.company.tagline || undefined,
+  };
+}
 
 export default async function SiteLayout({ children }: { children: ReactNode }) {
   let site: PublicSite | undefined;

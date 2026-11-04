@@ -8,7 +8,8 @@ also keeps every active redirect one hop long (no chains, no loops; redirects.py
 SECURITY (SECURITY.md §5, review H1): `to_path` is the `Location` the website sends, so it is a
 path on our site: it starts with one `/` and has no backslash (`ck_redirect_to_path_is_site_path`,
 a backstop for seo/paths.normalise_target). `//host` or a backslash would send visitors elsewhere.
-`hits` and `last_hit_at` are written by the web app's redirect middleware in Phase 5.
+`hits` and `last_hit_at` are written only by seo/hits.py, for the website's redirect proxy
+(task 5.6).
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ class Redirect(Base):
     status_code: Mapped[int] = mapped_column(SmallInteger, server_default=sql("308"))
     is_active: Mapped[bool] = mapped_column(server_default=sql("true"))
     origin: Mapped[str] = mapped_column(String(10), server_default=sql("'manual'"))
-    # TODO(phase-5): the redirect middleware counts these; nothing writes them before then.
+    # Counted by the website's redirect proxy through seo/hits.py (task 5.6, D-047).
     hits: Mapped[int] = mapped_column(BigInteger, server_default=sql("0"))
     last_hit_at: Mapped[datetime | None] = mapped_column()
     # WHY no foreign keys: like project.created_by, authorship outlives any staff account row.

@@ -585,6 +585,32 @@ export function BlockList({
   );
 }
 
+/** The first image a page shows (hero, image or gallery), for its share card (task 5.6). */
+export function firstImage(blocks: PublicBlock[]): Media | null {
+  for (const b of ordered(blocks)) {
+    const d = b.data as Data;
+    const media = (d.image ?? (Array.isArray(d.images) ? d.images[0] : null)) as Media | null;
+    if (media && media.kind === "image") return media;
+  }
+  return null;
+}
+
+/** The first text a page shows (a hero's subheading or a text block), for its description. */
+export function firstText(blocks: PublicBlock[]): string | null {
+  for (const b of ordered(blocks)) {
+    const d = b.data as Data;
+    const text = b.type === "hero" ? d.subheading : b.type === "rich_text" ? d.body : null;
+    if (typeof text === "string" && text.trim()) return text;
+  }
+  return null;
+}
+
+function ordered(blocks: PublicBlock[]): PublicBlock[] {
+  return [...blocks]
+    .filter((b) => b.is_visible !== false)
+    .sort((a, b) => a.sort_order - b.sort_order);
+}
+
 /** True when the page's first block is a hero (it then carries the page's h1). */
 export function startsWithHero(blocks: PublicBlock[]): boolean {
   const first = [...blocks]

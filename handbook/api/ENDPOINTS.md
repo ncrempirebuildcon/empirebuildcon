@@ -260,3 +260,4 @@ Public read-only endpoints (Task 5.1). Responses set `Cache-Control: public, max
 | Method | Path | Needs | What it does |
 |---|---|---|---|
 | POST | `/api/v1/internal/outbox/drain` | internal key | Process pending events (called by the scheduler on free hosting) |
+| POST | `/api/v1/internal/redirects/hit` | signed (`REVALIDATE_SECRET`, `redirect-hit.` prefix) | Count one redirect the website answered (task 5.6, D-047); 204 for any address |
