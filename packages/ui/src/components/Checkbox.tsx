@@ -44,9 +44,12 @@ export function Checkbox({
           required={required}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
-          className="mt-0.5 size-5 shrink-0 accent-gold-500"
+          className="mt-3.5 size-5 shrink-0 accent-gold-500"
         />
-        <label htmlFor={fieldId} className="text-caption text-ivory">
+        {/* WHY py-3.5 (not negative margins): the label is the tap target, 44 px tall
+            (DESIGN_SYSTEM touch targets, task 5.7), and it must never reach over the element
+            above or below it, or a tap there would tick this box (a consent mis-tap). */}
+        <label htmlFor={fieldId} className="py-3.5 text-caption text-ivory">
           {label}
           {required ? " (Required)" : null}
         </label>

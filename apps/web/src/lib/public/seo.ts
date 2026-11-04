@@ -29,6 +29,13 @@ type Faq = components["schemas"]["PublicFaq"];
 
 export const SHARE_IMAGE = { width: 1200, height: 630 } as const;
 
+/**
+ * The last fallback, so no page is without a description (task 5.7: Lighthouse SEO). It says
+ * only what the site itself shows (the projects list's heading and the RERA rule).
+ */
+export const SITE_DESCRIPTION =
+  "Empire — Delivering Happiness. Projects and homes in Uttar Pradesh, each with its UP-RERA registration.";
+
 /** The logo on black (public/brand/share-default.png), for pages with no image of their own. */
 const DEFAULT_SHARE_IMAGE = () => ({
   url: absoluteUrl("/brand/share-default.png"),
@@ -125,7 +132,7 @@ export function pageMetadata(meta: PageMeta): Metadata {
   const description =
     plainExcerpt(meta.seo?.description) ??
     (meta.fallbackDescriptions ?? []).map((d) => plainExcerpt(d)).find(Boolean) ??
-    undefined;
+    SITE_DESCRIPTION;
   // SECURITY: only a site path from the CMS becomes the canonical; never another host.
   const cmsCanonical = meta.seo?.canonical_path;
   const canonicalPath =

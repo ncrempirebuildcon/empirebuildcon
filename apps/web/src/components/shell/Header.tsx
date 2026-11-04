@@ -92,14 +92,7 @@ export function Header({ site, isProduction }: HeaderProps) {
 
   return (
     <>
-      {/* Skip link for keyboard users */}
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-full focus:bg-gold-500 focus:px-4 focus:py-2 focus:text-sm focus:font-extrabold focus:text-noir-900 focus:shadow-lg focus:outline-2 focus:outline-gold-200"
-      >
-        Skip to content
-      </a>
-
+      {/* The skip link is the first thing on the page: (site)/layout.tsx (task 5.7). */}
       <header
         role="banner"
         className="sticky top-0 z-30 border-b border-gold-500/35 bg-noir-900/95 backdrop-blur-md"
@@ -107,7 +100,7 @@ export function Header({ site, isProduction }: HeaderProps) {
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3.5 md:px-8">
           {/* Logo */}
-          <Link href="/" aria-label="Empire home" className="flex items-center">
+          <Link href="/" aria-label="Empire home" className="flex min-h-11 items-center">
             <Image
               src="/brand/logo-horizontal-noir.svg"
               alt="Empire — Delivering Happiness"
@@ -126,7 +119,7 @@ export function Header({ site, isProduction }: HeaderProps) {
           >
             <Link
               href="/projects"
-              className={`hover:text-gold-300 transition-colors ${
+              className={`inline-flex min-h-11 items-center hover:text-gold-300 transition-colors ${
                 pathname?.startsWith("/projects") ? "text-gold-300 font-bold" : ""
               }`}
             >
@@ -136,7 +129,7 @@ export function Header({ site, isProduction }: HeaderProps) {
               <Link
                 key={item.path}
                 href={item.path}
-                className={`hover:text-gold-300 transition-colors ${
+                className={`inline-flex min-h-11 items-center hover:text-gold-300 transition-colors ${
                   pathname === item.path ? "text-gold-300 font-bold" : ""
                 }`}
               >
@@ -150,7 +143,7 @@ export function Header({ site, isProduction }: HeaderProps) {
             {telHref && (
               <a
                 href={telHref}
-                className="hidden xl:inline-flex items-center gap-2 text-sm font-semibold text-sand-100 hover:text-gold-300"
+                className="hidden xl:inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-sand-100 hover:text-gold-300"
               >
                 <svg
                   width="16"
@@ -214,7 +207,12 @@ export function Header({ site, isProduction }: HeaderProps) {
         >
           {/* Drawer Header with Close Button */}
           <div className="flex items-center justify-between border-b border-gold-500/35 px-4 py-3.5">
-            <Link href="/" onClick={() => setMobileMenuOpen(false)} aria-label="Empire home">
+            <Link
+              href="/"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Empire home"
+              className="flex min-h-11 items-center"
+            >
               <Image
                 src="/brand/logo-horizontal-noir.svg"
                 alt="Empire — Delivering Happiness"

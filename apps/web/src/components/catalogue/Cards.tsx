@@ -82,7 +82,7 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           <SampleChip isSample={project.is_sample} />
         </div>
         <h3 className="font-display text-xl font-semibold">
-          <Link href={href} className="text-ivory hover:text-gold-300">
+          <Link href={href} className="-my-2.5 inline-block py-2.5 text-ivory hover:text-gold-300">
             {project.name}
           </Link>
         </h3>
@@ -127,7 +127,7 @@ export function PropertyCard({ property }: { property: PropertySummary }) {
           <SampleChip isSample={property.is_sample} />
         </div>
         <h3 className="font-display text-xl font-semibold">
-          <Link href={href} className="text-ivory hover:text-gold-300">
+          <Link href={href} className="-my-2.5 inline-block py-2.5 text-ivory hover:text-gold-300">
             {property.name}
           </Link>
         </h3>

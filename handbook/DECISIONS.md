@@ -859,3 +859,34 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 **Verified / assumed:**
 - Verified in Next.js 16.4's source that Googlebot is not in its "HTML-limited bots" list, so it receives streamed metadata.
 - Assumed: Google reads that metadata after rendering, which Google documents for JavaScript sites.
+
+## D-049 · Performance budgets and the 390 px pass (Proposed, 2026-11-03)
+
+**Context:** Task 5.7 holds the public site to Lighthouse ≥ 90 on mobile and to a full accessibility and 390 px pass (PLAN). The first measurement (mobile Lighthouse, six pages) gave performance 85–94.
+**Decision:**
+- **The Sentry browser SDK loads only with a DSN, after `load`** (`instrumentation-client.ts`). It was ~118 KB gzipped in every page's first bundle.
+  - Trade-off: an error in a page's first moments isn't reported from the browser. The server still reports its own errors.
+- **The stylesheet is inlined** (`experimental.inlineCss`). It is ~12 KB gzipped and saves a render-blocking request. CSP already allows inline styles.
+- **Fonts use `next/font/local`** with the same @fontsource files. They are preloaded with metric-matched fallbacks, Latin only. The theme's font tokens point at the next/font variables (`globals.css`), with plain fallbacks.
+  - The rupee sign isn't in the Latin file. A face holding only U+20B9 (from the latin-ext file, not preloaded) keeps prices in the site's font.
+- **Touch targets:** every button, control and stand-alone link is 44×44 px. Links in running text are exempt, as WCAG 2.5.8 allows.
+  - A checkbox label grows to 44 px without negative margins, so it never covers a neighbour. The public pass checks that no label covers another element.
+  - "Skip to content" is the first Tab. Main takes focus and keeps clear of the sticky header (`scroll-mt-24`, WCAG 2.4.11).
+- **Budgets in CI:** Lighthouse runs as its own Playwright project and CI job on every push, with the API and real pages, median of 3:
+  - performance ≥ 90;
+  - accessibility and best practices ≥ 95;
+  - SEO ≥ 90, counted without "is-crawlable" until go-live (the site is `noindex` by design). An audit that errors counts as 0.
+  - This replaces the lhci job, which measured `/` with no API.
+  - No retries, and JSON and HTML reports as a CI artifact.
+  - **CPU calibration** (Lighthouse `docs/throttling.md`): Lighthouse's default 4× CPU slowdown assumes a high-end desktop host. The first CI run on GitHub's runner scored 69–89 on the same code that scored 91–97 here, because the slower runner times 4 simulated a much slower phone.
+    - The spec now reads the host's `benchmarkIndex` from a warm-up run and uses `benchmarkIndex / 375` as the slowdown, between 1× and 4×. That is 4× on a high-end desktop (≥ 1500) and about 2.7× on a low-end desktop (1000), following the table's "host → mid-tier mobile" row.
+    - It never goes above Lighthouse's default 4×, which is what PageSpeed Insights uses.
+    - The summary prints the benchmark and the slowdown used.
+  - **CI finding, 4 Nov 2026:** the runner's benchmark was 2391, so calibration didn't change anything (4×). The reports showed two runs in three with a ~800 ms "unattributable" main-thread task: browser work, not the page's code. That task alone moved a page from ~93 to ~74.
+  - **Owner's decision (4 Nov 2026):** until its cause is found, performance below 90 is reported as a **warning** (summary, `warnings.txt` and the test annotation). Accessibility, best practices and SEO still fail the job.
+    - Runs with more than 500 ms of blocking time keep their trace (at most two per job) for the follow-up.
+    - Performance becomes a hard budget again once the cause is fixed (`TODO(phase-5)` in the spec).
+  - The CI build has no Sentry DSN, so the Sentry chunk that production loads after `load` is not in the measurement.
+**Verified / assumed:**
+- Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.
+- Assumed: GitHub's runners score at least as well. If CI scores sit near 90, the budget is the thing to discuss, not a reason to retry.

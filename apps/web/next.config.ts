@@ -35,6 +35,10 @@ const nextConfig: NextConfig = {
   agentRules: false,
   skipTrailingSlashRedirect: true,
   experimental: {
+    // PERF (task 5.7, D-049): the site's one stylesheet (~12 KB gzipped) goes inline in the HTML,
+    // so the first paint doesn't wait for a second request (Lighthouse "render-blocking"). CSP
+    // already allows inline styles (style-src 'unsafe-inline', SECURITY.md §4).
+    inlineCss: true,
     // WHY: with a proxy (src/proxy.ts) Next.js buffers request bodies and silently cuts them at
     // 10 MB, so a photo near the API's 10 MB cap would arrive truncated instead of getting the
     // API's clear 413. This is the cap plus 64 KB for the multipart fields. Videos and documents
