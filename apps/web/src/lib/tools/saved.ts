@@ -11,7 +11,7 @@
  *   - Paths strictly validated: `/projects/<slug>` for projects, `/projects/<slug>/<config>` for properties.
  *   - Browser only: no cookies, no accounts, nothing sent to the server.
  *
- * Collaborators: Antigravity <noreply@google.com>, Claude (review 1). Decisions: D-040, D-049.
+ * Collaborators: Antigravity <noreply@google.com>, Claude (reviews 1 & 2). Decisions: D-040, D-049.
  */
 
 export const SAVED_HOMES_STORAGE_KEY = "empire_saved_homes";
@@ -41,8 +41,9 @@ export interface SaveOperationResult {
   error?: string;
 }
 
-const PROJECT_PATH_REGEX = /^\/projects\/[a-z0-9-]+$/;
-const PROPERTY_PATH_REGEX = /^\/projects\/[a-z0-9-]+\/[a-z0-9-]+$/;
+const SLUG_PATTERN = "[a-z0-9]+(?:-[a-z0-9]+)*";
+const PROJECT_PATH_REGEX = new RegExp(`^/projects/${SLUG_PATTERN}$`);
+const PROPERTY_PATH_REGEX = new RegExp(`^/projects/${SLUG_PATTERN}/${SLUG_PATTERN}$`);
 
 /**
  * Accesses window.localStorage safely without throwing when site data or cookies are blocked.
@@ -54,6 +55,27 @@ export function safeLocalStorage(): Storage | null {
     return window.localStorage;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Checks if the existing storage payload has an unknown schema version (e.g. future v2).
+ * If unknown, we do not read or overwrite it to prevent data loss.
+ */
+function isUnknownVersionStored(s: Storage): boolean {
+  try {
+    const raw = s.getItem(SAVED_HOMES_STORAGE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return false;
+    if (parsed && typeof parsed === "object") {
+      const v = (parsed as Record<string, unknown>).v;
+      if (v === 1) return false;
+      if (v !== undefined) return true;
+    }
+    return false;
+  } catch {
+    return false;
   }
 }
 
@@ -109,6 +131,7 @@ export function getSavedItems(storage?: Storage): SavedItem[] {
     } else if (
       parsed &&
       typeof parsed === "object" &&
+      (parsed as Record<string, unknown>).v === 1 &&
       Array.isArray((parsed as Record<string, unknown>).items)
     ) {
       rawList = (parsed as Record<string, unknown>).items as unknown[];
@@ -152,6 +175,9 @@ export function addSavedItem(
     const s = resolveStorage(storage);
     if (!s) {
       return { success: false, items: [], error: "Storage unavailable" };
+    }
+    if (isUnknownVersionStored(s)) {
+      return { success: false, items: [], error: "Unknown storage version" };
     }
 
     if (!item.path || typeof item.path !== "string") {
@@ -200,6 +226,9 @@ export function removeSavedItem(path: string, storage?: Storage): SaveOperationR
     const s = resolveStorage(storage);
     if (!s) {
       return { success: false, items: [], error: "Storage unavailable" };
+    }
+    if (isUnknownVersionStored(s)) {
+      return { success: false, items: [], error: "Unknown storage version" };
     }
     const currentItems = getSavedItems(s);
     const updated = currentItems.filter((i) => i.path !== path);

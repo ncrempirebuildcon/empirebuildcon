@@ -4,27 +4,27 @@
  * Requirements tested:
  *   1. EMI calculator:
  *      - Property page with default price displays pre-filled EMI.
- *      - Loan amount prefill hint explains GST/stamp duty exclusions.
+ *      - Loan amount prefill hint explains GST/stamp duty exclusions (Should 12).
+ *      - Live announcement region is silent on page load and announces only on user input (Should 1).
  *      - Typing a new loan amount recalculates monthly EMI to exact expected figure.
- *      - Typing invalid rate (e.g. 20%) displays visible error and suppresses monthly result (Must 1).
+ *      - Typing invalid rate (e.g. 20%) displays visible error, announces error, and suppresses monthly result (Must 1, Should 1).
  *      - Adjusting tenure or rate updates EMI, total interest, and total paid.
  *      - Note and sample rate guidance are visible ("Indicative only, not a loan offer...").
  *      - JavaScript disabled: standard reducing-balance formula and note are visible.
  *   2. Saved homes:
  *      - Save button on project and property pages toggles between "Save" and "Saved" with aria-pressed.
  *      - Visiting /saved lists both saved items without prices.
- *      - Items show "Checking…" before API verification completes, then become active links (Item 4).
  *      - Privacy notice "Saved only in this browser." is present.
- *      - Removing an item updates the list and moves focus accessibility (Item 5).
+ *      - Removing an item updates list, announces change, and shifts focus to next Remove button or empty heading (Should 5).
  *      - When a saved project is unpublished, /saved displays "No longer listed" with a Remove button.
  *      - Removing the delisted item leaves /saved in empty state linking to /projects.
  *      - When site data / localStorage is blocked, /saved and SaveButton display friendly message without crashing (Must 2).
  *   3. General:
- *      - Axe accessibility check (WCAG 2.1 AA) with zero serious/critical violations on /saved (populated) and property page.
- *      - Enforced CSP with zero violations.
- *      - 390 px responsive mobile check has zero horizontal overflow on populated /saved and property page.
+ *      - Axe accessibility check (WCAG 2.1 AA) on populated /saved and delisted /saved.
+ *      - Enforced CSP with zero violations on /saved and property page.
+ *      - 390 px responsive mobile check has zero horizontal overflow on populated /saved.
  *
- * Collaborators: Antigravity <noreply@google.com>, Claude (review 1). Decisions: D-040, D-049.
+ * Collaborators: Antigravity <noreply@google.com>, Claude (reviews 1 & 2). Decisions: D-040, D-049.
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
@@ -63,7 +63,12 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     const emiHeading = page.getByRole("heading", { level: 2, name: "EMI calculator" });
     await expect(emiHeading).toBeVisible();
 
-    // Prefilled price note (Must 12)
+    // Should 1 (Review 2): Screen reader live region announces nothing on initial load
+    await page.waitForTimeout(600);
+    const emiLive = page.getByTestId("emi-live-announcement");
+    await expect(emiLive).toHaveText("");
+
+    // Prefilled price note (Should 12)
     const prefillNote = page.getByText(
       "Prefilled with the lowest listed price, which excludes GST, stamp duty and registration. Banks usually lend less than the full price.",
     );
@@ -89,6 +94,8 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     await loanInput.blur();
 
     await expect(monthlyResult).toHaveText("₹ 43,391");
+    // Should 1 (Review 2): Changing input announces the new monthly EMI
+    await expect(emiLive).toHaveText("Monthly EMI ₹ 43,391");
     await expect(page.getByText("54,13,840")).toBeVisible(); // Total interest
     await expect(page.getByText("1,04,13,840")).toBeVisible(); // Total paid
     await expect(page.getByTestId("emi-over-duration")).toHaveText("20 years (240 months)");
@@ -101,12 +108,15 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     const rateError = page.getByText("Enter a rate between 6.00% and 15.00%");
     await expect(rateError).toBeVisible();
     await expect(monthlyResult).not.toBeVisible();
+    // Should 1 (Review 2): Error is announced in the live region
+    await expect(emiLive).toHaveText("Enter a rate between 6.00% and 15.00%");
 
     // Restore rate to 8.50% -> result reappears
     await rateInput.fill("8.50");
     await rateInput.blur();
     await expect(rateError).not.toBeVisible();
     await expect(monthlyResult).toHaveText("₹ 43,391");
+    await expect(emiLive).toHaveText("Monthly EMI ₹ 43,391");
   });
 
   test("EMI calculator displays formula and disclaimer when JavaScript is disabled", async ({
@@ -271,6 +281,9 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     // Item 11: toHaveCount(1) waits for removal
     await expect(list.getByTestId("saved-home-item")).toHaveCount(1);
 
+    // Should 2 (Review 2): Focus moves to the next item's Remove button
+    await expect(list.getByRole("button", { name: /Remove/ }).first()).toBeFocused();
+
     // 5. Unpublish the project through staff API to test delisted item handling
     const unpubRes = await apiCall(
       adminPage,
@@ -289,14 +302,29 @@ test.describe("Tools: EMI Calculator & Saved Homes (Task 5.7b)", () => {
     await expect(delistedBadge).toHaveText("No longer listed");
     await expect(list.getByRole("link", { name: project.name })).not.toBeVisible();
 
+    // Should 2 (Review 2): Run axe check when delisted badge is showing
+    const a11yDelisted = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    const seriousDelisted = a11yDelisted.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    );
+    expect(seriousDelisted.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
+
     // Remove the delisted item
     const finalRemoveBtn = list.getByRole("button", { name: /Remove/ });
     await finalRemoveBtn.click();
 
     // Empty state should now show
-    await expect(
-      page.getByRole("heading", { level: 2, name: "You haven't saved any homes yet" }),
-    ).toBeVisible();
+    const emptyHeading = page.getByRole("heading", {
+      level: 2,
+      name: "You haven't saved any homes yet",
+    });
+    await expect(emptyHeading).toBeVisible();
+
+    // Should 2 (Review 2): Focus moves to the empty-state heading after last removal
+    await expect(emptyHeading).toBeFocused();
+
     const exploreBtn = page.getByRole("link", { name: "Explore projects" });
     await expect(exploreBtn).toBeVisible();
     await expect(exploreBtn).toHaveAttribute("href", "/projects");

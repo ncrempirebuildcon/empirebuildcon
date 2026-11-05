@@ -21,6 +21,7 @@ import {
   getSavedItems,
   isItemSaved,
   isStorageAvailable,
+  isValidSavedItem,
   MAX_SAVED_ITEMS,
   removeSavedItem,
   safeLocalStorage,
@@ -268,5 +269,87 @@ describe("Saved homes storage (Task 5.7b)", () => {
     const rmRes = removeSavedItem("/projects/p");
     expect(rmRes.success).toBe(false);
     expect(rmRes.error).toBe("Storage unavailable");
+  });
+
+  it("treats unknown storage version as unknown without overwriting (Nit)", () => {
+    const futureV2Payload = {
+      v: 2,
+      items: [
+        {
+          kind: "project",
+          path: "/projects/future-project",
+          name: "Future Project",
+          savedAt: new Date().toISOString(),
+          notes: "Future field",
+        },
+      ],
+    };
+    mockStorage.setItem(SAVED_HOMES_STORAGE_KEY, JSON.stringify(futureV2Payload));
+
+    // getSavedItems treats unknown v as []
+    expect(getSavedItems(mockStorage)).toEqual([]);
+
+    // addSavedItem refuses to overwrite unknown version
+    const addRes = addSavedItem(
+      { kind: "project", path: "/projects/new-project", name: "New Project" },
+      mockStorage,
+    );
+    expect(addRes.success).toBe(false);
+    expect(addRes.error).toBe("Unknown storage version");
+
+    // removeSavedItem refuses to overwrite unknown version
+    const rmRes = removeSavedItem("/projects/future-project", mockStorage);
+    expect(rmRes.success).toBe(false);
+    expect(rmRes.error).toBe("Unknown storage version");
+
+    // Raw storage is untouched and preserved
+    const raw = mockStorage.getItem(SAVED_HOMES_STORAGE_KEY);
+    expect(raw).toBe(JSON.stringify(futureV2Payload));
+  });
+
+  it("strictly validates paths matching API slug rules (Nit)", () => {
+    // Valid slugs
+    expect(
+      isValidSavedItem({
+        kind: "project",
+        path: "/projects/valid-slug",
+        name: "Valid",
+        savedAt: new Date().toISOString(),
+      }),
+    ).toBe(true);
+
+    // Invalid slugs: leading hyphen, trailing hyphen, double hyphen
+    expect(
+      isValidSavedItem({
+        kind: "project",
+        path: "/projects/-invalid",
+        name: "Invalid",
+        savedAt: new Date().toISOString(),
+      }),
+    ).toBe(false);
+    expect(
+      isValidSavedItem({
+        kind: "project",
+        path: "/projects/invalid-",
+        name: "Invalid",
+        savedAt: new Date().toISOString(),
+      }),
+    ).toBe(false);
+    expect(
+      isValidSavedItem({
+        kind: "project",
+        path: "/projects/double--hyphen",
+        name: "Invalid",
+        savedAt: new Date().toISOString(),
+      }),
+    ).toBe(false);
+    expect(
+      isValidSavedItem({
+        kind: "property",
+        path: "/projects/valid-project/double--hyphen",
+        name: "Invalid",
+        savedAt: new Date().toISOString(),
+      }),
+    ).toBe(false);
   });
 });

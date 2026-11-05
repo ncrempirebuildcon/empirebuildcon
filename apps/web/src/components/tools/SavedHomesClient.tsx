@@ -16,11 +16,10 @@
  *   - Privacy notice: "Saved only in this browser."
  *   - Accessible announcements and focus management on item removal.
  *
- * Collaborators: Antigravity <noreply@google.com>, Claude (review 1). Decisions: D-040, D-049.
+ * Collaborators: Antigravity <noreply@google.com>, Claude (reviews 1 & 2). Decisions: D-040, D-049.
  */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { cx } from "@empire/ui";
 import { useMounted } from "@/lib/tools/mounted";
 import {
   getSavedHomesSnapshot,
@@ -148,7 +147,7 @@ export function SavedHomesClient() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Polite live region rendered persistently across both empty and list branches (Must 5) */}
+      {/* Polite live region rendered persistently across both empty and list branches (Should 5) */}
       <div aria-live="polite" className="sr-only">
         {announcement}
       </div>
@@ -159,11 +158,7 @@ export function SavedHomesClient() {
         </p>
       </noscript>
 
-      {!isMounted ? (
-        <div className="flex flex-col gap-4 py-8">
-          <p className="text-body text-muted">Loading saved homes…</p>
-        </div>
-      ) : !isStorageReady ? (
+      {!isMounted ? null : !isStorageReady ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-card border border-line bg-noir-800 p-12 text-center">
           <h2
             ref={emptyHeadingRef}
@@ -247,9 +242,7 @@ export function SavedHomesClient() {
                   ) : (
                     <Link
                       href={item.path}
-                      className={cx(
-                        "inline-flex min-h-11 items-center font-display text-h3 font-semibold text-body underline underline-offset-4 transition-colors hover:text-gold-300",
-                      )}
+                      className="inline-flex min-h-11 items-center font-display text-h3 font-semibold text-body underline underline-offset-4 transition-colors hover:text-gold-300"
                     >
                       {item.name}
                     </Link>

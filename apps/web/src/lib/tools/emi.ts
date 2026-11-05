@@ -7,11 +7,11 @@
  *        EMI = P · r · (1 + r)^n / ((1 + r)^n − 1)
  *      where r = annualRate / 12 / 100 is the monthly rate, and n is the total number of monthly instalments.
  *   3. Edge cases: for 0% interest rate (or infinitesimal rate < 1e-9 % per month), EMI = P / n.
- *   4. Total paid is the sum of rounded monthly instalments (monthlyEmi * n); total interest is max(0, totalPaid - P).
+ *   4. For loans with interest (r > 0), total paid is the sum of rounded monthly instalments (monthlyEmi * n) and total interest is max(0, totalPaid - P); for 0% loans, total paid is strictly P and total interest is 0.
  *   5. All monetary outputs are formatted in whole rupees with Indian number grouping.
  *   6. Out-of-bounds inputs are strictly refused with descriptive errors (no silent clamping).
  *
- * Collaborators: Antigravity <noreply@google.com>, Claude (review 1). Decisions: D-040, D-049.
+ * Collaborators: Antigravity <noreply@google.com>, Claude (reviews 1 & 2). Decisions: D-040, D-049.
  */
 
 export const EMI_LIMITS = {

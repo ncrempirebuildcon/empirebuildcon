@@ -21,9 +21,9 @@
  *       - No bank names, no fake urgency or lowest-EMI claims.
  *   - Progressive enhancement: renders formula and note when JavaScript is disabled.
  *
- * Collaborators: Antigravity <noreply@google.com>, Claude (review 1). Decisions: D-040, D-049.
+ * Collaborators: Antigravity <noreply@google.com>, Claude (reviews 1 & 2). Decisions: D-040, D-049.
  */
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { formatInrFull, NumberField, Select } from "@empire/ui";
 import {
   calculateEmi,
@@ -67,12 +67,13 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
   const [tenureYears, setTenureYears] = useState<number>(EMI_LIMITS.DEFAULT_TENURE_YEARS);
   const [ratePercent, setRatePercent] = useState<number | null>(EMI_LIMITS.DEFAULT_RATE);
   const [liveAnnouncement, setLiveAnnouncement] = useState<string>("");
+  const isTouchedRef = useRef(false);
 
   const tenureId = useId();
   const rateId = useId();
   const loanId = useId();
 
-  // Validate loan amount
+  // Validate loan amount (Should 8)
   let loanError: string | undefined;
   if (loanAmount !== null) {
     if (loanAmount < EMI_LIMITS.MIN_PRINCIPAL) {
@@ -114,17 +115,27 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
     }
   }
 
-  // Debounced screen reader live announcement for monthly EMI (Must 9)
+  const monthlyEmi = emiResult?.monthlyEmi;
+
+  // Debounced screen reader live announcement for monthly EMI (Should 1 & 9)
+  // WHY: announces nothing on page load until the visitor touches an input;
+  // announces errors when present instead of clearing the region.
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (emiResult) {
-        setLiveAnnouncement(`Monthly EMI ${formatInrFull(emiResult.monthlyEmi)}`);
+      if (!isTouchedRef.current) return;
+
+      if (loanError) {
+        setLiveAnnouncement(loanError);
+      } else if (rateError) {
+        setLiveAnnouncement(rateError);
+      } else if (monthlyEmi !== undefined) {
+        setLiveAnnouncement(`Monthly EMI ${formatInrFull(monthlyEmi)}`);
       } else {
         setLiveAnnouncement("");
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [emiResult]);
+  }, [monthlyEmi, loanError, rateError]);
 
   if (!isMounted) {
     // Progressive enhancement: when JavaScript is disabled, render formula and note instead
@@ -161,7 +172,7 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
     );
   }
 
-  // Loan amount hint: prefilled price note (Must 12)
+  // Loan amount hint: prefilled price note (Should 12)
   let loanHint = "Whole rupees with Indian digit grouping";
   if (isPrefilled && loanAmount === initialPrincipal) {
     loanHint =
@@ -181,8 +192,8 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
         </span>
       </div>
 
-      {/* Screen reader polite live region for debounced EMI result (Must 9) */}
-      <div aria-live="polite" className="sr-only">
+      {/* Screen reader polite live region for debounced EMI result (Should 9) */}
+      <div aria-live="polite" className="sr-only" data-testid="emi-live-announcement">
         {liveAnnouncement}
       </div>
 
@@ -193,7 +204,10 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
             id={loanId}
             label="Loan amount"
             value={loanAmount}
-            onValueChange={setLoanAmount}
+            onValueChange={(val) => {
+              isTouchedRef.current = true;
+              setLoanAmount(val);
+            }}
             prefix={priceOnRequest && (!loanAmount || loanAmount <= 0) ? undefined : "₹"}
             error={loanError}
             hint={loanHint}
@@ -205,6 +219,7 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
             value={String(tenureYears)}
             options={TENURE_OPTIONS}
             onChange={(e) => {
+              isTouchedRef.current = true;
               const val = parseInt(e.target.value, 10);
               if (Number.isFinite(val)) setTenureYears(val);
             }}
@@ -222,7 +237,10 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
               </span>
             }
             value={ratePercent}
-            onValueChange={setRatePercent}
+            onValueChange={(val) => {
+              isTouchedRef.current = true;
+              setRatePercent(val);
+            }}
             decimals={2}
             suffix="%"
             error={rateError}
@@ -230,7 +248,7 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
           />
         </div>
 
-        {/* Calculation Output (no aria-live on the whole block, Must 9) */}
+        {/* Calculation Output (no aria-live on the whole block, Should 9) */}
         <div
           data-testid="emi-output"
           className="flex flex-col justify-between gap-5 rounded-card border border-gold-line-strong bg-noir-900 p-5 md:p-6"
@@ -275,9 +293,11 @@ export function EmiCalculator({ defaultPriceInr, priceOnRequest }: EmiCalculator
                 MONTHLY EMI
               </span>
               <p className="text-body text-muted">
-                {priceOnRequest
-                  ? "Enter a loan amount to see the estimated EMI breakdown."
-                  : "Type a loan amount above to calculate your estimated monthly EMI."}
+                {loanAmount && loanAmount > 0 && ratePercent === null
+                  ? "Enter an interest rate"
+                  : priceOnRequest
+                    ? "Enter a loan amount to see the estimated EMI breakdown."
+                    : "Type a loan amount above to calculate your estimated monthly EMI."}
               </p>
             </div>
           )}

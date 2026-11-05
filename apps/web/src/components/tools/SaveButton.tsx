@@ -12,7 +12,7 @@
  *   - If storage is blocked or unavailable, displays "Saving isn't available in this browser".
  *   - Browser only, no network calls or tracking.
  *
- * Collaborators: Antigravity <noreply@google.com>, Claude (review 1). Decisions: D-040, D-049.
+ * Collaborators: Antigravity <noreply@google.com>, Claude (reviews 1 & 2). Decisions: D-040, D-049.
  */
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { cx } from "@empire/ui";
@@ -67,11 +67,15 @@ export function SaveButton({ kind, path, name, className }: SaveButtonProps) {
       const res = removeSavedItem(path);
       if (res.success) {
         setAnnouncement(`${name} removed from saved homes`);
+      } else {
+        setAnnouncement("Couldn't save in this browser");
       }
     } else {
       const res = addSavedItem({ kind, path, name });
       if (res.success) {
         setAnnouncement(`${name} saved to this browser`);
+      } else {
+        setAnnouncement("Couldn't save in this browser");
       }
     }
   };
