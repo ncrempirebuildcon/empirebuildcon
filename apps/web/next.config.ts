@@ -35,10 +35,11 @@ const nextConfig: NextConfig = {
   agentRules: false,
   skipTrailingSlashRedirect: true,
   experimental: {
-    // PERF (task 5.7, D-049): the site's one stylesheet (~12 KB gzipped) goes inline in the HTML,
-    // so the first paint doesn't wait for a second request (Lighthouse "render-blocking"). CSP
-    // already allows inline styles (style-src 'unsafe-inline', SECURITY.md §4).
-    inlineCss: true,
+    // PERF (task 5.7c, D-049): the stylesheet stays a separate, cached file. Inlined (task 5.7),
+    // Next.js also wrote it twice into the page's React data, so the CSS was in every page three
+    // times (~190 KB of the ~250 KB of HTML on "/"), and parsing that data was one of the longest
+    // main-thread tasks. As a file, the HTML is ~13 KB gzipped instead of ~51 KB.
+    inlineCss: false,
     // WHY: with a proxy (src/proxy.ts) Next.js buffers request bodies and silently cuts them at
     // 10 MB, so a photo near the API's 10 MB cap would arrive truncated instead of getting the
     // API's clear 413. This is the cap plus 64 KB for the multipart fields. Videos and documents

@@ -5,15 +5,20 @@
  * Implements:
  *   - Captures error via Sentry (@sentry/nextjs), which scrubs URLs and personal data.
  *   - Next.js 16 `retry()` re-fetches and re-renders the segment.
+ *
+ * PERF (task 5.7c, D-049): Next.js loads the root error boundary with every page, so a static
+ * Sentry import put the SDK core (~15 KB gzipped) in every page's first bundle, even with no DSN.
+ * It is imported only when an error is actually shown.
  */
 import { useEffect } from "react";
 import Link from "next/link";
-import * as Sentry from "@sentry/nextjs";
 import { Button } from "@empire/ui";
 
 export default function ErrorPage({ error, retry }: { error: unknown; retry: () => void }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    // WHY the catch: if the chunk can't load (offline, or an old chunk after a deploy), the
+    // visitor still sees this page; the server side reports its own errors.
+    void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error)).catch(() => {});
   }, [error]);
 
   return (

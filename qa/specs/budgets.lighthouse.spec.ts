@@ -66,19 +66,15 @@ function rendererOf(trace: unknown): number | undefined {
 }
 /** A run with more blocking time than this keeps its trace for diagnosis (at most 2 per job). */
 const TRACE_OVER_MS = 500;
-/**
- * TODO(phase-5): make performance a hard budget again once 5.7c lands (owner, 4 Nov 2026, D-049).
- * With the renderer reuse fixed, CI and the workspace both score 85–91: React hydration
- * (react-dom, ~73 KB) and, on localhost, Lighthouse timing the LCP after the scripts. Until the
- * client JavaScript is cut, a performance miss is a warning; the other three budgets fail the job.
- */
-const WARN_ONLY: ReadonlySet<string> = new Set(["performance"]);
+/** Lighthouse errors that mean the trace was lost, not that the page failed. */
+const TRACE_ERRORS: ReadonlySet<string> = new Set(["NO_NAVSTART", "NO_TRACING_STARTED"]);
 type Category = keyof typeof BUDGET;
 const OUT = resolve(import.meta.dirname, "..", "test-results", "lighthouse");
 
 interface Lhr {
   categories: Record<string, { score: number | null; auditRefs: { id: string; weight: number }[] }>;
   audits: Record<string, { score: number | null; displayValue?: string }>;
+  runtimeError?: { code: string; message: string };
 }
 
 /** A category's score out of 100; SEO leaves out "is-crawlable" (noindex before go-live). */
@@ -136,12 +132,12 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
     defaultViewport: null,
   });
   const misses: string[] = [];
-  const warnings: string[] = [];
   let tracesKept = 0;
   const table: string[] = [];
   const renderers = new Set<number>();
   let reused = 0;
   let measured = 0;
+  const remeasured: string[] = [];
   try {
     // Calibration (Lighthouse docs/throttling.md): the default 4× CPU slowdown assumes a
     // high-end desktop host. A slower host (a CI runner) would then simulate a phone far slower
@@ -166,26 +162,43 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
         seo: [],
       };
       for (let run = 0; run < RUNS; run += 1) {
-        const fresh = await freshPage(browser);
-        const result = await lighthouse(
-          `${WEB_URL}${path}`,
-          {
-            output: ["json", "html"],
-            throttling: { cpuSlowdownMultiplier: cpu },
-            logLevel: "error",
-          },
-          undefined,
-          fresh.page,
-        );
-        await fresh.done();
+        // WHY measured again: now and then Lighthouse loses the trace's start ("NO_NAVSTART")
+        // and reports no score at all. That is a failed measurement, not a slow page, so only
+        // those trace errors are measured again (at most two more times) and each repeat is
+        // listed in the summary. Any other error (the page answered 5xx, never painted…) is a
+        // miss straight away.
+        let result: Awaited<ReturnType<typeof lighthouse>> | undefined;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const fresh = await freshPage(browser);
+          result = await lighthouse(
+            `${WEB_URL}${path}`,
+            {
+              output: ["json", "html"],
+              throttling: { cpuSlowdownMultiplier: cpu },
+              logLevel: "error",
+            },
+            undefined,
+            fresh.page,
+          );
+          await fresh.done();
+          const code = (result?.lhr as unknown as Lhr | undefined)?.runtimeError?.code;
+          if (!code || !TRACE_ERRORS.has(code) || attempt === 2) break;
+          remeasured.push(`${path} run ${run + 1}: ${code}`);
+        }
         const lhr = result?.lhr as unknown as Lhr | undefined;
         const html = Array.isArray(result?.report) ? result.report[1] : undefined;
-        expect(lhr, `${path}: Lighthouse ran`).toBeTruthy();
-        if (!lhr) continue;
+        const file = `${path.replace(/[^a-z0-9]+/gi, "_") || "home"}-${run + 1}.json`;
+        if (!lhr || lhr.runtimeError) {
+          // Kept as a miss (not a thrown error), so the report and the summary are still written.
+          misses.push(
+            `${path} run ${run + 1}: not measured (${lhr?.runtimeError?.code ?? "no result"})`,
+          );
+          if (lhr) writeFileSync(resolve(OUT, file), JSON.stringify(lhr));
+          continue;
+        }
         for (const name of Object.keys(BUDGET) as Category[]) {
           scores[name].push(categoryScore(lhr, name));
         }
-        const file = `${path.replace(/[^a-z0-9]+/gi, "_") || "home"}-${run + 1}.json`;
         const blocking = Number(
           (lhr.audits["total-blocking-time"] as { numericValue?: number } | undefined)
             ?.numericValue ?? 0,
@@ -211,27 +224,19 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
       }
       const line = (Object.keys(BUDGET) as Category[]).map((name) => {
         const value = median(scores[name]);
-        if (value < BUDGET[name]) {
-          const miss = `${path}: ${name} ${value} < ${BUDGET[name]}`;
-          if (WARN_ONLY.has(name)) warnings.push(miss);
-          else misses.push(miss);
-        }
+        if (value < BUDGET[name]) misses.push(`${path}: ${name} ${value} < ${BUDGET[name]}`);
         return `${name} ${value}`;
       });
       table.push(`${path}  ${line.join(" · ")}`);
     }
     table.push(`renderer: ${reused} of ${measured} runs reused an earlier run's process`);
+    table.push(`measured again after a failed trace: ${remeasured.length}`);
+    for (const repeat of remeasured) table.push(`  ${repeat}`);
   } finally {
     await browser.disconnect();
     await chrome.kill();
   }
   writeFileSync(resolve(OUT, "summary.txt"), `${table.join("\n")}\n`);
   console.log(table.join("\n"));
-  if (warnings.length > 0) {
-    // Shown in the report and in the CI log; it doesn't fail the job (WARN_ONLY above).
-    test.info().annotations.push({ type: "warning", description: warnings.join("; ") });
-    console.warn(`Lighthouse budget warnings (not failing):\n${warnings.join("\n")}`);
-    writeFileSync(resolve(OUT, "warnings.txt"), `${warnings.join("\n")}\n`);
-  }
   expect(misses, misses.join("\n")).toEqual([]);
 });
