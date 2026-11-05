@@ -11,6 +11,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicImage } from "@/components/media/PublicImage";
 import { Breadcrumbs } from "@/components/catalogue/ListControls";
+import { EmiCalculator } from "@/components/tools/EmiCalculator";
+import { SaveButton } from "@/components/tools/SaveButton";
 import { ReraBlock } from "@/components/catalogue/ReraBlock";
 import {
   AreaText,
@@ -84,6 +86,11 @@ export default async function PropertyPage({ params }: Params) {
           <ProjectStatusChip status={project.status} />
           <SoldOutChip salesStatus={property.sales_status} />
           <SampleChip isSample={property.is_sample} />
+          <SaveButton
+            kind="property"
+            path={propertyPath(project.slug, property.slug)}
+            name={`${title} · ${project.name}`}
+          />
         </div>
         <h1 className="font-display text-[clamp(32px,6vw,58px)] leading-tight font-semibold text-balance text-metallic">
           {title}
@@ -168,6 +175,11 @@ export default async function PropertyPage({ params }: Params) {
               </p>
             </Section>
           ) : null}
+
+          <EmiCalculator
+            defaultPriceInr={property.price.min_inr}
+            priceOnRequest={property.price.on_request}
+          />
 
           {others.length > 0 ? (
             <Section id="other-homes" title={`Other homes in ${project.name}`}>
