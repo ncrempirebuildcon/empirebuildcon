@@ -7,6 +7,7 @@
  * number; with no number at all it points to the contact page.
  */
 import Link from "next/link";
+import { Suspense } from "react";
 import { fetchPublicSite } from "@/lib/public/api";
 import { buildTelLink, buildWhatsAppLink, filterValue, isProductionEnv } from "@/lib/public/format";
 import type { LeadIntent } from "@/lib/public/leads";
@@ -69,21 +70,26 @@ export async function LeadPanel(props: LeadPanelProps) {
     </div>
   );
 
+  // PERF (task 5.7c, D-049): the boundary suspends nothing (the form is in the HTML as before),
+  // but React hydrates each boundary as its own piece of work and yields between them, so a
+  // page with two forms (/contact) no longer hydrates in one long main-thread task.
   return (
-    <LeadForm
-      intent={props.intent}
-      title={props.title}
-      intro={props.intro}
-      submitLabel={props.submitLabel}
-      consent={consent}
-      marketing={marketing}
-      projectSlug={props.projectSlug}
-      configurationId={props.configurationId}
-      source={props.source}
-      projectChoices={props.projectChoices}
-      headingLevel={props.headingLevel}
-      fallback={fallback}
-    />
+    <Suspense fallback={fallback}>
+      <LeadForm
+        intent={props.intent}
+        title={props.title}
+        intro={props.intro}
+        submitLabel={props.submitLabel}
+        consent={consent}
+        marketing={marketing}
+        projectSlug={props.projectSlug}
+        configurationId={props.configurationId}
+        source={props.source}
+        projectChoices={props.projectChoices}
+        headingLevel={props.headingLevel}
+        fallback={fallback}
+      />
+    </Suspense>
   );
 }
 
