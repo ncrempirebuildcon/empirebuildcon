@@ -3,10 +3,18 @@
  * a mid-range phone on a slow 4G connection, simulated) on the home page, the projects list, a
  * project, a home, the properties list and the contact page.
  *
- * Budgets, each the median of three runs per page:
- *   - performance ≥ 90, accessibility ≥ 95, best practices ≥ 95;
- *   - SEO ≥ 90, counted without "is-crawlable": the whole site is `noindex` until go-live
- *     (Phase 9 gate), which that one audit reports by design. Every other SEO audit counts.
+ * Budgets, on the median of five runs per page:
+ *   - accessibility ≥ 95, best practices ≥ 95 and SEO ≥ 90 on every page. SEO is counted without
+ *     "is-crawlable": the whole site is `noindex` until go-live (Phase 9 gate), which that one
+ *     audit reports by design. Every other SEO audit counts.
+ *   - performance: the six pages average ≥ 90, and no page is below 85. A page between 85 and 89
+ *     is reported as a warning.
+ *
+ * WHY performance is gated this way (D-049, 6 Nov 2026): on GitHub's shared runner the same
+ * commit scores a page anywhere from ~87 to ~98 from one CI run to the next (5.7c's three CI
+ * runs). A hard 90 on each of six pages therefore failed at random, whichever page dipped that
+ * time. A real slowdown moves every page: before 5.7c the pages averaged ~88, and the renderer
+ * bug made them average ~78. Both fail this gate, while runner noise on one page doesn't.
  *
  * Run alone (`pnpm --filter @empire/qa lighthouse`, CI job "lighthouse"): scores need a quiet
  * machine. The reports are saved under test-results/lighthouse/ for a look at what slipped.
@@ -23,7 +31,10 @@ import { WEB_URL } from "../lib/env";
 
 test.use({ storageState: CMS_STATE });
 
-const RUNS = 3;
+const RUNS = 5;
+/** Performance: the pages' average must reach this, and no page may fall under the floor. */
+const PERFORMANCE_AVERAGE = 90;
+const PERFORMANCE_FLOOR = 85;
 const BUDGET = { performance: 90, accessibility: 95, "best-practices": 95, seo: 90 } as const;
 /**
  * WHY each run in its own browser context: on GitHub's runner (Chrome 156) every Lighthouse run's
@@ -132,6 +143,8 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
     defaultViewport: null,
   });
   const misses: string[] = [];
+  const warnings: string[] = [];
+  const performance: number[] = [];
   let tracesKept = 0;
   const table: string[] = [];
   const renderers = new Set<number>();
@@ -224,10 +237,24 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
       }
       const line = (Object.keys(BUDGET) as Category[]).map((name) => {
         const value = median(scores[name]);
-        if (value < BUDGET[name]) misses.push(`${path}: ${name} ${value} < ${BUDGET[name]}`);
+        if (name === "performance") {
+          performance.push(value);
+          if (value < PERFORMANCE_FLOOR) {
+            misses.push(`${path}: performance ${value} < ${PERFORMANCE_FLOOR} (floor)`);
+          } else if (value < BUDGET.performance) {
+            warnings.push(`${path}: performance ${value} < ${BUDGET.performance}`);
+          }
+        } else if (value < BUDGET[name]) {
+          misses.push(`${path}: ${name} ${value} < ${BUDGET[name]}`);
+        }
         return `${name} ${value}`;
       });
       table.push(`${path}  ${line.join(" · ")}`);
+    }
+    const average = performance.reduce((a, b) => a + b, 0) / Math.max(1, performance.length);
+    table.push(`performance average ${average.toFixed(1)} (must be ≥ ${PERFORMANCE_AVERAGE})`);
+    if (average < PERFORMANCE_AVERAGE) {
+      misses.push(`performance average ${average.toFixed(1)} < ${PERFORMANCE_AVERAGE}`);
     }
     table.push(`renderer: ${reused} of ${measured} runs reused an earlier run's process`);
     table.push(`measured again after a failed trace: ${remeasured.length}`);
@@ -238,5 +265,11 @@ test("the public pages meet the Lighthouse budgets on a phone", async ({ page })
   }
   writeFileSync(resolve(OUT, "summary.txt"), `${table.join("\n")}\n`);
   console.log(table.join("\n"));
+  if (warnings.length > 0) {
+    // Shown in the report and the CI log; a page between the floor and 90 doesn't fail the job.
+    test.info().annotations.push({ type: "warning", description: warnings.join("; ") });
+    console.warn(`Lighthouse performance warnings (not failing):\n${warnings.join("\n")}`);
+    writeFileSync(resolve(OUT, "warnings.txt"), `${warnings.join("\n")}\n`);
+  }
   expect(misses, misses.join("\n")).toEqual([]);
 });

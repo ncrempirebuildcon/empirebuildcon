@@ -916,6 +916,24 @@ Building part 1 against the design contract (D-020) needed some choices the cont
     - **Not changed:** the brand SVG logos. svgo would halve them (the LCP image on `/`, ~14 KB → ~7 KB gzipped), but they carry a C2PA provenance manifest that any edit invalidates. Changing them is the owner's call.
     - **Lighthouse reliability:** a run whose trace lost its start (`NO_NAVSTART`, no score) is measured again, at most twice, and the summary counts the repeats. Before this, such a run counted as 0 in the median.
     - Performance is a hard budget again: `WARN_ONLY` is removed.
+  - **How performance is gated (owner: "do it once and for all", 6 Nov 2026).**
+    - **Why a hard 90 per page kept failing:** on GitHub's shared runner the same commit scored a page anywhere from ~87 to ~98 between CI runs. 5.7c's three CI runs gave per-page medians of 89–96, 88–97 and 88–96, and every time a different page dipped under 90. A hard 90 on each of six pages fails at random.
+    - **The gate now:**
+      - Median of **5** runs per page instead of 3.
+      - The six pages must **average ≥ 90**, and **no page may be under 85**.
+      - A page at 85–89 is a warning (`warnings.txt`).
+      - Accessibility, best practices and SEO stay hard on every page.
+    - **Checked against every CI run so far:**
+
+      | Run | Average | Result |
+      |---|---|---|
+      | 5.8 (renderer bug) | ~83 | fail, correctly |
+      | First renderer fix | ~79 | fail, correctly |
+      | Context fix, before 5.7c | ~88 | fail, correctly (the pages really were slow) |
+      | 5.7c (×3) | 93.0, 92.7, 91.7 | pass |
+
+      A real slowdown moves every page; runner noise moves one.
+    - The job takes ~5 minutes instead of ~3.
     - The header links to `/saved` (owner's decision, 4 Nov: header only).
 **Verified / assumed:**
 - Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.
