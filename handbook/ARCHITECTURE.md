@@ -167,7 +167,7 @@ The `/_internal/revalidate` route lives outside `/api/*` so it is handled by Nex
   - Captcha comes only if spam gets through (flag `captcha`).
 - **General leads:** `project_id` may be empty (contact page, NRI page).
 - **Website forms (task 5.4, D-043):** one client component (`components/leads/LeadForm.tsx`) for the enquiry, site-visit and brochure intents, on the project page (enquiry, site visit, gated brochure), the property page (enquiry with `configuration_id`, none when sold out) and `/contact` (site visit and enquiry with a project choice; `?project=` preselects).
-  - It posts through the site's `/api` proxy, so the API sees the visitor's network for its rate limit. That needs JavaScript. Without it, and with no current lead-form text, the visitor sees call and WhatsApp links instead of the form.
+  - It posts through the site's `/api` proxy, so the API sees the visitor's network for its rate limit. That needs JavaScript. The form is in the HTML from the start, switched off until hydration (task 5.7c). Without JavaScript it stays off, with call and WhatsApp links above it. With no current lead-form text there is no form, only those links.
   - `page_url` is the path only. The referrer is sent without its query.
   - A gated brochure: the project answer says `brochure_gated: true` only when there is a brochure to give, without its address. The address comes back from `/public/brochure-requests` after the form.
 - **Assignment (D-016):** in the same transaction as the insert, using `settings.lead_routing`: `single` (everything to one person or the sales inbox), `round_robin` (in turn among listed sales users), or `manual`. Default: single → sales inbox.
