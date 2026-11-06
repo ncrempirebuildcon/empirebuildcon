@@ -7,6 +7,8 @@ How it works:
 
 INVARIANT: the counter is written on its own connection and committed at once, so a request
 that later fails (wrong password → 401) still counts. Never move this into the request session.
+That connection comes from the small side pool (db.get_side_engine, D-054), never the request
+pool: a request holding its session must not wait for a second connection from the same pool.
 PERF: one tiny write per limited request; the daily clean-up deletes expired buckets.
 """
 
@@ -17,7 +19,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
-from empire_api.db import get_engine
+from empire_api.db import get_side_engine
 from empire_api.errors import ApiProblem
 from empire_api.timeutil import utcnow
 
@@ -49,7 +51,7 @@ def hit(key: str, *, limit: int, window_seconds: int, now: datetime | None = Non
     now = now or utcnow()
     start = _window_start(now, window_seconds)
     ends = start + timedelta(seconds=window_seconds)
-    with get_engine().begin() as conn:
+    with get_side_engine().begin() as conn:
         count = int(
             conn.execute(
                 _UPSERT, {"key": key, "window_start": start, "expires_at": ends}
@@ -61,14 +63,14 @@ def hit(key: str, *, limit: int, window_seconds: int, now: datetime | None = Non
 
 def clear(key: str) -> None:
     """Forget every window of `key` (e.g. after a successful sign-in)."""
-    with get_engine().begin() as conn:
+    with get_side_engine().begin() as conn:
         conn.execute(text("DELETE FROM rate_limit_bucket WHERE key = :key"), {"key": key})
 
 
 def clear_prefix(prefix: str) -> None:
     """Forget every key that starts with `prefix` (e.g. all networks of one account on unlock)."""
     escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    with get_engine().begin() as conn:
+    with get_side_engine().begin() as conn:
         conn.execute(
             text("DELETE FROM rate_limit_bucket WHERE key LIKE :pattern ESCAPE '\\'"),
             {"pattern": escaped + "%"},

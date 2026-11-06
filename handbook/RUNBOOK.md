@@ -32,7 +32,7 @@ Generate a fresh set for each environment, on the owner's own computer: `uv --di
 | `APP_ENV` | `staging` | `production` | no (the API refuses to start on Cloud Run without one of these, D-052) |
 | `SITE_URL` | `https://staging.empirebuildcon.com` | `https://empirebuildcon.com` | no |
 | `DATABASE_URL` | Neon staging, `postgresql+psycopg://…?sslmode=require` | Neon production | yes |
-| `DB_POOL_SIZE` | `3` | `5` | no (keep the total under Neon's connection limit) |
+| `DB_POOL_SIZE` | `3` | `5` | no (keep the total under Neon's connection limit: each API instance opens up to 2 × `DB_POOL_SIZE` + 4 connections, the + 4 being the small pool for rate limits and the sent-email record, D-054) |
 | `SESSION_SECRET`, `DATA_ENCRYPTION_KEY`, `INTERNAL_API_KEY`, `IP_HASH_SALT`, `REVALIDATE_SECRET`, `EDGE_PROXY_KEY` | from `gen-secrets` | from `gen-secrets` | yes (`DATA_ENCRYPTION_KEY` can't be changed later without losing encrypted data, so back it up) |
 | `WEB_REVALIDATE_URL` | `https://staging…/_internal/revalidate` | `https://empirebuildcon.com/_internal/revalidate` | no |
 | `CLOUDINARY_URL` | Cloudinary staging folder key | production key | yes |
@@ -144,7 +144,30 @@ Generate a fresh set for each environment, on the owner's own computer: `uv --di
   1. Download the artifact, then: `gpg --batch --pinentry-mode loopback --passphrase-fd 3 --decrypt empire-<date>.dump.gpg > empire.dump 3<<<"$BACKUP_PASSPHRASE"`
   2. Create an empty Neon branch, then: `pg_restore --no-owner --no-privileges -d "<branch connection string>" empire.dump`
   3. Point a staging API at it and check the CMS: projects, leads and settings are there.
-- A full restore test is part of L7. Record the date and the time it took here.
+- **Keep `DATA_ENCRYPTION_KEY` with the backups' passphrase.** Staff two-factor secrets and recovery codes depend on it. A database restored without that key works, but every staff member must set two-factor up again. Lead data itself is not encrypted with it.
+- **Restore drill, 6 Nov 2026 (L7a, local PostgreSQL 16, test data: 40 tables, 68 projects, 45 leads):**
+  - the backup job's exact steps, run as a role with only `pg_read_all_data`: dump and encrypt took 3 s (190 KB);
+  - decrypt and `pg_restore` into an empty database took 1 s, with no errors;
+  - the row count of every table matched the source;
+  - an API started on the restored copy answered `/api/health` ok, and its public project list was byte-for-byte the same as the source's.
+  - Still to do at go-live: the same with production's PostgreSQL 18 (§3 checklist), and note the real dump size above.
+
+## 6a. Load test (L7a, 6 Nov 2026)
+
+Measured in the cloud workspace (2 CPUs, shared with the load generator), with one API process run like production (`--no-access-log --no-proxy-headers`) and `next start`, on local PostgreSQL 16 with 43 published projects. Production runs on different hardware, so read these as a floor and a shape, not a promise.
+
+| What | At once | Requests in 20 s | Per second | p50 / p95 | Errors |
+|---|---|---|---|---|---|
+| Enquiry form (`POST /public/leads`), a different visitor each time | 10 | 953 | 47 | 191 / 374 ms | none |
+| The same | 40 | 1,210 | 58 | 621 / 1,128 ms | none |
+| One visitor, 8 enquiries | 1 | 8 | – | – | 5 accepted, then 429 (the limit, 5 per 10 minutes) |
+| API project list (`/public/projects`) | 50 | 1,714 | 84 | 573 / 956 ms | none |
+| Website project page (`/projects/<slug>`) | 50 | 1,416 | 70 | 683 / 991 ms | none |
+| Website projects list (`/projects`) | 20 | 1,222 | 61 | 309 / 431 ms | none |
+
+**Found and fixed: enquiries under load (D-054).** Before the fix, 10 enquiries at once made 9 of 42 fail after 30 s with a 500. Each request held its database connection and waited for a second one for the rate-limit counter, from the same pool. A launch-day ad could have done the same.
+
+**After go-live,** repeat the enquiry row against staging with the real Cloud Run and Neon settings before any big campaign.
 
 ## 7. When something breaks
 

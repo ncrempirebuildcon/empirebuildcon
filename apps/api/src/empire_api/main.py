@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from empire_api import health
@@ -24,6 +24,7 @@ from empire_api.content import routes_pages as content_page_routes
 from empire_api.dashboard import routes as dashboard_routes
 from empire_api.errors import PROBLEM_MEDIA_TYPE, register_error_handlers
 from empire_api.integrations import routes as internal_routes
+from empire_api.integrations.outbox_drain import deliver_writes_soon
 from empire_api.leads import routes as lead_routes
 from empire_api.leads import routes_public as lead_public_routes
 from empire_api.leads import routes_visits as lead_visit_routes
@@ -69,6 +70,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/api/openapi.json" if show_docs else None,
     )
     register_error_handlers(app)
+    website_content = (
+        settings_routes.router,
+        project_routes.router,
+        routes_children.router,
+        routes_catalogue.router,
+        media_routes.router,
+        content_routes.router,
+        content_page_routes.router,
+        content_marketing_routes.router,
+        content_marketing_routes.offers_router,
+        seo_routes.router,
+    )
     for router in (
         health.router,
         routes_auth.router,
@@ -91,7 +104,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         public_routes.router,
         internal_routes.router,
     ):
-        app.include_router(router)
+        # WHY: changes to what the website shows reach it in seconds, not at the next sweep.
+        deliver = [Depends(deliver_writes_soon)] if router in website_content else []
+        app.include_router(router, dependencies=deliver)
     if settings.media_store_kind == "fake":
         # SECURITY: the fake store's file and upload routes exist only while it is active,
         # which config.py refuses in staging and production (D-033).

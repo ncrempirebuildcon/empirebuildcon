@@ -24,7 +24,7 @@
 | **L4** Short CMS guide | A | How staff add a project, homes, photos and RERA, publish, and handle leads (with screenshots) | — | Done 6 Nov: "Empire CMS Staff Guide", a shared doc (not in git) |
 | **L5** Content import | A | Turn the filled project form into CMS entries (a checked import, or staff enter it with the guide) | Content form back | Waiting for content |
 | **L6** Legal drafts | A | Privacy policy, terms, disclaimer, consent texts from the company facts; the reviewer approves (owner item o-20) | Legal facts back | Waiting for facts |
-| **L7** Pre-launch checks | A | Phase 8 content review on real content, backup restore test, load test of lead intake and list pages, full test run | L3, L5, L6 | Later |
+| **L7** Pre-launch checks | A | Phase 8 content review on real content, backup restore test, load test of lead intake and list pages, full test run | L3, L5, L6 | **L7a done** (D-054: backup drill, load test, two fixes); the content review waits for L5 and L6 |
 | **Go-live** | A + owner | Phase 9 | Billing approval, L7 | Later |
 
 **Lead alerts at launch need no new code.** Phase 4 already emails every new lead and site-visit request to the CMS's sales inbox (Settings → Lead routing → inbox email; `mail/handlers.py`). At go-live: set **Settings → Lead routing → Shared sales inbox** to `sales@empirebuildcon.com` and add the production Resend key. This is on the go-live checklist.

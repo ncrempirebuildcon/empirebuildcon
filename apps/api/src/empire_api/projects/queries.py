@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from empire_api.config import get_settings
-from empire_api.projects.blockers import Blocker, publish_blockers
+from empire_api.projects.blockers import Blocker, publish_blockers_for
 from empire_api.projects.models import City, Configuration, Project
 
 
@@ -128,16 +128,17 @@ def publish_state_counts(db: Session) -> dict[str, int]:
 def blocked_drafts(db: Session) -> list[BlockedProject]:
     """Drafts that can't be published yet, with every reason, most recently edited first.
 
-    PERF: one blocker check per draft (a few queries each); a developer has a handful of drafts.
+    PERF: the blockers for all drafts come from three queries in total (`publish_blockers_for`).
     """
     drafts = db.scalars(
         select(Project)
         .where(Project.publish_state == "draft")
         .order_by(Project.updated_at.desc(), Project.id)
     ).all()
+    all_blockers = publish_blockers_for(db, drafts)
     found: list[BlockedProject] = []
     for project in drafts:
-        blockers = publish_blockers(db, project)
+        blockers = all_blockers[project.id]
         if blockers:
             found.append(
                 BlockedProject(ProjectRef(project.id, project.slug, project.name), blockers)

@@ -20,7 +20,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, Request
 from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.orm import Session
 
@@ -165,6 +165,16 @@ def drain_soon(background: BackgroundTasks, budget_seconds: float = 3.0) -> None
     The 15-minute sweep retries anything this misses (ARCHITECTURE §10).
     """
     background.add_task(_drain_quietly, budget_seconds)
+
+
+def deliver_writes_soon(request: Request, background: BackgroundTasks) -> None:
+    """Router dependency: after any change in the CMS, deliver its events at once (`drain_soon`).
+
+    WHY: without it, a published project or an edited page reached the website only on the
+    15-minute sweep, which staff read as "Publish didn't work" (L7a). Reads deliver nothing.
+    """
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        drain_soon(background)
 
 
 def cleanup(now: datetime | None = None) -> dict[str, int]:

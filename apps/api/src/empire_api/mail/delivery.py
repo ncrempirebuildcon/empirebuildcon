@@ -30,7 +30,7 @@ from typing import Final
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
-from empire_api.db import get_engine
+from empire_api.db import get_side_engine
 from empire_api.logs import get_logger
 from empire_api.mail.models import EmailMessage
 from empire_api.mail.templates import Rendered
@@ -58,7 +58,7 @@ def idempotency_key(event: OutboxEvent, template: str, key: str) -> str:
 
 
 def already_sent(event: OutboxEvent, template: str, key: str) -> bool:
-    with get_engine().connect() as conn:
+    with get_side_engine().connect() as conn:
         found = conn.execute(
             select(EmailMessage.id).where(
                 EmailMessage.event_id == event.event_id,
@@ -71,7 +71,7 @@ def already_sent(event: OutboxEvent, template: str, key: str) -> bool:
 
 def _record(event: OutboxEvent, template: str, key: str, transport: str, provider_id: str) -> None:
     """Step 3: on its own connection, committed at once (module header INVARIANT)."""
-    with get_engine().begin() as conn:
+    with get_side_engine().begin() as conn:
         conn.execute(
             insert(EmailMessage)
             .values(
@@ -154,7 +154,7 @@ def recent_template_sent(address: str, template: str, since_seconds: int) -> boo
     """Whether this person got an email of this template in the last `since_seconds` (the lock
     notice is sent at most once an hour per person, so a stranger can't flood an inbox or use
     up the plan's daily quota by locking an account from many networks)."""
-    with get_engine().connect() as conn:
+    with get_side_engine().connect() as conn:
         found = conn.execute(
             select(EmailMessage.id)
             .where(
