@@ -946,3 +946,18 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 **Verified / assumed:**
 - Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.
 - Assumed: GitHub's runners score at least as well. If CI scores sit near 90, the budget is the thing to discuss, not a reason to retry.
+
+## D-050 · Launch first; marketing, AI and handover after (6 Nov 2026)
+
+- **Decision (owner):** with the website, CMS, database and API built (Phases 3–5), launch comes first. The order is:
+  1. inputs from the company (project content, Google Cloud billing approval, legal facts);
+  2. the launch tasks in [tasks/launch/PLAN.md](tasks/launch/PLAN.md) (tests, security review, deploy readiness, CMS guide, content import, legal drafts, pre-launch checks);
+  3. go-live (Phase 9).
+
+  Phase 6 (marketing), Phase 7 (AI) and Phase 10 (full handover docs) follow after launch.
+- **Why:** the company wants the site live sooner. Marketing tags and the AI chat add nothing a first visitor needs, and the launch checks don't depend on them.
+- **What moves:**
+  - **Lead alerts:** these were listed under Phase 6, but Phase 4 already built them (an email to the CMS's shared sales inbox). Launch only sets the inbox to `sales@empirebuildcon.com`.
+  - **CMS guide:** a short version ships at launch (task L4).
+  - **No cookie banner at launch:** the site sets no tracking or marketing cookies until Phase 6 adds tags, so the banner comes with them.
+- **Forms for the company:** `docs/launch/` (private): `Empire_Project_Content_Form.xlsx`, `Empire_Google_Cloud_Billing_Approval.xlsx`, `Empire_Legal_Review.xlsx`.

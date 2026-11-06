@@ -24,8 +24,9 @@
 | 2 | Brand, design system, page and CMS templates | Done; approved by the owner on 22 Oct 2026 |
 | 3 | Foundation: monorepo, CI, auth, roles, outbox | Done; merged on 22 Oct 2026 (PR #1) |
 | 4 | CMS core, in five parts: projects and catalogue · media · leads · content · settings and users | Done; merged 22–26 Oct 2026 (PR #4, #5, #7, #8, #9) |
-| 5 | Public website, in seven tasks ([tasks/phase-5/PLAN.md](tasks/phase-5/PLAN.md)), built by a developer agent and reviewed by Claude ([agents/WORKFLOW.md](agents/WORKFLOW.md)) | Next |
-| 6–10 | Marketing, AI layer, QA, go-live, handover | Planned |
+| 5 | Public website ([tasks/phase-5/PLAN.md](tasks/phase-5/PLAN.md)), built in two tracks by Claude and a developer agent ([agents/WORKFLOW.md](agents/WORKFLOW.md)) | Done; merged 1–6 Nov 2026 (PR #16 to #32) |
+| Launch | Pre-launch work and go-live: QA and security (Phase 8) and go-live (Phase 9) come first ([tasks/launch/PLAN.md](tasks/launch/PLAN.md), D-050) | In progress |
+| 6, 7, 10 | Marketing, AI layer, handover | After launch |
 
 The owner keeps the live task list (a private tracker page). Ask the owner for access.
 
