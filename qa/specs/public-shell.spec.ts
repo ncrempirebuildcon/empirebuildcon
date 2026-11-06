@@ -49,6 +49,11 @@ test.describe("Public Website Shell", () => {
     await expect(header.getByRole("link", { name: "Empire home" })).toBeVisible();
     await expect(header.getByRole("link", { name: "Projects" })).toBeVisible();
     await expect(header.getByRole("link", { name: "Book a site visit" })).toBeVisible();
+    // Saved homes (task 5.7b) are reached from the header (owner's decision, task 5.7c).
+    await expect(header.getByRole("link", { name: "Saved", exact: true })).toHaveAttribute(
+      "href",
+      "/saved",
+    );
 
     // Main landmark
     const main = page.locator("#main-content");
@@ -101,6 +106,10 @@ test.describe("Public Website Shell", () => {
     const drawer = page.getByTestId("mobile-menu-drawer");
     await expect(drawer).toBeVisible();
     await expect(drawer.getByRole("link", { name: "Projects" })).toBeVisible();
+    await expect(drawer.getByRole("link", { name: "Saved homes" })).toHaveAttribute(
+      "href",
+      "/saved",
+    );
 
     // Keyboard navigation: Tab wrap test (N5) - focus stays trapped within the drawer
     await page.keyboard.press("Tab");

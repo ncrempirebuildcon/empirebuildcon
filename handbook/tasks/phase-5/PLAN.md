@@ -28,11 +28,11 @@
 | 5.5a Page-builder pages | A | Merged 3 Nov | D-045 |
 | 5.5b Blog | B | Merged 4 Nov | three review rounds |
 | 5.6 SEO (metadata, structured data, redirects) | A | Merged 3 Nov | #23, D-047 |
-| 5.7 Performance and the 390 px pass | A | Merged 4 Nov | D-049; performance is a CI warning until 5.7c (owner's decision) |
-| **5.7b** EMI calculator, saved homes | B | **In review** (round 1: fix first) | [5.7b-tools.md](5.7b-tools.md) |
-| **5.6b** `sitemap.xml`, `robots.txt` | B | **Ready**, after 5.7b | [5.6b-sitemap-robots.md](5.6b-sitemap-robots.md) |
+| 5.7 Performance and the 390 px pass | A | Merged 4 Nov | D-049 |
+| 5.7b EMI calculator, saved homes | B | Merged 5 Nov | #29, three review rounds | [5.7b-tools.md](5.7b-tools.md) |
+| **5.6b** `sitemap.xml`, `robots.txt` | B | **In progress** (developer agent) | [5.6b-sitemap-robots.md](5.6b-sitemap-robots.md) |
 | 5.8 Phase 5 finish | A | Merged 4 Nov | #27 |
-| **5.7c** Less client JavaScript; performance a hard budget | A | **Next for Claude**, after `fix/p5-lh-perf` | [5.7c-client-js.md](5.7c-client-js.md), D-049 |
+| **5.7c** Less client JavaScript; performance a hard budget | A | **In review** (`perf/p5-7c-client-js`) | [5.7c-client-js.md](5.7c-client-js.md), D-049 |
 
 **5.8 · Phase 5 finish (Claude, one branch).** These are the loose ends kept from the reviews:
 - the blog's metadata through `pageMetadata`;

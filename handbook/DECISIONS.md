@@ -866,7 +866,7 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 **Decision:**
 - **The Sentry browser SDK loads only with a DSN, after `load`** (`instrumentation-client.ts`). It was ~118 KB gzipped in every page's first bundle.
   - Trade-off: an error in a page's first moments isn't reported from the browser. The server still reports its own errors.
-- **The stylesheet is inlined** (`experimental.inlineCss`). It is ~12 KB gzipped and saves a render-blocking request. CSP already allows inline styles.
+- **The stylesheet is inlined** (`experimental.inlineCss`). It is ~12 KB gzipped and saves a render-blocking request. CSP already allows inline styles. *Reversed in 5.7c (below): Next.js also copied it twice into the page data.*
 - **Fonts use `next/font/local`** with the same @fontsource files. They are preloaded with metric-matched fallbacks, Latin only. The theme's font tokens point at the next/font variables (`globals.css`), with plain fallbacks.
   - The rupee sign isn't in the Latin file. A face holding only U+20B9 (from the latin-ext file, not preloaded) keeps prices in the site's font.
 - **Touch targets:** every button, control and stand-alone link is 44×44 px. Links in running text are exempt, as WCAG 2.5.8 allows.
@@ -893,6 +893,48 @@ Building part 1 against the design contract (D-020) needed some choices the cont
     - **CI result with the fix (4 Nov 2026):** 0 of 18 runs reused a process. The ~800 ms task is gone, and CI now matches the workspace: performance 85–91 (median per page), the other three 100.
     - What is left is the site's own work: React hydration (react-dom, ~73 KB; ~250–430 ms of simulated blocking time) and, on localhost, Lighthouse counting the LCP after the scripts, because they arrive before the first paint (simulated LCP ~2.5–3.4 s against FCP ~1.1 s).
     - **Owner's decision (4 Nov 2026):** merge the fix and keep performance as a **warning** (`WARN_ONLY`, `warnings.txt`). Cutting client JavaScript is its own task, **5.7c**. Performance becomes a hard budget again when 5.7c lands (`TODO(phase-5)` in the spec).
+  - **Task 5.7c (5 Nov 2026): what the page sends, and performance a hard budget again.**
+    - **Inline CSS was counted three times.** With `experimental.inlineCss`, Next.js put the stylesheet (63 KB raw) in a `<style>` tag *and* twice in the page's React data. On `/` that was ~190 KB of ~250 KB of HTML (51 KB gzipped), and parsing the data was one of the longest early tasks. Now the stylesheet is a separate cached file again: the HTML is ~13 KB gzipped.
+    - **Sentry in every page:** the root `error.tsx` imported `@sentry/nextjs` statically. Next.js loads the root error boundary with every page, so the SDK core (~15 KB gzipped) was in every first bundle even with no DSN. It is now imported only when an error is shown.
+    - **Measured in the workspace** (Chrome 141, 4×, medians of 3): before, with a host benchmark of 1760: performance 86–93 per page. After, with a benchmark of 1820: 94–97, and the other three scores 100. Blocking time on `/` dropped from ~90 ms to ~55 ms. CI before: 85–91 (Chrome 156, benchmark ~1700).
+    - **Tried and dropped: a `<Suspense>` around each lead form**, to split hydration. On the server, a client component's boundary can stream: its HTML arrives later in a hidden `<div>` and an inline script swaps it in. Without JavaScript the form and its call/WhatsApp note then stayed hidden. The SSR form below replaced it.
+    - **First CI run of 5.7c** (before the `Suspense` change; Chrome 156, benchmark 1722): `/` 95, `/projects` 93, a project 92, a home 93, `/properties` 96, `/contact` 89. Accessibility, best practices and SEO scored 100, and 0 of 18 runs reused a renderer process.
+    - **Second CI run** (with that `Suspense`; benchmark 1967): `/contact` still 88. On `/contact` the forms sit above the fold, and `LeadForm` drew the whole form only after hydration: one long render, a late LCP, and a "needs JavaScript" note flashing on slow phones.
+    - **Owner's decision (5 Nov 2026):** the form is in the HTML from the start, inside a `<fieldset disabled>` until hydration. Without JavaScript it stays off and the call/WhatsApp note shows above it (`<noscript>`). This replaces task 5.4's "no form without JavaScript".
+    - **Per page after 5.7c** (workspace, benchmark 2203, medians of 3). Bytes are gzipped transfer and don't depend on the host. Before 5.7c, every page carried ~15 KB more script and ~35–40 KB more HTML (`/`: ~182 KB script, 51 KB HTML on CI).
+
+      | Page | Performance | Blocking time | LCP (simulated) | Script | HTML |
+      |---|---|---|---|---|---|
+      | `/` | 96 | 76 ms | 2.7 s | 167 KB | 13 KB |
+      | `/projects` | 95 | 125 ms | 2.6 s | 162 KB | 20 KB |
+      | a project | 95 | 92 ms | 2.9 s | 168 KB | 20 KB |
+      | a home | 95 | 70 ms | 2.9 s | 170 KB | 18 KB |
+      | `/properties` | 96 | 151 ms | 2.4 s | 162 KB | 18 KB |
+      | `/contact` | 95 | 186 ms | 2.4 s | 167 KB | 15 KB |
+
+    - **The LCP still waits for the scripts in Lighthouse's simulation:** on localhost they arrive before the first paint. Most of what is left is React and Next.js themselves (~120 KB of the ~165 KB). Going further would mean fewer client components, which these pages don't have many of (shell, lead form, map, images).
+    - **Not changed:** the brand SVG logos. svgo would halve them (the LCP image on `/`, ~14 KB → ~7 KB gzipped), but they carry a C2PA provenance manifest that any edit invalidates. Changing them is the owner's call.
+    - **Lighthouse reliability:** a run whose trace lost its start (`NO_NAVSTART`, no score) is measured again, at most twice, and the summary counts the repeats. Before this, such a run counted as 0 in the median.
+    - Performance is a hard budget again: `WARN_ONLY` is removed.
+  - **How performance is gated (owner: "do it once and for all", 6 Nov 2026).**
+    - **Why a hard 90 per page kept failing:** on GitHub's shared runner the same commit scored a page anywhere from ~87 to ~98 between CI runs. 5.7c's three CI runs gave per-page medians of 89–96, 88–97 and 88–96, and every time a different page dipped under 90. A hard 90 on each of six pages fails at random.
+    - **The gate now:**
+      - Median of **5** runs per page instead of 3.
+      - The six pages must **average ≥ 90**, and **no page may be under 85**.
+      - A page at 85–89 is a warning (`warnings.txt`).
+      - Accessibility, best practices and SEO stay hard on every page.
+    - **Checked against every CI run so far:**
+
+      | Run | Average | Result |
+      |---|---|---|
+      | 5.8 (renderer bug) | ~83 | fail, correctly |
+      | First renderer fix | ~79 | fail, correctly |
+      | Context fix, before 5.7c | ~88 | fail, correctly (the pages really were slow) |
+      | 5.7c (×3) | 93.0, 92.7, 91.7 | pass |
+
+      A real slowdown moves every page; runner noise moves one.
+    - The job takes ~5 minutes instead of ~3.
+    - The header links to `/saved` (owner's decision, 4 Nov: header only).
 **Verified / assumed:**
 - Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.
 - Assumed: GitHub's runners score at least as well. If CI scores sit near 90, the budget is the thing to discuss, not a reason to retry.

@@ -252,7 +252,7 @@ describe("LeadForm before hydration and without a consent text", () => {
   const fallback = React.createElement("p", null, "Call or WhatsApp us");
   const text = { id: "t", version: 1, body: "Full text", checkbox_label: "Contact me" };
 
-  it("renders the fallback, not the form, on the server (what a no-JavaScript visitor sees)", () => {
+  it("renders the form switched off on the server, with the fallback for no JavaScript", () => {
     const html = renderToStaticMarkup(
       React.createElement(LeadForm, {
         intent: "enquiry",
@@ -263,8 +263,13 @@ describe("LeadForm before hydration and without a consent text", () => {
         submitLabel: "Send",
       }),
     );
-    expect(html).toContain("Call or WhatsApp us");
-    expect(html).not.toContain("<form");
+    // Task 5.7c: the form is in the HTML (no "needs JavaScript" flash, no late LCP), off
+    // until hydration; without JavaScript the note inside <noscript> is what's read.
+    expect(html).toMatch(/<noscript><p>Call or WhatsApp us<\/p><\/noscript>/);
+    expect(html).toContain("<form");
+    expect(html).toMatch(/<fieldset disabled=""/);
+    // COMPLIANCE: the consent boxes are drawn unticked, as after hydration.
+    expect(html).not.toMatch(/<input[^>]*type="checkbox"[^>]*checked/);
   });
 
   it("shows no form at all without a current lead-form text (COMPLIANCE)", () => {

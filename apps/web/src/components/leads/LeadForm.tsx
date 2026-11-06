@@ -7,8 +7,12 @@
  * How it works:
  *   1. The server page passes the current consent texts from /public/site. With no current
  *      lead-form text the form isn't drawn; an honest "call or WhatsApp" note is shown instead.
- *   2. After hydration the form appears (it posts with fetch, so it needs JavaScript); before
- *      that, and with JavaScript off, the "call or WhatsApp" note is what the visitor sees.
+ *   2. The form is in the page's HTML from the start, switched off (a disabled fieldset) until
+ *      React has hydrated it: it posts with fetch, so it needs JavaScript. With JavaScript off
+ *      it stays off, and the "call or WhatsApp" note shows above it (`<noscript>`).
+ *      PERF (task 5.7c, D-049, owner's decision 5 Nov 2026): drawing the whole form only after
+ *      hydration made a long task, a late LCP on /contact, and a "needs JavaScript" flash on
+ *      slow phones.
  *   3. On submit the body is built by lib/public/leads.ts and sent to the site's own /api
  *      proxy, which adds the visitor's network for the API's rate limit (SECURITY §1).
  *   4. The answer becomes a message in a live region; field errors sit under their fields.
@@ -258,16 +262,16 @@ export function LeadForm(props: LeadFormProps) {
         {title}
       </Heading>
       {intro ? <p className="text-small text-body">{intro}</p> : null}
-      {!hydrated ? (
-        fallback
-      ) : (
-        <form
-          noValidate
-          onSubmit={onSubmit}
-          aria-labelledby={`${id}-title`}
-          className="flex flex-col gap-4"
-          data-testid={`lead-form-${intent}`}
-        >
+      {/* WHY only before hydration: React doesn't rebuild <noscript> on the client, so it is
+          dropped once the form works; with JavaScript off it is the note visitors read. */}
+      {!hydrated ? <noscript>{fallback}</noscript> : null}
+      <form
+        noValidate
+        onSubmit={onSubmit}
+        aria-labelledby={`${id}-title`}
+        data-testid={`lead-form-${intent}`}
+      >
+        <fieldset disabled={!hydrated} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
           <TextField
             label="Your name"
             name="name"
@@ -410,8 +414,8 @@ export function LeadForm(props: LeadFormProps) {
             </Link>{" "}
             · you can withdraw consent any time.
           </p>
-        </form>
-      )}
+        </fieldset>
+      </form>
     </section>
   );
 }
