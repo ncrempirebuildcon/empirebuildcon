@@ -136,6 +136,15 @@ export function Header({ site, isProduction }: HeaderProps) {
                 {item.label}
               </Link>
             ))}
+            {/* Saved homes live in this browser only (task 5.7b); the owner put the link here (5.7c). */}
+            <Link
+              href="/saved"
+              className={`inline-flex min-h-11 min-w-11 items-center justify-center hover:text-gold-300 transition-colors ${
+                pathname === "/saved" ? "text-gold-300 font-bold" : ""
+              }`}
+            >
+              Saved
+            </Link>
           </nav>
 
           {/* Right Action / CTA */}
@@ -268,6 +277,13 @@ export function Header({ site, isProduction }: HeaderProps) {
                 {item.label}
               </Link>
             ))}
+            <Link
+              href="/saved"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex min-h-[44px] items-center text-lg font-semibold text-sand-100 hover:text-gold-300"
+            >
+              Saved homes
+            </Link>
 
             <div className="my-4 border-t border-noir-800" />
 

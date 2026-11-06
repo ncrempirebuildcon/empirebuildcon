@@ -231,7 +231,7 @@ test("error answers are explained and nothing typed is lost (mocked, nothing sub
   await visitorContext.close();
 });
 
-test("without JavaScript the page offers call or WhatsApp instead of the form", async ({
+test("without JavaScript the form stays off and the page offers call or WhatsApp", async ({
   page,
   browser,
 }) => {
@@ -239,8 +239,14 @@ test("without JavaScript the page offers call or WhatsApp instead of the form", 
   const context = await browser.newContext({ javaScriptEnabled: false });
   const visitor = await context.newPage();
   await visitor.goto(`/projects/${project.slug}`);
-  await expect(visitor.getByTestId("lead-form-enquiry")).toHaveCount(0);
-  await expect(visitor.getByTestId("lead-fallback").first()).toContainText("needs JavaScript");
+  // Task 5.7c: the form is drawn but stays switched off; the note says how to reach us.
+  const form = visitor.getByTestId("lead-form-enquiry");
+  await expect(form).toBeVisible();
+  await expect(form.locator("button[type=submit]")).toBeDisabled();
+  await expect(form.getByRole("textbox").first()).toBeDisabled();
+  const note = visitor.getByTestId("lead-fallback").first();
+  await expect(note).toBeVisible();
+  await expect(note).toContainText("needs JavaScript");
   await context.close();
 });
 
