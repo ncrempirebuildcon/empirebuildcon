@@ -31,6 +31,7 @@ export type PublicPostDetail = components["schemas"]["PublicPost"];
 export type PublicFaqList = components["schemas"]["PublicFaq"][];
 export type PublicTestimonialList = components["schemas"]["PublicTestimonial"][];
 export type PublicRedirect = components["schemas"]["PublicRedirect"];
+export type PublicSitemapEntry = components["schemas"]["PublicSitemapEntry"];
 
 /**
  * For cached reads, send only the edge key (server bucket) without visitor IP.
@@ -213,5 +214,17 @@ export async function fetchPublicRedirects(): Promise<PublicRedirect[]> {
     fetch: cachedFetch(["redirects", "site"]),
   });
   if (res.response.status === 404) notFound();
+  return unwrap(res);
+}
+
+/**
+ * Public sitemap entries from the API (task 5.6b, D-046).
+ * Tagged 'sitemap' and 'content' so any publish, unpublish, or content event invalidates it.
+ */
+export async function fetchPublicSitemap(): Promise<PublicSitemapEntry[]> {
+  const client = getClient();
+  const res = await client.GET("/api/v1/public/sitemap", {
+    fetch: cachedFetch(["sitemap", "content"]),
+  });
   return unwrap(res);
 }

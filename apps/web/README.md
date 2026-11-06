@@ -47,7 +47,8 @@ The Empire public website and the CMS user interface (Next.js 16 App Router, Typ
 | `/admin/testimonials` | Testimonials: the "Real testimonials only — record where it came from and when the person agreed" banner, the list (shown or not, source, consent date; 25 a page) and the editor (`?testimonial=<id>|new&page=`); "Show on website" is locked until the source and consent date are recorded. Writing needs `content.publish` |
 | `/admin/redirects` | Redirects (`seo.manage`): from, to, code, who made it (by hand, or a renamed page/post/project), on/off, hits and last hit (counted by the website, approximate; task 5.6); 25 a page; search, origin and page in the URL (`?q=&origin=&page=`); the editor shows the API's loop refusal and chain notices |
 | 404 / error | Black & gold not-found page and a "Try again" error state |
-| `/robots.txt` | Disallows everything until go-live (`TODO(phase-9)`) |
+| `/robots.txt` | Disallows crawling by default (`Disallow: /`) with the canonical `Sitemap: <SITE_URL>/sitemap.xml` line; `ALLOW_INDEXING=true` in `APP_ENV=production` allows crawling (`Allow: /`) with `/admin` and `/api` disallowed (`TODO(phase-9)`, task 5.6b) |
+| `/sitemap.xml` | Dynamic XML sitemap (task 5.6b, D-046): lists public pages from `GET /api/v1/public/sitemap` (cached with tags `sitemap` and `content`), canonical URLs on `SITE_URL` with `lastModified`, core list pages (`/`, `/projects`, `/properties`, `/contact`, `/blog`) guaranteed, fails loud on API errors |
 
 The rest of the public pages (page-builder pages, blog, lead forms) arrive in later Phase 5 tasks. Designs are on the design canvas; see `handbook/README.md#designs`.
 

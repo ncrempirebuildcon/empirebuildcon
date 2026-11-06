@@ -329,7 +329,8 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 - Structured data (`components/JsonLd.tsx`, with the CSP nonce):
   - Types: `Organization` (home page), `RealEstateListing` for projects and homes, `FAQPage`, `BreadcrumbList`.
   - The RERA number is the identifier. There is no price when the price is on request, and no data for samples or placeholders.
-- `sitemap.xml` (split by type) and `robots.txt` (task 5.6b). Clean slugs; breadcrumbs on every inner page.
+- `sitemap.xml` (`apps/web/src/app/sitemap.ts`, task 5.6b, D-046): metadata route fetching public URLs from `GET /api/v1/public/sitemap` with cache tags `sitemap` and `content`, generating canonical URLs on `SITE_URL` with `lastModified`, guaranteeing core list pages (`/`, `/projects`, `/properties`, `/contact`, `/blog`), and failing loud on API errors.
+- `robots.txt` (`apps/web/src/app/robots.ts`, task 5.6b): metadata route blocking crawlers by default (`Disallow: /`) with the canonical `Sitemap:` directive; `ALLOW_INDEXING=true` go-live gate functions strictly in `APP_ENV=production`, allowing root while disallowing `/admin` and `/api`. Clean slugs; breadcrumbs on every inner page.
 - Redirects:
   - A redirects manager in the CMS (301/308). Redirects are one hop, never loop, and are created automatically on slug changes (§6, D-035).
   - The web app's proxy (`proxy.ts`, `lib/public/redirects.ts`) answers them for GET and HEAD, with the list cached 60 s per server process.
