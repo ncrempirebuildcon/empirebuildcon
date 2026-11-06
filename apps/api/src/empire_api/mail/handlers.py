@@ -12,8 +12,13 @@ Who gets what:
     to that account. Skipped when the account is inactive or the link was used or burned
     meanwhile (a retry never emails a dead link). An undecryptable link (the data key changed)
     is a permanent failure.
-  - `user.created`: no separate email. WHY: the setup-link email goes out at the same moment and
-    says an account was made for them; two emails at once would look like phishing.
+  - `user.created`: no email to the new person. WHY: the setup-link email goes out at the same
+    moment and says an account was made for them; two emails at once would look like phishing.
+  - `user.created` with the super-admin role, and `user.updated` that makes someone a
+    super-admin or changes a super-admin's email: a notice to every active super-admin, and to
+    the old address when the email changed. SECURITY (L2 security review): with a stolen
+    super-admin session, a new super-admin account or an email change would otherwise keep the
+    attacker in quietly; the real owner now hears about it.
   - `user.locked`, `user.password_changed`, `user.two_factor_enabled` / `_disabled` / `_reset`,
     `user.recovery_code_used`: a short notice to that account ("if this wasn't you, contact the
     super-admin"). Lock notices go at most once an hour per person (delivery.py
@@ -52,6 +57,7 @@ from empire_api.mail import brand as brand_lines
 from empire_api.mail import templates
 from empire_api.mail.delivery import recent_template_sent, send_to_each
 from empire_api.mail.events import (
+    ADMIN_CHANGE_EVENTS,
     LEAD_EVENTS,
     PASSWORD_LINK_EVENTS,
     SECURITY_NOTICE_EVENTS,
@@ -63,6 +69,7 @@ from empire_api.site_settings.groups import LeadRoutingSettings
 from empire_api.site_settings.service import read_typed
 from empire_api.users import directory
 from empire_api.users import service as user_service
+from empire_api.users.models import User
 
 LOCK_NOTICE_EVERY_SECONDS: Final = 3600
 Render = Callable[[], templates.Rendered]
@@ -146,6 +153,48 @@ def security_notice(db: Session, event: OutboxEvent) -> None:
             templates.two_factor_notice, account.name, what, when, brand, remaining=remaining
         )
     _send(db, event, template, [(account.email, render)])
+
+
+# --- Super-admin changes --------------------------------------------------------------------
+
+
+def admin_change_notice(db: Session, event: OutboxEvent) -> None:
+    payload = event.payload
+    if payload.get("role") != "super_admin":
+        return
+    changed = set(payload.get("changed") or [])
+    if event.type == "user.created":
+        what = "created"
+    elif "role" in changed:
+        what = "promoted"
+    elif "email" in changed:
+        what = "email_changed"
+    else:
+        return
+    user = db.get(User, _uuid(payload.get("user_id")))
+    if user is None:
+        return
+    brand = brand_lines.brand(db)
+    # The account itself isn't told (WHY at the top: its own setup email or sign-out says what
+    # happened, and a notice saying "deactivate that account" would only warn an intruder).
+    recipients = [
+        admin.email for admin in directory.active_super_admins(db) if admin.user_id != user.id
+    ]
+    previous = payload.get("previous_email")
+    email_changed = "email" in changed and isinstance(previous, str) and bool(previous)
+    if email_changed:
+        # The old address hears even when the role changed in the same edit.
+        recipients.append(str(previous))
+    render = partial(
+        templates.admin_change_notice,
+        user.name,
+        user.email,
+        what,
+        event.occurred_at,
+        brand,
+        email_changed=email_changed and what != "email_changed",
+    )
+    _send(db, event, "admin_change", [(to, render) for to in dict.fromkeys(recipients)])
 
 
 # --- Lead alerts ---------------------------------------------------------------------------
@@ -243,3 +292,5 @@ for _type in SECURITY_NOTICE_EVENTS:
     on(_type)(security_notice)
 for _type in LEAD_EVENTS:
     on(_type)(_LEAD_HANDLERS[_type])
+for _type in ADMIN_CHANGE_EVENTS:
+    on(_type)(admin_change_notice)

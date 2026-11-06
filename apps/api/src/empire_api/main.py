@@ -3,7 +3,8 @@
 Implements: ARCHITECTURE §3 (no redirects, same-origin API under /api), SECURITY.md §3–4.
 
 Middleware order (outermost first): trailing-slash strip → security headers → request id/log
-and the 500 safety net → edge guard (only our web proxy may call us) → CORS (development only).
+and the 500 safety net → edge guard (only our web proxy may call us) → the public body cap →
+CORS (development only).
 The strip must run first so every later layer sees the final path; security headers sit outside
 the 500 safety net and the edge guard so their answers carry the headers too.
 """
@@ -30,6 +31,7 @@ from empire_api.logs import configure_logging
 from empire_api.mail import routes_dev as mail_dev_routes
 from empire_api.media import routes as media_routes
 from empire_api.media import routes_dev as media_dev_routes
+from empire_api.middleware.body_limit import PublicBodyLimitMiddleware
 from empire_api.middleware.edge_guard import EdgeGuardMiddleware
 from empire_api.middleware.request_context import RequestContextMiddleware
 from empire_api.middleware.security_headers import SecurityHeadersMiddleware
@@ -109,6 +111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_headers=["Content-Type", "X-CSRF-Token"],
         )
     # add_middleware wraps the app, so the LAST one added is the OUTERMOST.
+    app.add_middleware(PublicBodyLimitMiddleware)
     app.add_middleware(EdgeGuardMiddleware, edge_key=settings.edge_proxy_key.get_secret_value())
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_production_like)

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import os
 import re
 from functools import lru_cache
 from typing import Literal, Self
@@ -217,6 +218,13 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _check_secrets(self) -> Self:
         problems = self._media_problems() + self._email_problems()
+        # SECURITY (L2 security review): APP_ENV defaults to "development", which turns every
+        # production check above off (dev secrets, dev mail, fake media store, docs pages). On a
+        # hosted server (Cloud Run sets K_SERVICE; a Cloud Run job sets CLOUD_RUN_JOB) a missing
+        # or wrong APP_ENV refuses to start instead of running with dev defaults.
+        hosted = any(os.environ.get(marker) for marker in ("K_SERVICE", "CLOUD_RUN_JOB"))
+        if hosted and not self.is_production_like:
+            problems.append("APP_ENV must be staging or production on a hosted server")
         if self.is_production_like:
             problems += self._secret_problems()
         if problems:

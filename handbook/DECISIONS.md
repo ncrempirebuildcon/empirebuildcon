@@ -961,3 +961,45 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - **CMS guide:** a short version ships at launch (task L4).
   - **No cookie banner at launch:** the site sets no tracking or marketing cookies until Phase 6 adds tags, so the banner comes with them.
 - **Forms for the company:** `docs/launch/` (private): `Empire_Project_Content_Form.xlsx`, `Empire_Google_Cloud_Billing_Approval.xlsx`, `Empire_Legal_Review.xlsx`.
+
+## D-052 · Security review before launch: what changed (6 Nov 2026, task L2)
+
+- **Decision:** the L2 review's fixes are in. [SECURITY.md §12](SECURITY.md) lists them with the findings left for the owner.
+- **Changes in how things behave:**
+  1. The API refuses to start on Cloud Run unless `APP_ENV` is staging or production.
+  2. Production enforces the CSP by default (opt out with `CSP_ENFORCE=false`).
+  3. On staging and production, `/api/*` without a client IP from the host is a 503 (a misconfigured host fails closed instead of putting every visitor under one rate-limit key).
+  4. Public API writes are capped at 32 KB.
+  5. Super-admin changes are emailed to every super-admin.
+  6. Logs and Sentry drop exception messages, query strings and unlisted headers.
+- **Owner approval:** `proxy.ts` and the CSP are `DO NOT CHANGE` / SECURITY code. Merging the L2 pull request is the approval.
+- **Go-live items** (RUNBOOK, L3):
+  - run uvicorn with `--no-access-log`;
+  - add a Cloudflare rate-limiting rule for page requests per IP;
+  - confirm Netlify's client-IP header on staging.
+
+## D-053 · How the site is deployed (6 Nov 2026, task L3)
+
+- **Decision:** the API ships as one container image (`apps/api/Dockerfile`), used three ways on Google Cloud Run in `asia-south1`, Mumbai, near the visitors and Neon's `ap-south-1`:
+  - the service `empire-api`;
+  - a migrations job (`alembic upgrade head`) that runs before each deploy;
+  - a one-off admin job (`empire-api create-superadmin`).
+
+  Cloud Scheduler calls the outbox drain every 15 minutes (D-010). The website builds on Netlify from `apps/web/netlify.toml`. Daily backups are a GitHub Actions job that encrypts a `pg_dump` with GPG and keeps it 30 days. It is off until the owner adds its two secrets.
+- **Why:**
+  - One image, so the code that migrates is the code that runs.
+  - Cloud Run scales to zero on the free tier.
+  - Mumbai keeps the API close to the database and the visitors.
+  - The backup lives outside Neon, so losing the Neon account or project doesn't lose the data.
+- **Image rules:**
+  - Python 3.14.6 slim and uv 0.13.5, pinned (D-006); Dependabot's docker ecosystem updates them.
+  - Dependencies come from the locked `uv.lock` only.
+  - It runs as UID 10001.
+  - uvicorn runs with `--no-access-log --no-proxy-headers` (D-052, D-027).
+- **Checked:** CI's new `image` job builds the image, runs the migrations from empty on PostgreSQL 18, and checks that `/api/health` answers as UID 10001 with no query string in the log, and that the image refuses to start on Cloud Run without a production `APP_ENV`. The workspace can't pull base images, so the image itself is only ever built in CI. The same steps (install from the lock without the source tree, migrate, start with the same flags, refuse without `APP_ENV`) were run outside Docker here.
+- **Cost:** Cloud Run, Scheduler and Artifact Registry (last 5 images) stay free. Secret Manager has 6 free secret versions and staging plus production need about 14, so expect under ₹100 a month. The billing approval sheet was updated to say so.
+- **Open at staging (RUNBOOK §3–§4):**
+  - the client-IP header;
+  - Cloudflare proxy and rate-limit rule versus Netlify's DNS-only advice (proxying changes the client IP);
+  - a 9.5 MB photo through Netlify's function size limit.
+

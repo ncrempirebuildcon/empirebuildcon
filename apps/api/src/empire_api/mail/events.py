@@ -16,4 +16,11 @@ SECURITY_NOTICE_EVENTS: Final = (
     "user.recovery_code_used",
 )
 LEAD_EVENTS: Final = ("lead.created", "lead.assigned", "site_visit.requested")
-EMAIL_EVENT_TYPES: Final = (*PASSWORD_LINK_EVENTS, *SECURITY_NOTICE_EVENTS, *LEAD_EVENTS)
+# Super-admin changes, announced to every super-admin (L2 security review).
+ADMIN_CHANGE_EVENTS: Final = ("user.created", "user.updated")
+EMAIL_EVENT_TYPES: Final = (
+    *PASSWORD_LINK_EVENTS,
+    *SECURITY_NOTICE_EVENTS,
+    *LEAD_EVENTS,
+    *ADMIN_CHANGE_EVENTS,
+)
