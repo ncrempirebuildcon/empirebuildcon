@@ -40,7 +40,7 @@ The owner keeps the live task list (a private tracker page). Ask the owner for a
 6. [SECURITY.md](SECURITY.md): auth, sessions, uploads, secrets, personal data and backups.
 7. [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md): colour tokens, type, components and accessibility.
 8. [api/ENDPOINTS.md](api/ENDPOINTS.md): the API at a glance. [api/openapi-v1.yaml](api/openapi-v1.yaml) is the design contract until Phase 3 code takes over ([D-020](DECISIONS.md)).
-9. [SETUP.md](SETUP.md): running everything locally (from Phase 3).
+9. [SETUP.md](SETUP.md): running everything locally (from Phase 3). [RUNBOOK.md](RUNBOOK.md): staging, production, deploys, backups and go-live (task L3).
 10. [agents/WORKFLOW.md](agents/WORKFLOW.md) and [tasks/](tasks/README.md): how work is handed out, built, reviewed and merged from Phase 5.
 
 ## Repository map
