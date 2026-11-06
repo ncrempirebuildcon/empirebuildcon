@@ -456,7 +456,13 @@ def update_user(
         aggregate_type="user",
         aggregate_id=user.id,
         actor_id=actor_id,
-        data={"user_id": str(user.id), "changed": sorted(delta)},
+        data={
+            "user_id": str(user.id),
+            "changed": sorted(delta),
+            "role": user.role,
+            # For the super-admin change notice (mail/handlers.py): the old address hears too.
+            **({"previous_email": before["email"]} if "email" in delta else {}),
+        },
     )
     db.commit()
     return user

@@ -5,6 +5,7 @@
  * Logs compact, PII-free violation details on development and staging without logging IPs or queries.
  */
 import { NextResponse, type NextRequest } from "next/server";
+import { readCapped } from "@/lib/body";
 import { sanitizeUrl } from "@/lib/sentry-scrubber";
 
 const MAX_BODY_BYTES = 16 * 1024; // 16 KB cap (S-N5)
@@ -16,8 +17,8 @@ export async function POST(request: NextRequest) {
       return new NextResponse(null, { status: 413 });
     }
 
-    const text = await request.text();
-    if (text.length > MAX_BODY_BYTES) {
+    const text = await readCapped(request, MAX_BODY_BYTES);
+    if (text === null) {
       return new NextResponse(null, { status: 413 });
     }
 

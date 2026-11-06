@@ -257,6 +257,37 @@ def two_factor_notice(
     return _render(subject, body, brand)
 
 
+def admin_change_notice(
+    name: str, email: str, what: str, when: datetime, brand: Brand, *, email_changed: bool = False
+) -> Rendered:
+    """`what`: created, promoted or email_changed (a super-admin account)."""
+    texts = {
+        "created": ("A new super-admin account was created", "A super-admin account was created"),
+        "promoted": (
+            "A staff member was made a super-admin",
+            "This account was made a super-admin",
+        ),
+        "email_changed": (
+            "A super-admin's email address was changed",
+            "The email address of this super-admin account was changed",
+        ),
+    }
+    subject, sentence = texts[what]
+    body = (
+        _Body("Hello,")
+        .para(
+            f"{sentence}{', and its email address was changed' if email_changed else ''}. "
+            "Super-admins can manage every account and setting."
+        )
+        .facts([("Account", f"{name} ({email})"), ("When", ist(when))])
+        .para(
+            "If nobody on your team did this, sign in, deactivate that account and change your "
+            "password straight away."
+        )
+    )
+    return _render(subject, body, brand)
+
+
 # --- Lead alerts ---------------------------------------------------------------------------
 
 

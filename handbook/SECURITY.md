@@ -44,7 +44,7 @@ Set by the web app (pages) and the API (JSON responses):
 | Header | Value |
 |---|---|
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` (add `preload` one month after go-live if nothing breaks) |
-| `Content-Security-Policy` | Nonce-based `script-src` for Next.js; `img-src 'self' https://res.cloudinary.com data: blob: https://tile.openstreetmap.org` (the map tiles, task 5.3); `media-src 'self' https://res.cloudinary.com blob:`; `connect-src 'self' https://api.cloudinary.com` (the CMS uploads videos and documents straight to Cloudinary) plus Sentry ingest host; `frame-ancestors 'none'`; `form-action 'self'`; `object-src 'none'`; `base-uri 'self'`; `report-uri /_internal/csp-report`. Report-only by default (`Content-Security-Policy-Report-Only`), enforced with `CSP_ENFORCE=true` (D-039). Dynamic pages receive nonce-based `script-src`. The static auth pages (`/admin/setup`, `/admin/reset`, `/admin/forgot`) receive `'unsafe-inline'` script-src so they can remain pre-rendered static pages, preventing query tokens from being serialized into the server HTML RSC payload. |
+| `Content-Security-Policy` | Nonce-based `script-src` for Next.js; `img-src 'self' https://res.cloudinary.com data: blob: https://tile.openstreetmap.org` (the map tiles, task 5.3); `media-src 'self' https://res.cloudinary.com blob:`; `connect-src 'self' https://api.cloudinary.com` (the CMS uploads videos and documents straight to Cloudinary) plus Sentry ingest host; `frame-ancestors 'none'`; `form-action 'self'`; `object-src 'none'`; `base-uri 'self'`; `report-uri /_internal/csp-report`. Enforced in production (`APP_ENV=production`) unless `CSP_ENFORCE=false` is set on purpose; report-only elsewhere until `CSP_ENFORCE=true`, so staging collects reports first (D-039, L2 review D-052). Dynamic pages receive nonce-based `script-src`. The static auth pages (`/admin/setup`, `/admin/reset`, `/admin/forgot`) receive `'unsafe-inline'` script-src so they can remain pre-rendered static pages, preventing query tokens from being serialized into the server HTML RSC payload. |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | camera, microphone, geolocation, payment all `()` |
@@ -129,6 +129,13 @@ India's Digital Personal Data Protection Act applies to lead data. The design su
 - The audit log shows IP addresses masked (the first two IPv4 parts, or the IPv6 /32).
 - Logs and audit diffs mask phone numbers and never contain form bodies.
 - Error reports (Sentry) never include local variables, request bodies or cookies, so a crash during sign-in can't send a password; password fields are hidden from `repr`.
+- Since the L2 security review (D-052), the API's error reports and logs also drop:
+  - query strings, since lead search text can be a name or phone;
+  - every header except a short allow-list, which keeps the visitor's IP out;
+  - exception messages, for structlog and the stdlib loggers (uvicorn, SQLAlchemy, httpx) alike: a database error can quote the row it failed on, so only the types and the stacks of the chain are kept;
+  - query strings and log messages in breadcrumbs.
+
+  SQL errors never list their bound values (`hide_parameters`). Production runs uvicorn with `--no-access-log` (RUNBOOK), because its access log would print query strings.
 
 ## 9. Dependencies and code
 
@@ -147,3 +154,27 @@ India's Digital Personal Data Protection Act applies to lead data. The design su
 - Sentry alerts on new error types; uptime alerts on site and `/api/health`.
 - Audit log covers logins, failed logins, permission changes, exports, erasures, publishes.
 - Runbook entries (handbook/RUNBOOK.md, Phase 9): suspected account compromise (revoke sessions, reset password, rotate `SESSION_SECRET` to sign everyone out), leaked secret (rotate), spam wave (switch on captcha flag), domain on hold (NIXI/registrar steps).
+
+## 12. Security review before launch (task L2, 6 Nov 2026, D-052)
+
+Every area of this plan was checked against the code by three independent reviewers (authentication and permissions; anonymous visitors and uploads; headers, personal data, logs, configuration and CI), plus `pnpm audit` and `pip-audit`. Fixed in L2:
+
+| Finding | Fix |
+|---|---|
+| Lead data could reach logs and Sentry through exception messages, query strings and the visitor-IP header | See §8 |
+| A missing `APP_ENV` on the host would run the API with development defaults (public dev secrets, dev mail with readable reset links) | Refuses to start when Cloud Run's markers are set and `APP_ENV` isn't staging or production |
+| If the host stopped sending the client-IP header, every visitor would share one rate-limit key (one stranger could lock sign-in and enquiries for everyone) | On staging and production, `proxy.ts` refuses `/api/*` with 503 and logs an error when no client IP came |
+| `/api/v1/internal%2F…` (percent-encoded) wasn't recognised as internal by `proxy.ts` | Matched on the decoded path; a broken escape is a 400 |
+| Public request bodies of any size were parsed before validation and rate limits | 32 KB cap on writes to `/api/v1/public/*` (`middleware/body_limit.py`), checked while reading too |
+| `/_internal/revalidate` and `/_internal/csp-report` read chunked bodies whole before checking size | Read with a running byte cap (`lib/body.ts`) |
+| CSP stayed report-only in production unless someone remembered `CSP_ENFORCE` | Enforced by default in production |
+| A stolen super-admin session could add a super-admin, or change a super-admin's email, without anyone knowing | Every other active super-admin, and the old address when the email changed, is emailed about new super-admins, promotions and super-admin email changes |
+| GitHub Actions pinned to tags | Pinned to commits (Dependabot keeps them current) |
+
+**Recorded, not changed (owner's decision needed or done at go-live):**
+- **Shared server-render rate bucket:** a flood of unique search URLs (`/projects?q=…`) could use up the 3,000-a-minute bucket that all server renders share, and the site would then show error pages. Mitigation at go-live (L3/RUNBOOK): Cloudflare's free rate-limiting rule on page requests per IP, in front of Netlify. A code change (per-visitor counting of server renders) would split Next.js's cache.
+- **Step-up for super-admin changes:** asking for the actor's password before creating a super-admin or changing a super-admin's email would also stop a stolen session; the email notice above detects it. Proposed for after launch.
+- **Forgot-password timing:** an unknown email answers a few milliseconds faster than a real one. The per-email limit (3 an hour) makes this slow to use. Proposed for after launch.
+- **Dependencies:** `pnpm audit` finds 2 moderate issues (`glob`, `minimatch`), both only inside Sentry's build plugin, which runs at build time. `pip-audit`: none.
+- **Secrets:** a scan of the working tree and all history found no real secret (only test fixtures and `change-me` placeholders).
+

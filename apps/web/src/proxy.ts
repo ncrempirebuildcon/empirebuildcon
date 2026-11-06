@@ -12,7 +12,9 @@
  *      Locally (no key) nothing is added and the API uses the socket address.
  *   4. For page requests: a redirect made in the CMS answers first (301/308, counted; task 5.6,
  *      lib/public/redirects.ts). Otherwise a per-request cryptographically random nonce is made
- *      and Content-Security-Policy is set (report-only by default; enforced when CSP_ENFORCE=true).
+ *      and Content-Security-Policy is set (enforced in production and when CSP_ENFORCE=true;
+ *      report-only otherwise, so staging can collect reports first).
+ *   5. On staging and production, an /api/* call whose host gave no client IP is refused (503).
  *
  * SECURITY / DO NOT CHANGE without owner approval:
  *   - The API trusts X-Empire-Client-IP only because this file is the only thing that can set it.
@@ -22,7 +24,7 @@
  *   (x-nf-client-connection-ip by default) and record it in handbook/RUNBOOK.md.
  */
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
-import { edgeHeaders } from "./lib/edge";
+import { CLIENT_IP_HEADER, EDGE_KEY_HEADER, edgeHeaders } from "./lib/edge";
 import { findRedirect, reportHit } from "./lib/public/redirects";
 
 function buildCsp(options: { nonce?: string }): string {
@@ -67,8 +69,19 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
     return NextResponse.next();
   }
 
-  // 1. Block internal API calls
-  if (pathname.startsWith("/api/v1/internal/")) {
+  // 1. Block internal API calls. SECURITY (L2 security review): matched on the decoded path,
+  // because the API decodes "%2F" and "%69": "/api/v1/internal%2Foutbox" is the same route.
+  // Decoded until it stops changing, so "%252F" can't hide a slash either; page paths aren't
+  // decoded here (a page URL with a stray "%" still reaches its 404).
+  let decoded = pathname;
+  if (pathname.toLowerCase().startsWith("/api")) {
+    try {
+      for (let i = 0; i < 3 && decoded.includes("%"); i += 1) decoded = decodeURIComponent(decoded);
+    } catch {
+      return new NextResponse(null, { status: 400 });
+    }
+  }
+  if (decoded.startsWith("/api/v1/internal/") || decoded === "/api/v1/internal") {
     return NextResponse.json(
       { type: "about:blank", title: "Not Found", status: 404, detail: "Not found." },
       { status: 404, headers: { "content-type": "application/problem+json" } },
@@ -83,7 +96,27 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
   // 3. For /api/* calls: attach edge headers and forward (MM2, S3, Note 7)
   if (pathname === "/api" || pathname.startsWith("/api/")) {
-    for (const [name, value] of Object.entries(edgeHeaders((n) => request.headers.get(n)))) {
+    const edge = edgeHeaders((n) => request.headers.get(n));
+    // SECURITY (L2 security review): on staging and production, a browser call must carry the
+    // visitor's IP (tests and local runs have no hosting platform to add it). Without it the API would count every visitor under the web host's own
+    // address: one stranger could then use up the shared sign-in, reset and enquiry limits for
+    // everybody. A missing header is a hosting misconfiguration, so fail closed and say so.
+    const hosted = process.env.APP_ENV === "staging" || process.env.APP_ENV === "production";
+    if (hosted && edge[EDGE_KEY_HEADER] && !edge[CLIENT_IP_HEADER]) {
+      console.error(
+        `[edge] no client IP in ${process.env.CLIENT_IP_SOURCE_HEADER ?? "x-nf-client-connection-ip"}; refusing /api call`,
+      );
+      return NextResponse.json(
+        {
+          type: "about:blank",
+          title: "Service Unavailable",
+          status: 503,
+          detail: "Please try again in a minute.",
+        },
+        { status: 503, headers: { "content-type": "application/problem+json" } },
+      );
+    }
+    for (const [name, value] of Object.entries(edge)) {
       headers.set(name, value);
     }
     return NextResponse.next({ request: { headers } });
@@ -125,7 +158,11 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   // Dynamic pages (CMS, public shell, 404) use a cryptographically random per-request nonce.
   const nonce = isStaticAuth ? undefined : Buffer.from(crypto.randomUUID()).toString("base64");
   const csp = buildCsp({ nonce });
-  const enforce = process.env.CSP_ENFORCE === "true";
+  // SECURITY (L2 security review): production enforces the policy unless CSP_ENFORCE=false is
+  // set on purpose; staging stays report-only until CSP_ENFORCE=true (D-039's week of reports).
+  const enforce =
+    process.env.CSP_ENFORCE === "true" ||
+    (process.env.APP_ENV === "production" && process.env.CSP_ENFORCE !== "false");
   const cspHeaderName = enforce ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only";
 
   if (nonce) {
