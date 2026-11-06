@@ -214,7 +214,7 @@ Envelope: `{id, type, occurred_at, actor_id, aggregate: {type, id, slug}, data}`
 
 | Job | Frequency | Notes |
 |---|---|---|
-| Outbox drain | Inside the request right after commit for time-critical events (3 s budget), plus a sweep every 15 minutes | Lead alerts go out within seconds; the sweep retries failures. Every 15 minutes (not every minute) so the free database can sleep (D-007) |
+| Outbox drain | Inside the request right after commit for time-critical events (3 s budget), plus a sweep every 15 minutes | Lead alerts go out within seconds, and so do CMS changes to what the website shows (every write to projects, media, pages, offers, settings and SEO, L7a); the sweep retries failures. Every 15 minutes (not every minute) so the free database can sleep (D-007) |
 | Schedule tick | Every 15 minutes, before every drain (worker loop and the internal drain endpoint) | Scheduled page publish/unpublish and offer start/end; each change is announced once. A scheduled publish that is blocked (for example a legal page still marked draft) is cancelled and audited |
 | Clean-up | Daily | Expired sessions, reset tokens, old rate-limit buckets, stale upload intents, and anonymising leads past the retention period |
 | Backup export | Daily | Only if the database plan has no automatic backups (D-007) |

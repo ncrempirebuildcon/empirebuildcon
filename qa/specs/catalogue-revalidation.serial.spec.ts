@@ -1,9 +1,11 @@
 /**
- * A CMS change reaches the cached project page only after revalidation (task 5.3, D-041).
+ * A CMS change reaches the cached project page through revalidation (task 5.3, D-041), within
+ * seconds and with no manual drain (D-054: CMS writes deliver their events straight away).
  *
- * WHY its own Playwright project ("serial", playwright.config.ts): the negative control (the
- * cached page still shows the old text before the outbox is drained) only holds when no other
- * spec drains the outbox at the same time. This project runs after the main one has finished.
+ * The negative control this test used to have (the cached page still shows the old text until
+ * the outbox is drained) no longer holds by design. That pages are served from the data cache
+ * is checked in apps/web/test/public-api-cache.test.ts (force-cache, our tags).
+ * WHY still in the "serial" project: it needs its first drain to clear the publish events.
  */
 import { expect, test } from "@playwright/test";
 import { apiCall, CMS_STATE } from "../lib/auth";
@@ -12,10 +14,7 @@ import { catalogueProject, drainOutbox } from "../lib/catalogue";
 test.use({ storageState: CMS_STATE });
 test.describe.configure({ mode: "serial" });
 
-test("a CMS change reaches the cached project page after revalidation, not before", async ({
-  browser,
-  page,
-}) => {
+test("a CMS change reaches the cached project page within seconds", async ({ browser, page }) => {
   const project = await catalogueProject(page);
   // Deliver the project's own publish events first, so only the change below is pending.
   await drainOutbox(page);
@@ -31,13 +30,6 @@ test("a CMS change reaches the cached project page after revalidation, not befor
   });
   expect(patched.status()).toBe(200);
 
-  // Negative control: the page is served from the data cache, so before the outbox is drained
-  // it still shows the old tagline (this fails if the page were not cached at all).
-  await visitor.reload();
-  await expect(visitor.getByText("Garden homes for the test suite")).toBeVisible();
-  await expect(visitor.getByText(tagline)).toHaveCount(0);
-
-  await drainOutbox(page);
   await expect
     .poll(
       async () => {

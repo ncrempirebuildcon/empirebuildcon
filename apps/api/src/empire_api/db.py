@@ -14,7 +14,7 @@ import uuid
 from collections.abc import Iterator
 from datetime import datetime
 from functools import lru_cache
-from typing import Any
+from typing import Any, Final
 
 from sqlalchemy import DateTime, Engine, MetaData, create_engine, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -54,6 +54,10 @@ def created_at_column() -> Mapped[datetime]:
     return mapped_column(server_default=func.now(), nullable=False)
 
 
+# Per process: at most 4 connections (2 + 2 overflow); each write takes milliseconds.
+SIDE_POOL_SIZE: Final = 2
+
+
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
     """The process-wide engine. Tests dispose and clear it when they switch databases."""
@@ -71,6 +75,29 @@ def get_engine() -> Engine:
         connect_args={"prepare_threshold": None},
     )
     return engine
+
+
+@lru_cache(maxsize=1)
+def get_side_engine() -> Engine:
+    """A small second pool for the short writes that must commit on their own connection while a
+    request's session is open (rate-limit counters, the sent-email record).
+
+    WHY (L7a load test): with one pool, every request held its session's connection and then
+    waited for a second one for the rate limit. Ten enquiries at once used up the pool, each
+    waited for the others, and all of them failed after 30 s (sqlalchemy TimeoutError).
+    INVARIANT: code using this engine never waits for the main pool while holding one of these
+    connections, so the two pools can't wait on each other.
+    """
+    settings = get_settings()
+    return create_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        hide_parameters=True,  # SECURITY: as get_engine
+        pool_size=SIDE_POOL_SIZE,
+        max_overflow=SIDE_POOL_SIZE,
+        pool_timeout=10,
+        connect_args={"prepare_threshold": None},  # WHY: as get_engine (PgBouncer)
+    )
 
 
 @lru_cache(maxsize=1)
@@ -101,5 +128,8 @@ def reset_engine() -> None:
     """Dispose pooled connections and forget the cached engine (tests, CLI env switches)."""
     if get_engine.cache_info().currsize:
         get_engine().dispose()
+    if get_side_engine.cache_info().currsize:
+        get_side_engine().dispose()
     get_engine.cache_clear()
+    get_side_engine.cache_clear()
     get_sessionmaker.cache_clear()

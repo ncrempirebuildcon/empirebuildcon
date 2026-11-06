@@ -1010,3 +1010,17 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - Cloudflare proxy and rate-limit rule versus Netlify's DNS-only advice (proxying changes the client IP);
   - a 9.5 MB photo through Netlify's function size limit.
 
+## D-054 · Pre-launch checks, part one: what changed (6 Nov 2026, task L7a)
+
+- **Decision:** three changes from the checks that don't need the company's content (L7a). The rest of L7 (the content review, and the production restore and load runs) waits for L5, L6 and staging.
+  1. **A second, small database pool for the counters.** Rate-limit counters and the sent-email record are written on their own connection, committed at once (an INVARIANT since Phase 2). They now use their own pool (`db.get_side_engine`, 2 + 2 connections) instead of the request pool.
+     - Why: the load test found that 10 enquiries at once made each request hold one connection and wait for a second from the same pool. They all waited for each other and failed after 30 s.
+     - Checked: a test holds the whole request pool and still counts; with the old code it times out. The enquiry load test then ran 2,163 enquiries with no errors (RUNBOOK §6a).
+  2. **CMS changes reach the website in seconds.** Every write to what the website shows (projects, media, pages, offers, settings, SEO) delivers its events straight after the response (`deliver_writes_soon`). The 15-minute sweep stays as the retry.
+     - Tests: the e2e checks that a project page changed "only after the drain, not before" (D-041) can't hold any more. They now check that the change arrives within seconds with no manual drain. That pages come from the data cache is still checked by the web unit test `public-api-cache.test.ts`.
+     - Why: before, a published project appeared only at the next sweep. Staff would read that as "Publish didn't work".
+  3. **The dashboard's blocked drafts take three queries, not two per draft** (`blockers.publish_blockers_for`, one rule set with the single-project check).
+     - Why: with hundreds of drafts it took seconds (seen in L1).
+     - This is `COMPLIANCE` code: the rules are unchanged, only how they are read. A test compares the two for every combination. Merging the pull request is the owner's approval.
+- **Also checked, nothing to change:** the backup and restore drill (RUNBOOK §6), and the public pages under load (RUNBOOK §6a).
+

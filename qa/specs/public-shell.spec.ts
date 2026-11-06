@@ -15,7 +15,7 @@ import { createHmac } from "node:crypto";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { CMS_STATE } from "../lib/auth";
-import { API_URL, WEB_URL, apiEnv } from "../lib/env";
+import { WEB_URL, apiEnv } from "../lib/env";
 
 test.describe("Public Website Shell", () => {
   test("desktop shell renders header, footer, landmarks and enforced CSP", async ({ page }) => {
@@ -193,9 +193,8 @@ test.describe("Public Website Shell", () => {
     expect(json.tags).toEqual(["site", "projects"]);
   });
 
-  test("CMS settings update revalidates and reflects in the public footer (M6)", async ({
+  test("CMS settings update reaches the public footer within seconds (M6, D-054)", async ({
     browser,
-    request,
   }) => {
     // 1. Initial homepage check
     const publicContext = await browser.newContext();
@@ -221,20 +220,8 @@ test.describe("Public Website Shell", () => {
     await companyForm.getByRole("button", { name: "Save changes" }).click();
     await expect(companyForm.getByRole("status").filter({ hasText: /^Saved\./ })).toBeVisible();
 
-    // 3. Before draining the outbox, read the public page text to prove cached content
-    // is served and the new tagline is NOT present yet (S-N6 negative control).
-    await publicPage.reload();
-    const preDrainText = await footer.textContent();
-    expect(preDrainText).not.toContain(testTagline);
-
-    // 4. Drain outbox through the API host directly with the internal key (M6)
-    const internalKey = apiEnv().INTERNAL_API_KEY ?? "dev-internal-key-32-chars-minimum-ok";
-    const drainRes = await request.post(`${API_URL}/api/v1/internal/outbox/drain`, {
-      headers: { "X-Internal-Key": internalKey },
-    });
-    expect(drainRes.status()).toBe(200);
-
-    // 5. Poll public page: tagline reflects in footer within Next.js revalidation
+    // 3. No manual drain: a CMS save delivers its events straight after the response
+    // (deliver_writes_soon, D-054), so the footer changes within seconds on its own.
     await expect
       .poll(
         async () => {

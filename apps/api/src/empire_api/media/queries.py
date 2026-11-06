@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass, field
 
-from sqlalchemy import Select, exists, func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from empire_api.media import present, schemas
@@ -134,17 +134,22 @@ def progress_photos(
     return _children_links(db, "construction_update_id", update_ids, "gallery")
 
 
-def rera_qr_present(db: Session, project_id: uuid.UUID) -> bool:
-    """COMPLIANCE (D-002): a *visible* RERA QR image is attached to the project."""
-    return bool(
-        db.scalar(
-            select(
-                exists().where(
-                    MediaLink.project_id == project_id,
-                    MediaLink.role == "rera_qr",
-                    MediaLink.is_visible.is_(True),
-                )
+def rera_qr_projects(db: Session, project_ids: Collection[uuid.UUID]) -> set[uuid.UUID]:
+    """COMPLIANCE (D-002): of these projects, the ones with a *visible* RERA QR image attached.
+
+    One query for any number of projects (a single publish, or the dashboard's blocked drafts).
+    """
+    if not project_ids:
+        return set()
+    return set(
+        db.scalars(
+            select(MediaLink.project_id)
+            .where(
+                MediaLink.project_id.in_(project_ids),
+                MediaLink.role == "rera_qr",
+                MediaLink.is_visible.is_(True),
             )
+            .distinct()
         )
     )
 

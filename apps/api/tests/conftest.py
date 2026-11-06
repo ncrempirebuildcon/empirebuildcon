@@ -165,7 +165,7 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
 def qr_present(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pretend every project has its RERA QR image, for publish tests that aren't about media.
     tests/test_media_projects.py uploads a real QR through the fake store instead."""
-    monkeypatch.setattr(blockers, "rera_qr_present", lambda db, project: True)
+    monkeypatch.setattr(blockers, "projects_with_rera_qr", lambda db, ids: set(ids))
 
 
 @pytest.fixture

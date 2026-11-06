@@ -12,10 +12,12 @@ page and advert. Don't remove or weaken a blocker without the owner's approval.
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from empire_api.config import get_settings
@@ -36,28 +38,51 @@ class Blocker:
     message: str
 
 
-def rera_qr_present(db: Session, project: Project) -> bool:
-    """Whether the project shows its RERA QR code: a *visible* `rera_qr` image link exists.
+def projects_with_rera_qr(db: Session, project_ids: Sequence[uuid.UUID]) -> set[uuid.UUID]:
+    """Of these projects, the ones that show their RERA QR code: a *visible* `rera_qr` image link.
 
     COMPLIANCE: hidden doesn't count, because the website wouldn't show it (D-002).
     """
-    return media_queries.rera_qr_present(db, project.id)
+    return media_queries.rera_qr_projects(db, project_ids)
 
 
 def publish_blockers(db: Session, project: Project) -> list[Blocker]:
     """Every reason the project can't be published now, in checklist order (empty = ready)."""
-    blockers: list[Blocker] = []
-    if not (project.rera_number or "").strip():
-        blockers.append(Blocker("rera_number", RERA_NUMBER_MISSING))
-    if not rera_qr_present(db, project):
-        blockers.append(Blocker("rera.qr", RERA_QR_MISSING))
-    if project.is_sample and get_settings().app_env == "production":
-        blockers.append(Blocker("is_sample", SAMPLE_ON_LIVE_SITE))
-    configurations = db.scalar(
-        select(func.count())
-        .select_from(Configuration)
-        .where(Configuration.project_id == project.id)
+    return publish_blockers_for(db, [project])[project.id]
+
+
+def publish_blockers_for(
+    db: Session, projects: Sequence[Project]
+) -> dict[uuid.UUID, list[Blocker]]:
+    """`publish_blockers` for many projects at once: project id → its blockers.
+
+    PERF: two queries for the whole list, not two per project (the dashboard checks every
+    draft; with a project per query it took seconds once drafts ran into the hundreds, L1).
+    INVARIANT: the one rule set. `publish_blockers` calls this, so a single project and the
+    dashboard can't disagree.
+    """
+    ids = [project.id for project in projects]
+    with_qr = projects_with_rera_qr(db, ids)
+    with_configurations: set[uuid.UUID] = (
+        set(
+            db.scalars(
+                select(Configuration.project_id).where(Configuration.project_id.in_(ids)).distinct()
+            )
+        )
+        if ids
+        else set()
     )
-    if not configurations:
-        blockers.append(Blocker("configurations", NO_CONFIGURATION))
-    return blockers
+    production = get_settings().app_env == "production"
+    found: dict[uuid.UUID, list[Blocker]] = {}
+    for project in projects:
+        blockers: list[Blocker] = []
+        if not (project.rera_number or "").strip():
+            blockers.append(Blocker("rera_number", RERA_NUMBER_MISSING))
+        if project.id not in with_qr:
+            blockers.append(Blocker("rera.qr", RERA_QR_MISSING))
+        if project.is_sample and production:
+            blockers.append(Blocker("is_sample", SAMPLE_ON_LIVE_SITE))
+        if project.id not in with_configurations:
+            blockers.append(Blocker("configurations", NO_CONFIGURATION))
+        found[project.id] = blockers
+    return found
