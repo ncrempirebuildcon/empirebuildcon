@@ -393,8 +393,12 @@ test("a library photo can be chosen for a hero block", async ({ page }) => {
   const hero = settings(page);
   await hero.getByRole("button", { name: "Choose from the library: Image" }).click();
   const picker = page.getByRole("dialog", { name: "Choose a photo from the library" });
-  await picker.getByRole("searchbox", { name: "Search" }).fill(photoTitle);
-  await picker.getByRole("radio", { name: photoTitle }).check({ force: true });
+  const search = picker.getByRole("searchbox", { name: "Search" });
+  await search.fill(photoTitle);
+  await search.press("Enter");
+  const radio = picker.getByRole("radio", { name: photoTitle });
+  await expect(radio).toBeAttached();
+  await radio.check({ force: true });
   await picker.getByRole("button", { name: "Use this photo" }).click();
   await expect(
     hero.getByRole("group", { name: "Image" }).getByText(photoTitle, { exact: true }),

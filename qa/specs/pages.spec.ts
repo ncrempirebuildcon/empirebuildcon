@@ -275,6 +275,6 @@ test("draft and unknown pages are not found", async ({ page }) => {
   for (const path of [`/${draft.slug}`, "/e2e-no-such-page"]) {
     const response = await page.goto(path);
     expect(response?.status(), path).toBe(404);
-    await expect(page.getByText("PAGE NOT FOUND")).toBeVisible();
+    await expect(page.getByText("PAGE NOT FOUND", { exact: true })).toBeVisible();
   }
 });

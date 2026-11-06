@@ -139,7 +139,11 @@ export function LeadTimeline({
             hint="Notes are visible to the lead's owner and admins."
             value={draft}
             error={noteError ?? undefined}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              const val = event.target.value;
+              setDraft(val);
+              onDirtyChange?.(val.trim() !== "");
+            }}
           />
           <Button type="submit" loading={busy} className="self-start">
             Add note

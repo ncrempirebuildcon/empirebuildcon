@@ -63,6 +63,7 @@ pnpm --filter @empire/qa lighthouse  # Lighthouse budgets (run alone; scores nee
 - API secrets for the run are generated on the spot unless the environment provides them. You need no real secrets to run the suite.
 - **Media** uses the API's fake store (`MEDIA_STORE=fake`, set in `lib/env.ts`): files go to `apps/api/.media-dev/` (git-ignored) and the browser's direct uploads go to the fake store's Cloudinary-shaped endpoint, so nothing reaches Cloudinary and no account is needed. The test files are a few KB each and made in the test.
 - On a machine with a pre-installed Chromium, set `PW_CHROMIUM_PATH` to it; otherwise run `pnpm --filter @empire/qa exec playwright install chromium` once.
+- **Keep-Alive and connection pooling (task L1):** the test API server runs with `--timeout-keep-alive 75` and `DB_POOL_SIZE=15` in `qa/playwright.config.ts`. Next.js rewrites pool idle connections; setting uvicorn's keep-alive timeout above Playwright's test timeout prevents connection drops ("socket hang up" / ECONNRESET) during long client main-thread tasks like axe scans.
 
 ## Exceptions
 

@@ -81,15 +81,21 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "uv --directory ../apps/api run uvicorn empire_api.main:app --port 8000",
+      // WHY --timeout-keep-alive 75 (task L1): Next.js rewrites pool idle connections.
+      // Uvicorn's default 5 s timeout closes connections prematurely during axe runs,
+      // leading to ECONNRESET / "socket hang up".
+      command:
+        "uv --directory ../apps/api run uvicorn empire_api.main:app --port 8000 --timeout-keep-alive 75",
       url: `${API_URL}/api/health/live`,
       env: {
         ...env,
+        DB_POOL_SIZE: "15",
         WEB_REVALIDATE_URL: `${WEB_URL}/_internal/revalidate`,
         REVALIDATE_SECRET: env.REVALIDATE_SECRET ?? "test-revalidate-secret-minimum-32-chars-long",
       },
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
+      stderr: "pipe",
     },
     {
       command: "pnpm --filter @empire/web start",
@@ -105,6 +111,7 @@ export default defineConfig({
       },
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
+      stderr: "pipe",
     },
   ],
 });

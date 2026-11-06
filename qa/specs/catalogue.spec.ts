@@ -205,7 +205,7 @@ test("off-market, draft and unknown projects are not found", async ({ page }) =>
   ]) {
     const res = await page.goto(path);
     expect(res?.status(), path).toBe(404);
-    await expect(page.getByText("PAGE NOT FOUND")).toBeVisible();
+    await expect(page.getByText("PAGE NOT FOUND", { exact: true })).toBeVisible();
   }
 });
 
