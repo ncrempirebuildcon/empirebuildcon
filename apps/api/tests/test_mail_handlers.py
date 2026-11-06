@@ -54,7 +54,75 @@ def test_every_email_event_has_its_handler() -> None:
         if any(h.__module__ == mail_handlers.__name__ for h in handlers_for(event_type))
     }
     assert registered == set(EMAIL_EVENT_TYPES)
-    assert not any(h.__module__ == mail_handlers.__name__ for h in handlers_for("user.created"))
+
+
+# --- Super-admin changes (L2 security review) ------------------------------------------------
+
+
+def test_a_new_super_admin_is_announced_to_every_super_admin(owner: SignedIn) -> None:
+    make_user("super_admin", email="second-owner@example.com")
+    r = owner.client.post(
+        "/api/v1/admin/users",
+        json={"email": "intruder@example.com", "name": "Intruder", "role": "super_admin"},
+        headers=owner.headers(),
+    )
+    assert r.status_code == 201, r.text
+    for to in (owner.user.email, "second-owner@example.com"):
+        [notice] = mail_to(to, "admin_change")
+        assert notice.subject == "A new super-admin account was created"
+        assert "intruder@example.com" in notice.text
+    # The new account gets its setup link only, not the notice addressed to the team.
+    assert [m.template for m in mail_to("intruder@example.com")] == ["setup_link"]
+
+
+def test_other_roles_and_other_edits_send_no_admin_notice(owner: SignedIn) -> None:
+    r = owner.client.post(
+        "/api/v1/admin/users",
+        json={"email": "sales2@example.com", "name": "Sales Two", "role": "sales"},
+        headers=owner.headers(),
+    )
+    assert r.status_code == 201
+    user_id = r.json()["id"]
+    renamed = owner.client.patch(
+        f"/api/v1/admin/users/{user_id}", json={"name": "Sales 2"}, headers=owner.headers()
+    )
+    assert renamed.status_code == 200
+    assert mail_to(owner.user.email, "admin_change") == []
+
+
+def test_promotion_and_a_super_admin_email_change_are_announced(owner: SignedIn) -> None:
+    staff = make_user("admin", email="staff@example.com")
+    promoted = owner.client.patch(
+        f"/api/v1/admin/users/{staff.id}", json={"role": "super_admin"}, headers=owner.headers()
+    )
+    assert promoted.status_code == 200, promoted.text
+    [notice] = mail_to(owner.user.email, "admin_change")
+    assert notice.subject == "A staff member was made a super-admin"
+    moved = owner.client.patch(
+        f"/api/v1/admin/users/{staff.id}",
+        json={"email": "elsewhere@example.com"},
+        headers=owner.headers(),
+    )
+    assert moved.status_code == 200, moved.text
+    # The old address hears about it too, so a hijacked account can't move quietly.
+    [old] = mail_to("staff@example.com", "admin_change")
+    assert old.subject == "A super-admin's email address was changed"
+    assert "elsewhere@example.com" in old.text
+    assert mail_to("elsewhere@example.com", "admin_change") == []
+
+
+def test_promotion_with_a_new_email_in_one_edit_tells_the_old_address(owner: SignedIn) -> None:
+    staff = make_user("admin", email="quiet@example.com")
+    r = owner.client.patch(
+        f"/api/v1/admin/users/{staff.id}",
+        json={"role": "super_admin", "email": "attacker@example.com"},
+        headers=owner.headers(),
+    )
+    assert r.status_code == 200, r.text
+    [old] = mail_to("quiet@example.com", "admin_change")
+    assert old.subject == "A staff member was made a super-admin"
+    assert "and its email address was changed" in old.text
+    assert mail_to(owner.user.email, "admin_change") != []
 
 
 # --- Password links ------------------------------------------------------------------------

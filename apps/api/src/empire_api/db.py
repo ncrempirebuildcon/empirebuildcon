@@ -61,6 +61,9 @@ def get_engine() -> Engine:
     engine = create_engine(
         settings.database_url,
         pool_pre_ping=True,
+        # SECURITY (L2 security review): SQL errors otherwise print the bound values
+        # ("[parameters: {'phone': '+91…'}]"), which would put lead data in logs and Sentry.
+        hide_parameters=True,
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_pool_size,
         # WHY: Neon's pooled endpoint is PgBouncer in transaction mode, which breaks

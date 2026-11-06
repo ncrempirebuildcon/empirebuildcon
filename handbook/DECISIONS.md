@@ -961,3 +961,20 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - **CMS guide:** a short version ships at launch (task L4).
   - **No cookie banner at launch:** the site sets no tracking or marketing cookies until Phase 6 adds tags, so the banner comes with them.
 - **Forms for the company:** `docs/launch/` (private): `Empire_Project_Content_Form.xlsx`, `Empire_Google_Cloud_Billing_Approval.xlsx`, `Empire_Legal_Review.xlsx`.
+
+## D-052 · Security review before launch: what changed (6 Nov 2026, task L2)
+
+- **Decision:** the L2 review's fixes are in. [SECURITY.md §12](SECURITY.md) lists them with the findings left for the owner.
+- **Changes in how things behave:**
+  1. The API refuses to start on Cloud Run unless `APP_ENV` is staging or production.
+  2. Production enforces the CSP by default (opt out with `CSP_ENFORCE=false`).
+  3. On staging and production, `/api/*` without a client IP from the host is a 503 (a misconfigured host fails closed instead of putting every visitor under one rate-limit key).
+  4. Public API writes are capped at 32 KB.
+  5. Super-admin changes are emailed to every super-admin.
+  6. Logs and Sentry drop exception messages, query strings and unlisted headers.
+- **Owner approval:** `proxy.ts` and the CSP are `DO NOT CHANGE` / SECURITY code. Merging the L2 pull request is the approval.
+- **Go-live items** (RUNBOOK, L3):
+  - run uvicorn with `--no-access-log`;
+  - add a Cloudflare rate-limiting rule for page requests per IP;
+  - confirm Netlify's client-IP header on staging.
+

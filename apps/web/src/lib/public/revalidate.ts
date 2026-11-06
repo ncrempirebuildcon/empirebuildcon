@@ -15,6 +15,7 @@
  */
 import { timingSafeEqual, createHmac } from "node:crypto";
 import { revalidateTag, revalidatePath } from "next/cache";
+import { readCapped } from "@/lib/body";
 
 export const REVALIDATE_WINDOW_MS = 5 * 60 * 1000;
 export const MAX_REVALIDATE_BODY_BYTES = 16 * 1024;
@@ -98,8 +99,8 @@ export async function processRevalidate(
   }
 
   // 6. Read body and enforce size cap
-  const bodyText = await request.text();
-  if (bodyText.length > MAX_REVALIDATE_BODY_BYTES) {
+  const bodyText = await readCapped(request, MAX_REVALIDATE_BODY_BYTES);
+  if (bodyText === null) {
     return { ok: false, status: 401 };
   }
 
