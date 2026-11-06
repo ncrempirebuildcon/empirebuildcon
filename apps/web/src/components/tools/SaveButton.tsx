@@ -68,7 +68,7 @@ export function SaveButton({ kind, path, name, className }: SaveButtonProps) {
       if (res.success) {
         setAnnouncement(`${name} removed from saved homes`);
       } else {
-        setAnnouncement("Couldn't save in this browser");
+        setAnnouncement("Couldn't update saved homes in this browser");
       }
     } else {
       const res = addSavedItem({ kind, path, name });

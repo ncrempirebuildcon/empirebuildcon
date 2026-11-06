@@ -15,6 +15,9 @@
  * - window.localStorage getter throwing SecurityError handled gracefully (Must 2)
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import React from "react";
+import { act, fireEvent, render } from "@testing-library/react";
+import { SaveButton } from "../src/components/tools/SaveButton";
 import {
   addSavedItem,
   getSavedHomesSnapshot,
@@ -351,5 +354,38 @@ describe("Saved homes storage (Task 5.7b)", () => {
         savedAt: new Date().toISOString(),
       }),
     ).toBe(false);
+  });
+
+  it("announces 'Couldn't update saved homes in this browser' when removing a saved home fails (Task L1)", () => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: mockStorage,
+    });
+
+    addSavedItem(
+      { kind: "project", path: "/projects/luxury-villas", name: "Luxury Villas" },
+      mockStorage,
+    );
+
+    const { container, getByRole } = render(
+      React.createElement(SaveButton, {
+        kind: "project",
+        path: "/projects/luxury-villas",
+        name: "Luxury Villas",
+      }),
+    );
+
+    const button = getByRole("button", { name: /Saved Luxury Villas/i });
+    expect(button).toBeDefined();
+
+    // Cause storage write to fail during removal
+    mockStorage.shouldThrow = true;
+
+    act(() => {
+      fireEvent.click(button);
+    });
+
+    const liveRegion = container.querySelector("[aria-live='polite']");
+    expect(liveRegion?.textContent).toBe("Couldn't update saved homes in this browser");
   });
 });

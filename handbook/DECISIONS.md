@@ -962,6 +962,13 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - **No cookie banner at launch:** the site sets no tracking or marketing cookies until Phase 6 adds tags, so the banner comes with them.
 - **Forms for the company:** `docs/launch/` (private): `Empire_Project_Content_Form.xlsx`, `Empire_Google_Cloud_Billing_Approval.xlsx`, `Empire_Legal_Review.xlsx`.
 
+## D-051 · How the e2e servers run (6 Nov 2026, task L1)
+
+- **Decision:** the test API runs with `--timeout-keep-alive 75` and `DB_POOL_SIZE=15`, and both test servers show their error output (`qa/playwright.config.ts`).
+- **Why:** the admin tests that failed under a full run all came from one cause. The website's proxy (Node's fetch) reuses idle keep-alive connections to the API. uvicorn closes an idle connection after 5 s by default, and a request sent on it at that moment fails with "socket hang up", so a CMS screen showed no list. Long axe scans leave exactly such gaps.
+- **Production:** not changed. There the website reaches the API through Cloud Run's Google front end, which holds the connections, so uvicorn's keep-alive doesn't face Node's pool.
+- **Checked:** four full runs in the cloud workspace (2 CPUs) on L1 plus current `main`: no hang-ups in any. Two runs on a fresh database: 160 passed, none retried. Two runs on a local database grown to 1,514 draft projects each had one slow test pass on retry; the dashboard's draft check is per project (a known PERF trade-off in `projects/queries.py`), harmless at a developer's handful of drafts. `qa/README.md` says to reset a grown local database.
+
 ## D-052 · Security review before launch: what changed (6 Nov 2026, task L2)
 
 - **Decision:** the L2 review's fixes are in. [SECURITY.md §12](SECURITY.md) lists them with the findings left for the owner.

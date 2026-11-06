@@ -139,7 +139,13 @@ export function LeadTimeline({
             hint="Notes are visible to the lead's owner and admins."
             value={draft}
             error={noteError ?? undefined}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              // WHY also here, not only in useReportDirty's effect (L1): a click on a link straight
+              // after typing could run before the effect, so leaving didn't ask first.
+              const val = event.target.value;
+              setDraft(val);
+              onDirtyChange?.(val.trim() !== "");
+            }}
           />
           <Button type="submit" loading={busy} className="self-start">
             Add note

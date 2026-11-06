@@ -18,10 +18,10 @@
 
 | Task | Track | What | Needs | State |
 |---|---|---|---|---|
-| **L1** Steady tests and small fixes | B | Find and fix why admin e2e tests fail under load (the API answers "socket hang up"), the /saved remove message, `.env.example` | — | **Ready**, [L1-steady-tests.md](L1-steady-tests.md) |
+| **L1** Steady tests and small fixes | B | Find and fix why admin e2e tests fail under load (the API answers "socket hang up"), the /saved remove message, `.env.example` | — | Done 6 Nov, D-051 · [L1-steady-tests.md](L1-steady-tests.md) |
 | L2 Security review | A | Phase 8's security review on the code as it is: auth, permissions, uploads, rate limits, headers, dependency audit, secrets scan; fixes for anything found | — | Merged 6 Nov (#34), D-052 · [L2-security-review.md](L2-security-review.md) |
-| **L3** Ready to deploy | A | Container image for the API (Cloud Run, uvicorn `--no-access-log`), Netlify config, migrations at deploy, the full environment-variable list, staging RUNBOOK (client-IP header check, Cloudflare rate-limit rule for page requests, D-052). No account is touched | — | **In review** (`feat/l3-deploy`), [../../RUNBOOK.md](../../RUNBOOK.md), D-053 |
-| **L4** Short CMS guide | A | How staff add a project, homes, photos and RERA, publish, and handle leads (with screenshots) | — | After L3 |
+| **L3** Ready to deploy | A | Container image for the API (Cloud Run, uvicorn `--no-access-log`), Netlify config, migrations at deploy, the full environment-variable list, staging RUNBOOK (client-IP header check, Cloudflare rate-limit rule for page requests, D-052). No account is touched | — | Merged 6 Nov (#35), [../../RUNBOOK.md](../../RUNBOOK.md), D-053 |
+| **L4** Short CMS guide | A | How staff add a project, homes, photos and RERA, publish, and handle leads (with screenshots) | — | Done 6 Nov: "Empire CMS Staff Guide", a shared doc (not in git) |
 | **L5** Content import | A | Turn the filled project form into CMS entries (a checked import, or staff enter it with the guide) | Content form back | Waiting for content |
 | **L6** Legal drafts | A | Privacy policy, terms, disclaimer, consent texts from the company facts; the reviewer approves (owner item o-20) | Legal facts back | Waiting for facts |
 | **L7** Pre-launch checks | A | Phase 8 content review on real content, backup restore test, load test of lead intake and list pages, full test run | L3, L5, L6 | Later |
