@@ -934,6 +934,14 @@ Building part 1 against the design contract (D-020) needed some choices the cont
 
       A real slowdown moves every page; runner noise moves one.
     - The job takes ~5 minutes instead of ~3.
+  - **Rounds and extra rounds (6 Nov 2026, after the 5.6b CI run).**
+    - **What happened:** in 5.6b's CI run, `/contact`'s five runs scored 85, 71, 73, 81 and 85 (median 81, under the floor), while the pages measured just before it scored 92–96. 5.6b doesn't touch `/contact`, and the same code scored 88–92 in the three runs before. A slow patch on the runner lasted about a minute, and it took all five runs of the one page being measured.
+    - **Fix, in the spec only:**
+      - **Rounds:** each round measures every page once, five rounds in all. A slow patch now costs each page one or two runs, which the median leaves out.
+      - **Five more rounds, only if the gate would fail:** every page is then judged on the median of all ten runs.
+      - Every run counts; none is dropped or picked. A page that is really slow stays under the gate, as the runs before 5.7c would have.
+      - The summary says when the extra rounds ran.
+    - **Tried and dropped: `<Suspense>` inside `LeadForm`.** React's server rendering streams such boundaries here, even ones of 2 KB, so without JavaScript the form stayed hidden.
     - The header links to `/saved` (owner's decision, 4 Nov: header only).
 **Verified / assumed:**
 - Measured in the cloud workspace (2 CPUs, busy) after the changes: performance 91–98, accessibility, best practices and SEO 100 on all six pages.
