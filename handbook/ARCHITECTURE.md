@@ -370,6 +370,8 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 | Errors / uptime | Sentry / UptimeRobot |
 | Backups | GitHub Actions (encrypted daily `pg_dump`) |
 
+How each piece is set up, deployed, checked and restored: [RUNBOOK.md](RUNBOOK.md) (task L3, D-053).
+
 ## 20. Observability
 
 - Sentry for the web app (`@sentry/nextjs@11.10.0`) and API (`sentry-sdk`), release-tagged from CI. The web app's `beforeSend` scrubber strips query strings, fragments, request bodies, cookies and visitor IP addresses before transmission (D-039). Setting `NEXT_PUBLIC_SENTRY_DSN` empty disables Sentry locally and in test environments.

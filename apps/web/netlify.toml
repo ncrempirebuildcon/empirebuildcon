@@ -1,0 +1,12 @@
+# Netlify build for the website (task L3, handbook/RUNBOOK.md §2).
+# In the Netlify UI: base directory empty (the repository root, where pnpm-lock.yaml is) and
+# package directory `apps/web` (Netlify reads this file from the package directory). pnpm's
+# version comes from `packageManager` in the root package.json (Corepack). Next.js runs on
+# Netlify's OpenNext adapter, which Netlify adds and keeps up to date by itself.
+[build]
+  command = "pnpm --filter @empire/web build"
+  publish = "apps/web/.next"
+
+[build.environment]
+  NODE_VERSION = "24"
+  NEXT_TELEMETRY_DISABLED = "1"

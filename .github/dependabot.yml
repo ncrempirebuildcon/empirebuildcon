@@ -27,3 +27,6 @@ updates:
   - package-ecosystem: github-actions
     directory: "/"
     schedule: { interval: monthly }
+  - package-ecosystem: docker # apps/api/Dockerfile base images (task L3)
+    directory: "/apps/api"
+    schedule: { interval: monthly }

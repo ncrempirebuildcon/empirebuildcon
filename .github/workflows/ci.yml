@@ -7,6 +7,8 @@
 #   contract  the committed OpenAPI file and generated TS client match the API code (D-020)
 #   e2e       Playwright smoke, login journey and axe accessibility checks against the built app
 #   lighthouse  mobile Lighthouse budgets on every PR and on main (task 5.7; see qa/README.md)
+#   image     builds the API's Cloud Run image, runs its migrations against PostgreSQL 18 and
+#             checks it answers, as an unprivileged user, without an access log (task L3)
 #
 # DO NOT CHANGE: the PostgreSQL major version must match production (Neon, PostgreSQL 18; D-006/D-007).
 # WHY: astral-sh/setup-uv publishes only full version tags (there is no moving `v10` tag), so it is
@@ -27,7 +29,7 @@ permissions:
 
 env:
   NODE_VERSION: "24"
-  UV_VERSION: "0.13.5"
+  UV_VERSION: "0.13.5" # also in apps/api/Dockerfile: keep both the same
   PYTHON_VERSION: "3.14"
   # Throwaway values for CI only — not secrets, never used outside this workflow.
   APP_ENV: test
@@ -222,3 +224,52 @@ jobs:
           name: lighthouse-reports
           path: qa/test-results/lighthouse
           retention-days: 14
+
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: empire
+          POSTGRES_PASSWORD: empire
+          POSTGRES_DB: empire_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U empire -d empire_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build the API image
+        run: docker build -t empire-api:ci apps/api
+      - name: Migrations from empty (the Cloud Run job's command)
+        run: >-
+          docker run --rm --network host
+          -e APP_ENV -e DATABASE_URL -e SESSION_SECRET -e DATA_ENCRYPTION_KEY
+          -e INTERNAL_API_KEY -e IP_HASH_SALT -e REVALIDATE_SECRET
+          empire-api:ci alembic upgrade head
+      - name: The API answers, as an unprivileged user, without an access log
+        run: |
+          docker run -d --name api --network host -e PORT=8080 \
+            -e APP_ENV -e DATABASE_URL -e SESSION_SECRET -e DATA_ENCRYPTION_KEY \
+            -e INTERNAL_API_KEY -e IP_HASH_SALT -e REVALIDATE_SECRET empire-api:ci
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8080/api/health/live && break
+            sleep 1
+          done
+          curl -fsS http://localhost:8080/api/health
+          test "$(docker exec api id -u)" = "10001"
+          curl -sS -o /dev/null "http://localhost:8080/api/v1/public/site?q=probe"
+          sleep 1
+          docker logs api 2>&1 | grep -F '"/api/v1/public/site"'
+          if docker logs api 2>&1 | grep -F "q=probe"; then
+            echo "the query string reached the log"; exit 1
+          fi
+      - name: Refuses to start on Cloud Run without a production APP_ENV
+        run: |
+          out=$(docker run --rm -e K_SERVICE=empire-api -e APP_ENV=development -e PORT=8081 \
+            empire-api:ci timeout 20 uvicorn empire_api.main:app --port 8081 2>&1) || true
+          echo "$out" | grep -F "APP_ENV must be staging or production on a hosted server"
+      - if: always()
+        run: docker logs api || true
