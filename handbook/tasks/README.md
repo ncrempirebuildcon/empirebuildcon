@@ -17,6 +17,7 @@ Each task a developer works on is one file here, written by the manager (Claude)
 
 | Phase | Plan | Tasks |
 |---|---|---|
-| 5 · Public website | [phase-5/PLAN.md](phase-5/PLAN.md) | 5.1 merged (1 Nov 2026); 5.2 merged (2 Nov 2026). Two tracks from 2 Nov (D-040): Track A (Claude) [5.3](phase-5/5.3-projects-properties.md) in progress; Track B (developer agent) [5.5b](phase-5/5.5b-blog.md) ready |
+| 5 · Public website | [phase-5/PLAN.md](phase-5/PLAN.md) | Complete on 6 Nov 2026: every task merged (5.1–5.8, 5.5b, 5.6b, 5.7b, 5.7c) |
+| Launch | [launch/PLAN.md](launch/PLAN.md) | Fast launch (owner, 6 Nov 2026, D-050): L1 (developer agent) and L2 (Claude) ready |
 
 A task doc is not edited after its work starts, except to fix a mistake (noted at the bottom with the date). Changes of scope go in a new task.

@@ -17,7 +17,7 @@
 | **5.6** SEO | Being found, correctly | Metadata and share images, structured data (`Organization`, `RealEstateListing`/`Residence`, `FAQPage`, `BreadcrumbList`), `sitemap.xml`, `robots.txt`, canonical `.com` URLs, breadcrumbs, the redirects middleware with hit counting | 5.5 |
 | **5.7** Performance and extras | Fast and finished | Lighthouse ≥ 90 on mobile in all four scores, Core Web Vitals, EMI calculator, share buttons, saved properties (browser only, no account), a full accessibility and 390 px pass | 5.6 |
 
-## Status (updated 4 Nov 2026)
+## Status (updated 6 Nov 2026: Phase 5 complete)
 
 | Task | Track | State | Pull request / notes |
 |---|---|---|---|
@@ -30,9 +30,9 @@
 | 5.6 SEO (metadata, structured data, redirects) | A | Merged 3 Nov | #23, D-047 |
 | 5.7 Performance and the 390 px pass | A | Merged 4 Nov | D-049 |
 | 5.7b EMI calculator, saved homes | B | Merged 5 Nov | #29, three review rounds | [5.7b-tools.md](5.7b-tools.md) |
-| **5.6b** `sitemap.xml`, `robots.txt` | B | **In progress** (developer agent) | [5.6b-sitemap-robots.md](5.6b-sitemap-robots.md) |
+| 5.6b `sitemap.xml`, `robots.txt` | B | Merged 6 Nov | #31 | [5.6b-sitemap-robots.md](5.6b-sitemap-robots.md) |
 | 5.8 Phase 5 finish | A | Merged 4 Nov | #27 |
-| **5.7c** Less client JavaScript; performance a hard budget | A | **In review** (`perf/p5-7c-client-js`) | [5.7c-client-js.md](5.7c-client-js.md), D-049 |
+| 5.7c Less client JavaScript; performance a hard budget | A | Merged 6 Nov | #30, #32 (Lighthouse rounds) | [5.7c-client-js.md](5.7c-client-js.md), D-049 |
 
 **5.8 · Phase 5 finish (Claude, one branch).** These are the loose ends kept from the reviews:
 - the blog's metadata through `pageMetadata`;
