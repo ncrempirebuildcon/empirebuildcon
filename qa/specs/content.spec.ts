@@ -396,9 +396,10 @@ test("a library photo can be chosen for a hero block", async ({ page }) => {
   const search = picker.getByRole("searchbox", { name: "Search" });
   await search.fill(photoTitle);
   await search.press("Enter");
-  const radio = picker.getByRole("radio", { name: photoTitle });
-  await expect(radio).toBeAttached();
-  await radio.check({ force: true });
+  // WHY wait for aria-busy to clear (L1): the photo may already be on the first page, and the
+  // list then reloads for the search and replaces its radio mid-click.
+  await expect(picker.locator("fieldset[aria-busy]")).toHaveCount(0);
+  await picker.getByRole("radio", { name: photoTitle }).check({ force: true });
   await picker.getByRole("button", { name: "Use this photo" }).click();
   await expect(
     hero.getByRole("group", { name: "Image" }).getByText(photoTitle, { exact: true }),

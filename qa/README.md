@@ -63,7 +63,8 @@ pnpm --filter @empire/qa lighthouse  # Lighthouse budgets (run alone; scores nee
 - API secrets for the run are generated on the spot unless the environment provides them. You need no real secrets to run the suite.
 - **Media** uses the API's fake store (`MEDIA_STORE=fake`, set in `lib/env.ts`): files go to `apps/api/.media-dev/` (git-ignored) and the browser's direct uploads go to the fake store's Cloudinary-shaped endpoint, so nothing reaches Cloudinary and no account is needed. The test files are a few KB each and made in the test.
 - On a machine with a pre-installed Chromium, set `PW_CHROMIUM_PATH` to it; otherwise run `pnpm --filter @empire/qa exec playwright install chromium` once.
-- **Keep-Alive and connection pooling (task L1):** the test API server runs with `--timeout-keep-alive 75` and `DB_POOL_SIZE=15` in `qa/playwright.config.ts`. Next.js rewrites pool idle connections; setting uvicorn's keep-alive timeout above Playwright's test timeout prevents connection drops ("socket hang up" / ECONNRESET) during long client main-thread tasks like axe scans.
+- **Keep-alive and the DB pool (task L1, D-051):** the test API runs with `--timeout-keep-alive 75` and `DB_POOL_SIZE=15` (`qa/playwright.config.ts`). The website's proxy keeps idle connections to the API open and reuses them; uvicorn's default closes them after 5 s, and a request sent just as one closes fails with "socket hang up". 75 s is well above the longest quiet gap between API calls in a test. Both servers' error output is shown (`stderr: "pipe"`), so a hang-up shows in the log.
+- **Reset the local database if runs slow down.** The suite never deletes what it creates, so a local `empire_dev` grows with every run. After many runs (over 1,000 draft projects) the CMS dashboard takes seconds and lead tests can time out. CI starts empty each time. To reset: drop and create `empire_dev`, then `uv --directory apps/api run alembic upgrade head`.
 
 ## Exceptions
 
