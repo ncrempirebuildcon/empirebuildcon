@@ -103,6 +103,49 @@ class Settings(BaseSettings):
     email_transport: Literal["resend", "dev"] | None = None
     mail_dev_dir: str = ""
 
+    # Server-side conversions (integrations/conversions, task 6.2, D-057). All empty = off.
+    # SECURITY: the token, client secret and refresh token are only ever sent to the platform
+    # they belong to (graph.facebook.com, oauth2.googleapis.com, datamanager.googleapis.com);
+    # never logged, stored or returned.
+    # COMPLIANCE: nothing is sent until CONVERSIONS_CONSENT_MIN_VERSION names the version of the
+    # marketing consent text the legal reviewer approved for sharing with ad platforms.
+    conversions_consent_min_version: int | None = None
+    # Meta Conversions API: the pixel comes from Settings → Tracking; the token from Events
+    # Manager. META_TEST_EVENT_CODE (optional) sends to the Test Events tab only.
+    meta_capi_access_token: SecretStr = SecretStr("")
+    meta_graph_version: str = "v26.0"
+    meta_test_event_code: str = ""
+    # Google Ads through the Data Manager API (UploadClickConversions closed to new users on
+    # 15 Jun 2026). OAuth client with the datamanager scope, and the conversion action id.
+    google_dm_client_id: str = ""
+    google_dm_client_secret: SecretStr = SecretStr("")
+    google_dm_refresh_token: SecretStr = SecretStr("")
+    google_ads_customer_id: str = ""
+    google_ads_login_customer_id: str = ""
+    google_ads_conversion_action_id: str = ""
+    google_dm_validate_only: bool = False
+
+    @field_validator("conversions_consent_min_version", mode="before")
+    @classmethod
+    def _blank_version_is_unset(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @property
+    def meta_conversions_ready(self) -> bool:
+        return bool(self.meta_capi_access_token.get_secret_value().strip())
+
+    @property
+    def google_conversions_ready(self) -> bool:
+        return all(
+            (
+                self.google_dm_client_id.strip(),
+                self.google_dm_client_secret.get_secret_value().strip(),
+                self.google_dm_refresh_token.get_secret_value().strip(),
+                self.google_ads_customer_id.strip(),
+                self.google_ads_conversion_action_id.strip(),
+            )
+        )
+
     @property
     def is_production_like(self) -> bool:
         """Staging and production get the strict checks, HSTS and hidden API docs."""

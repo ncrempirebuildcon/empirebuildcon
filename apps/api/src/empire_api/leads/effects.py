@@ -8,7 +8,8 @@ site_visit.* events), §11 (audit); SECURITY.md §8 (masked phones, no form bodi
 
 INVARIANT: helpers only add to the session; the service commits once, so the change, its
 activity, audit row and event are saved together or not at all.
-COMPLIANCE: personal data (name, phone, email, message) goes ONLY into `lead.created`, and
+COMPLIANCE: personal data (name, phone, email, message, and the browser's User-Agent when the
+visitor gave marketing consent, for ad platforms, D-057) goes ONLY into `lead.created`, and
 staff's lost-reason note into `lead.status_changed`; both are flagged `contains_personal_data`
 so they reach only webhooks allowed to receive it (ARCHITECTURE §9), and erasure scrubs them.
 Audit diffs never hold personal text; activity data holds the lost-reason note only
@@ -130,6 +131,7 @@ def lead_created(
     marketing_consent: bool,
     project_slug: str | None,
     actor_id: uuid.UUID | None = None,
+    user_agent: str | None = None,
 ) -> None:
     """`lead.created`, the only event with personal data (COMPLIANCE in the module header).
 
@@ -162,6 +164,8 @@ def lead_created(
                 "email": lead.email,
                 "message": lead.message,
                 "language": lead.language,
+                # Public forms with marketing consent only; for the Meta Conversions API (D-057).
+                "user_agent": (user_agent or "")[:500] or None,
                 "utm": {
                     "source": lead.utm_source,
                     "medium": lead.utm_medium,
