@@ -103,6 +103,7 @@ def queue_conversions(db: Session, event: OutboxEvent) -> None:
 def _lead_for_ads(lead: Lead, user_agent: str | None) -> LeadForAds:
     return LeadForAds(
         lead_id=str(lead.id),
+        reference=lead.reference,
         created_at=lead.created_at,
         phone_e164=lead.phone_e164,
         email=lead.email,

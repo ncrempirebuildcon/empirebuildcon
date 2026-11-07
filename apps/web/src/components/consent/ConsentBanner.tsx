@@ -30,6 +30,10 @@ export const CONSENT_COPY = {
   analyticsText: "[DRAFT] Count visits and pages, without your name.",
   marketingTitle: "[DRAFT] Marketing",
   marketingText: "[DRAFT] Measure which ads bring visitors.",
+  // 6.1 review, Nit 1: the switches' state words belong with the rest of the wording.
+  alwaysOn: "[DRAFT] Always on",
+  on: "[DRAFT] On",
+  off: "[DRAFT] Off",
 } as const;
 
 export interface ConsentBannerProps {
@@ -175,7 +179,7 @@ export function ConsentBanner({ enabled }: ConsentBannerProps) {
                   disabled={true}
                   onChange={() => {}}
                   label={CONSENT_COPY.necessaryTitle}
-                  stateText={{ on: "Always on", off: "Off" }}
+                  stateText={{ on: CONSENT_COPY.alwaysOn, off: CONSENT_COPY.off }}
                 />
                 <p className="text-[11px] text-sand-400 pl-10.5">{CONSENT_COPY.necessaryText}</p>
               </div>
@@ -186,7 +190,7 @@ export function ConsentBanner({ enabled }: ConsentBannerProps) {
                   checked={analytics}
                   onChange={setAnalytics}
                   label={CONSENT_COPY.analyticsTitle}
-                  stateText={{ on: "On", off: "Off" }}
+                  stateText={{ on: CONSENT_COPY.on, off: CONSENT_COPY.off }}
                 />
                 <p className="text-[11px] text-sand-400 pl-10.5">{CONSENT_COPY.analyticsText}</p>
               </div>
@@ -197,7 +201,7 @@ export function ConsentBanner({ enabled }: ConsentBannerProps) {
                   checked={marketing}
                   onChange={setMarketing}
                   label={CONSENT_COPY.marketingTitle}
-                  stateText={{ on: "On", off: "Off" }}
+                  stateText={{ on: CONSENT_COPY.on, off: CONSENT_COPY.off }}
                 />
                 <p className="text-[11px] text-sand-400 pl-10.5">{CONSENT_COPY.marketingText}</p>
               </div>

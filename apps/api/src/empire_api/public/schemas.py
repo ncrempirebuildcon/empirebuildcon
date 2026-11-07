@@ -90,9 +90,12 @@ class PublicNavItem(OutModel):
 
 
 class PublicTracking(OutModel):
+    """Settings → Tracking, for the tags loaded after consent (task 6.3, D-058)."""
+
     gtm_id: str | None = None
     ga4_id: str | None = None
     meta_pixel_id: str | None = None
+    google_ads_id: str | None = None
 
 
 class PublicConsentText(OutModel):

@@ -31,6 +31,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import Link from "next/link";
+import { announceLead } from "@/lib/tracking/events";
 import { Button, Checkbox, Select, Textarea, TextField } from "@empire/ui";
 import {
   captureAttribution,
@@ -219,6 +220,8 @@ export function LeadForm(props: LeadFormProps) {
     }
     setOutcome(next);
     setBusy(false);
+    // Tags the visitor allowed hear only the reference (task 6.3, lib/tracking/events.ts).
+    if (next.kind === "ok") announceLead(next.reference);
     // Move focus to the message so keyboard and screen-reader users hear the result.
     requestAnimationFrame(() => statusRef.current?.focus());
   }

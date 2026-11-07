@@ -1065,3 +1065,35 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - The Meta token goes in the request body, never the URL, because URLs reach logs.
   - The Google client secret and refresh token go only to Google's token endpoint.
 
+## D-056 · Visitor cookie consent banner and storage (7 Nov 2026, task 6.1)
+
+- **Context:** DPDP Act (2023) and the marketing tags (Phase 6) need a clear choice before any tracking script runs.
+- **Decision** (proposed by the developer agent; accepted in review 6.1-review-1):
+  1. **Stored choice:** `localStorage` `empire.consent` = `{ v: 1, analytics, marketing, at }`. "Necessary" is always on and is not stored.
+  2. **12 months:** an older choice is asked again. The same happens when storage that works no longer holds a valid choice (6.3 fix).
+  3. **Equal prominence:** "Accept all" and "Reject all" have the same style and size. Nothing is pre-ticked.
+  4. **When it shows:** only when a tag can actually run (6.3: an ID set and its platform allowed). At launch, never.
+  5. **Fault tolerance:** storage that can't be used at all keeps the choice in memory for the visit.
+  6. **Draft wording:** all text is in `CONSENT_COPY`, marked `[DRAFT]` until the legal reviewer approves it (D-017). That includes the switches' state words (6.3 fix).
+
+## D-058 · Tags load only after consent and only for allowed platforms (7 Nov 2026, task 6.3)
+
+- **Decision:** the public site sends the IDs from Settings → Tracking (`PublicTracking`, with `google_ads_id` added). The website then loads a tag only when all three of these hold:
+  1. its ID is set;
+  2. its platform is in the web's `TRACKING_CSP`;
+  3. the visitor's choice allows it (ARCHITECTURE §17).
+- **Why `TRACKING_CSP` is a second switch:** an allowed script host is also a host an injected tag could load from. So the CSP is opened only by a deploy setting, and only for the platforms in use, never by an ID typed into the CMS. Hosts follow Google's CSP guide for its tag, Ads and Tag Manager (developers.google.com/tag-platform/security/guides/csp, read 7 Nov 2026), with google.co.in as India's domain. For Meta, they are the Pixel's script and beacon hosts.
+- **Consent Mode v2:** everything starts denied and is updated to the choice before any Google tag is configured. `ad_personalization` stays denied, as for the server-side sends (D-057).
+- **No inline script:** tags are added as script elements carrying the page's CSP nonce, which Tag Manager passes on to its own tags.
+- **Independent review (7 Nov), all fixed:**
+  - Tag Manager loads only with both analytics and marketing consent. Its container can hold any tag; a Custom HTML Pixel ignores Consent Mode.
+  - The CSP never adds the tracking hosts on `/admin`, where no tag runs and lead data lives.
+  - A page view goes once per address to each tag.
+  - With marketing only, the Google tag loads under the Ads ID.
+  - A choice that expires during a visit is noticed.
+  - The e2e checks wait for the page to settle, and the browser Lead event is tested.
+- **De-duplication with 6.2:** Meta's server event now uses the lead reference as `event_id`, the same value the browser Pixel's Lead event sends as `eventID`. The browser only knows the reference.
+- **Tests:**
+  - unit tests: which IDs are usable, what each choice loads, the CSP per `TRACKING_CSP`;
+  - e2e (`consent-tags.serial.spec.ts`): nothing reaches Google or Meta before a choice or after "Reject all"; "Accept all" loads both tags with no CSP violation; narrowing the choice reloads the page with no Pixel.
+

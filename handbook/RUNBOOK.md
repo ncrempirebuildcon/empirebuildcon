@@ -191,6 +191,18 @@ Off until every step below is done. Each one is the owner's call.
 
 **To switch off:** empty `CONVERSIONS_CONSENT_MIN_VERSION`. Queued sends are then skipped.
 
+## 6c. Switching on analytics and ad tags (after launch, D-058)
+
+Off until both steps are done. Each step is the owner's call.
+
+1. **Wording.** The legal reviewer approves the banner wording (`CONSENT_COPY` in `ConsentBanner.tsx`, now marked `[DRAFT]`) and the privacy policy's cookie section. Claude removes the `[DRAFT]` marks in a pull request.
+2. **Netlify.** Set `TRACKING_CSP` to the platforms in use (`google`, `meta`, or `google,meta`) and redeploy. This opens their hosts in the CSP and nothing else.
+3. **CMS → Settings → Tracking.** Enter the IDs: GA4 `G-…`, Google Ads `AW-…`, Tag Manager `GTM-…`, Meta Pixel. The banner appears within a minute.
+4. **Check.** In a private window, the banner shows and nothing is requested from Google or Meta. After "Accept all", the tags load and the browser console shows no CSP errors. Check the platforms' own debug views (GA4 DebugView, Meta Pixel Helper).
+5. **Tag Manager:** it loads only for visitors who allow both analytics and marketing. Every tag in the container should still check consent (Consent Mode), and only hosts in the CSP are reachable. A tag for another platform needs its hosts added in `lib/tracking/platforms.ts` first.
+
+**To switch off:** empty the IDs in the CMS. The banner and the tags go within a minute.
+
 ## 7. When something breaks
 
 | Symptom | First look |

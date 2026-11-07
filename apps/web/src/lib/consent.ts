@@ -46,6 +46,18 @@ function safeLocalStorage(): Storage | null {
   }
 }
 
+/** True when a write to storage succeeds, so a missing value means "not chosen". */
+function storageWorks(storage: Storage): boolean {
+  try {
+    const probe = `${CONSENT_STORAGE_KEY}.probe`;
+    storage.setItem(probe, "1");
+    storage.removeItem(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function parseConsent(raw: string | null): Consent | null {
   if (!raw) return null;
   try {
@@ -85,13 +97,22 @@ export function readConsent(): Consent | null {
     try {
       const raw = storage.getItem(CONSENT_STORAGE_KEY);
       if (raw === lastRawValue && cachedSnapshot !== null) {
-        return cachedSnapshot;
+        // The same stored value, unless it has expired during the visit (6.3 review).
+        if (parseConsent(raw) !== null) return cachedSnapshot;
+        cachedSnapshot = null;
       }
       lastRawValue = raw;
       cachedSnapshot = parseConsent(raw);
       if (cachedSnapshot) {
         memoryConsent = cachedSnapshot;
         return cachedSnapshot;
+      }
+      // WHY (6.1 review, Nit 2): storage works but holds no valid choice (cleared, or expired
+      // during a long visit), so the visitor is asked again. The memory copy is only for
+      // storage that can't be used at all.
+      if (storageWorks(storage)) {
+        memoryConsent = null;
+        return null;
       }
     } catch {
       // Storage access or read threw; fall back to memory

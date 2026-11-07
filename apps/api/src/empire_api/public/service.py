@@ -216,6 +216,22 @@ def _public_price(row: Any, *, project_on_request: bool = False) -> Price:
 # --- Public Site -----------------------------------------------------------------------------
 
 
+def _tracking(db: Session) -> schemas.PublicTracking | None:
+    """The tag IDs from Settings → Tracking, or None when none is set (task 6.3, D-058).
+
+    COMPLIANCE: these are IDs only. The website loads a tag only after the visitor's matching
+    cookie choice, and only for platforms its CSP allows (web lib/tracking).
+    """
+    vals = read_group(db, "tracking")
+    found = {
+        key: (vals.get(key) or None)
+        for key in ("gtm_id", "ga4_id", "meta_pixel_id", "google_ads_id")
+    }
+    if not any(found.values()):
+        return None
+    return schemas.PublicTracking(**found)
+
+
 def get_public_site(db: Session, *, locale: str | None = None) -> schemas.PublicSite:
     """Return public company details, regulator, nav, public flags, consent texts, and offers."""
     is_hi = is_hindi_active(db, locale)
@@ -381,7 +397,7 @@ def get_public_site(db: Session, *, locale: str | None = None) -> schemas.Public
         regulator=regulator,
         nav=nav_items,
         features=features,
-        tracking=None,
+        tracking=_tracking(db),
         consent=consent_dict,
         offers=public_offers,
         locales=available_locales,

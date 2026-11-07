@@ -5,9 +5,9 @@ token in the JSON body. Customer fields and `fbc` follow Meta's "Customer inform
 page (developers.facebook.com/docs/marketing-api/conversions-api/parameters/
 customer-information-parameters, read 7 Nov 2026). TODO(phase-9): before switching it on, send a
 test with META_TEST_EVENT_CODE and check it in Events Manager → Test Events.
-`event_id` is the lead's id, so the browser Pixel's Lead event (task 6.3) and this one are
-counted once. Website events need `client_user_agent` and `event_source_url`; without either
-nothing is sent.
+`event_id` is the lead's reference (EMP-…), so the browser Pixel's Lead event (task 6.3) and
+this one are counted once. Website events need `client_user_agent` and `event_source_url`;
+without either nothing is sent.
 
 SECURITY: the token travels only in the request to graph.facebook.com and never appears in logs
 or errors (`__repr__`, `_error`).
@@ -45,6 +45,7 @@ class LeadForAds:
     """What a platform may receive about one lead. COMPLIANCE: nothing else."""
 
     lead_id: str
+    reference: str
     created_at: datetime
     phone_e164: str | None
     email: str | None
@@ -77,7 +78,9 @@ def event_body(lead: LeadForAds, *, test_event_code: str = "") -> dict[str, Any]
     event: dict[str, Any] = {
         "event_name": "Lead",
         "event_time": int(lead.created_at.timestamp()),
-        "event_id": lead.lead_id,
+        # WHY the reference: the browser Pixel's Lead event (6.3) only knows the reference the
+        # form shows, and Meta counts the two once when their event ids match (D-058).
+        "event_id": lead.reference,
         "action_source": "website",
         "user_data": user_data,
     }

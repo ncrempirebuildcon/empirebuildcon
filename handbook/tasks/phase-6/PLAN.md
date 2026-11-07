@@ -37,9 +37,9 @@ So Phase 6 can merge before go-live with no effect on the launch.
 
 | Task | Track (D-040) | What | Depends on | Decision | Status |
 |---|---|---|---|---|---|
-| **6.1** Consent banner | B (developer agent) | The banner, the visitor's choice stored in the browser, and "Cookie settings" in the footer. No tags yet | — | D-056 | **In progress** (Antigravity), [6.1-consent-banner.md](6.1-consent-banner.md) |
-| **6.2** Server-side conversions | A (Claude) | Outbox consumers on `lead.created` for Meta Conversions API and Google Ads, sent only with marketing consent, hashed contact details, off until a token is set | — | D-057 | **In review** (`feat/p6-2-conversions`) |
-| **6.3** Tags after consent | A (Claude) | The public site sends the tracking IDs; GTM, GA4, Google Ads and Meta Pixel load only after consent (Google Consent Mode v2 defaults to denied); CSP allows their hosts only when an ID is set; privacy policy cookie section | 6.1 merged | D-058 | After 6.1 |
+| **6.1** Consent banner | B (developer agent) | The banner, the visitor's choice stored in the browser, and "Cookie settings" in the footer. No tags yet | — | D-056 | Merged 7 Nov (#44), [6.1-consent-banner.md](6.1-consent-banner.md) |
+| **6.2** Server-side conversions | A (Claude) | Outbox consumers on `lead.created` for Meta Conversions API and Google Ads, sent only with marketing consent, hashed contact details, off until a token is set | — | D-057 | Merged 7 Nov (#43) |
+| **6.3** Tags after consent | A (Claude) | The public site sends the tracking IDs; GTM, GA4, Google Ads and Meta Pixel load only after consent (Google Consent Mode v2 defaults to denied); CSP allows their hosts only when an ID is set; privacy policy cookie section | 6.1 merged | D-058 | **In review** (`feat/p6-3-tags`) |
 
 **Later, when the owner decides:** NRI leads; WhatsApp lead alerts; CRM or webhook export; the daily digest of failed outbox events (`TODO(phase-6)` in `outbox_drain.py`); the list of people in the audit log (`TODO(phase-6)` in `AuditScreen.tsx`).
 

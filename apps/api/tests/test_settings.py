@@ -409,3 +409,19 @@ def test_old_keys_in_stored_rows_are_ignored(owner: SignedIn, db: Session) -> No
     body = owner.client.get(SETTINGS).json()["contacts"]
     assert body["sales_phone"] is None and "hours" not in body
     assert patch(owner, "contacts", {"office_hours": "10–7"}).status_code == 200
+
+
+def test_public_site_sends_tracking_ids_only_once_set(owner: SignedIn, client: Any) -> None:
+    """Task 6.3 (D-058): no IDs → `tracking` is null (the launch state); IDs set → sent."""
+    assert client.get("/api/v1/public/site").json()["tracking"] is None
+    response = patch(
+        owner, "tracking", {"ga4_id": "G-AB12CD34EF", "meta_pixel_id": "123456789012345"}
+    )
+    assert response.status_code == 200, response.text
+    tracking = client.get("/api/v1/public/site").json()["tracking"]
+    assert tracking == {
+        "gtm_id": None,
+        "ga4_id": "G-AB12CD34EF",
+        "meta_pixel_id": "123456789012345",
+        "google_ads_id": None,
+    }
