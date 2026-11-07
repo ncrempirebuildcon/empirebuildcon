@@ -170,4 +170,22 @@ describe("Footer Component (S8)", () => {
     // 44 px target on social icons (Note 5)
     expect(html).toContain("min-h-[44px] min-w-[44px]");
   });
+
+  it("renders 'Cookie settings' button only when trackingEnabled is true (Task 6.1)", () => {
+    const withoutTracking = renderToStaticMarkup(
+      React.createElement(Footer, {
+        site: dummySite,
+        trackingEnabled: false,
+      }),
+    );
+    expect(withoutTracking).not.toContain("Cookie settings");
+
+    const withTracking = renderToStaticMarkup(
+      React.createElement(Footer, {
+        site: dummySite,
+        trackingEnabled: true,
+      }),
+    );
+    expect(withTracking).toContain("Cookie settings");
+  });
 });

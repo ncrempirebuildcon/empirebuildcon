@@ -14,13 +14,16 @@ import Link from "next/link";
 import type { PublicSite } from "@/lib/public/api";
 import { buildTelLink, filterPlaceholders, filterValue } from "@/lib/public/format";
 import FooterWhatsApp from "./FooterWhatsApp";
+import { CookieSettingsButton } from "@/components/consent/CookieSettingsButton";
 
 export function Footer({
   site,
   isProduction = false,
+  trackingEnabled = false,
 }: {
   site?: PublicSite;
   isProduction?: boolean;
+  trackingEnabled?: boolean;
 }) {
   const company = site?.company;
   const regulator = site?.regulator;
@@ -233,6 +236,7 @@ export function Footer({
             >
               Disclaimer
             </Link>
+            {trackingEnabled && <CookieSettingsButton />}
           </div>
         </div>
       </div>
