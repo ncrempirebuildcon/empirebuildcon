@@ -1024,3 +1024,17 @@ Building part 1 against the design contract (D-020) needed some choices the cont
      - This is `COMPLIANCE` code: the rules are unchanged, only how they are read. A test compares the two for every combination. Merging the pull request is the owner's approval.
 - **Also checked, nothing to change:** the backup and restore drill (RUNBOOK §6), and the public pages under load (RUNBOOK §6a).
 
+## D-055 · Phase 6 starts before go-live, everything off by default (6 Nov 2026)
+
+- **Context:** the launch waits on the company's content, legal and billing forms. The owner asked to start Phase 6 (marketing tools) meanwhile, so the work doesn't stop.
+- **Decision:**
+  - Phase 6 builds three things:
+    - 6.1, the consent banner (developer agent);
+    - 6.2, server-side conversions for Meta and Google Ads (Claude);
+    - 6.3, the tags loaded after consent (Claude, after 6.1).
+  - Each ships switched off. Tags need an ID in Settings → Tracking, and server-side reports need a token in the environment. Until then the website is exactly the launch version, so merging before go-live changes nothing.
+  - The ad platforms are not chosen yet, so both Google and Meta are built; only the ones given IDs run.
+  - **Later, by the owner's choice (6 Nov):** NRI enquiries with foreign numbers, and WhatsApp lead alerts.
+  - Landing pages, WhatsApp click-to-chat, campaign capture and the UTM report were already built in Phase 5 and are not repeated.
+- **Plan:** [tasks/phase-6/PLAN.md](tasks/phase-6/PLAN.md). Decision numbers reserved: D-056 (6.1), D-057 (6.2), D-058 (6.3).
+
