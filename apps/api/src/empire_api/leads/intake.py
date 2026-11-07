@@ -183,13 +183,19 @@ def _check(db: Session, body: LeadCreate, ip: str, intent: Intent) -> _Checked:
     return _Checked(phone, ip_hash, lead_form, marketing, project, brochure_url)
 
 
-def submit(db: Session, body: LeadCreate, ip: str, intent: Intent) -> Accepted:
-    """Run the module's steps for one public form. Returns what the visitor is told."""
+def submit(
+    db: Session, body: LeadCreate, ip: str, intent: Intent, user_agent: str | None = None
+) -> Accepted:
+    """Run the module's steps for one public form. Returns what the visitor is told.
+
+    `user_agent` (the browser's User-Agent header) goes only into the `lead.created` event, for
+    the Meta Conversions API, which requires it for website events (task 6.2), and only when the
+    visitor gave marketing consent. It is not stored on the lead."""
     checked = _check(db, body, ip, intent)
     if body.website.strip():  # 5
         log.info("lead_honeypot", intent=intent, ip_hash=checked.ip_hash[:8])
         return Accepted(new_reference(), THANKS[intent], checked.brochure_url)
-    lead = _create(db, body, checked, intent)  # 6
+    lead = _create(db, body, checked, intent, user_agent)  # 6
     db.commit()
     log.info(
         "lead_received",
@@ -231,7 +237,9 @@ def _new_row(body: LeadCreate, checked: _Checked) -> Lead:
     )
 
 
-def _create(db: Session, body: LeadCreate, checked: _Checked, intent: Intent) -> Lead:
+def _create(
+    db: Session, body: LeadCreate, checked: _Checked, intent: Intent, user_agent: str | None
+) -> Lead:
     """Step 6 (module header). Nothing is committed here."""
     now = utcnow()
     lead = _new_row(body, checked)
@@ -256,6 +264,8 @@ def _create(db: Session, body: LeadCreate, checked: _Checked, intent: Intent) ->
         alert=original is None,
         marketing_consent=checked.marketing is not None,
         project_slug=checked.project.slug if checked.project else None,
+        # COMPLIANCE: the User-Agent only for leads that may be reported to ad platforms (D-057).
+        user_agent=user_agent if checked.marketing is not None else None,
     )
     if visit is not None:
         effects.visit_event(db, visit, "site_visit.requested", None, reference=lead.reference)

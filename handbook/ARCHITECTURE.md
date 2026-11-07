@@ -340,7 +340,11 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 ## 17. Marketing and consent hooks (Phase 6, structure now)
 
 - A consent banner with three choices (necessary, analytics, marketing). GTM/GA4 and Meta Pixel load only after the matching consent; IDs come from Settings, so they can be switched on without a deploy.
-- Server-side conversions (Meta Conversions API, Google Ads enhanced conversions) are outbox consumers on `lead.created`, sent only when the lead's marketing consent is true. Phone/email are SHA-256 hashed before sending.
+- **Server-side conversions (built in task 6.2, D-057; `integrations/conversions/`):**
+  - **Flow:** `lead.created` → `queue_conversions` emits one `conversion.send` event per configured platform → `send_conversion` sends it, with the outbox's retries. A refusal marks only that event dead.
+  - **Platforms:** Meta Conversions API ("Lead" event; `event_id` = lead id for de-duplication with the Pixel) and Google Ads through the **Data Manager API** (`events:ingest`; `transactionId` = lead id). Google closed the Google Ads API's `UploadClickConversions` to new users on 15 June 2026.
+  - **Gate (`may_report`, COMPLIANCE):** a live, non-duplicate, non-sample web lead whose marketing consent was given on a text version ≥ `CONVERSIONS_CONSENT_MIN_VERSION`. With that unset, nothing is sent at all.
+  - **What is sent:** SHA-256 phone and email (each platform's normalisation, `hashing.py`), the ad click ids, the page URL and time, and, for Meta only, the browser's User-Agent. Meta requires the User-Agent for website events. It is captured only with marketing consent and travels in the events, never on the lead. Never the name or message.
 - Campaign landing pages are CMS pages of kind `landing` built from blocks, with their own lead form and `noindex` option.
 - WhatsApp click-to-chat on every page (mobile sticky bar) with a prefilled message naming the page.
 

@@ -1038,3 +1038,30 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - Landing pages, WhatsApp click-to-chat, campaign capture and the UTM report were already built in Phase 5 and are not repeated.
 - **Plan:** [tasks/phase-6/PLAN.md](tasks/phase-6/PLAN.md). Decision numbers reserved: D-056 (6.1), D-057 (6.2), D-058 (6.3).
 
+## D-057 · Server-side conversions (7 Nov 2026, task 6.2)
+
+- **Decision:** a new web enquiry can be reported to Meta (Conversions API) and Google Ads (Data Manager API) from the server, through the outbox (ARCHITECTURE §17). It is off until configured (RUNBOOK §6b).
+- **Why the Data Manager API for Google:**
+  - The Google Ads API's `UploadClickConversions` (offline click conversions and enhanced conversions for leads) stopped working on 15 June 2026 for accounts that hadn't used it in the previous 180 days. Empire never has.
+  - Google's replacement is the Data Manager API (`POST https://datamanager.googleapis.com/v1/events:ingest`).
+  - Checked 7 Nov 2026:
+    - Search Engine Land, "Google is moving offline conversion imports out of the Google Ads API";
+    - the Data Manager API reference (`events.ingest`, `Destination`, `UserData`) and its "Format user data" and Google Ads "send events" guides.
+- **Consent gate (COMPLIANCE):**
+  - A lead is reported only when its optional marketing consent was given on a text version ≥ `CONVERSIONS_CONSENT_MIN_VERSION`. The legal reviewer approves a version whose wording covers sharing with ad platforms, and the owner sets the number.
+  - Duplicates, manual leads, samples, spam and erased leads are never reported. This is checked again at send time.
+- **Data minimisation:**
+  - Only hashed phone and email (SHA-256, each platform's normalisation), the ad click ids, the page URL and the time are sent.
+  - Meta also gets the browser's User-Agent, because website events require it. It is kept only for leads that gave marketing consent, travels only in the events (scrubbed on erasure), and is never stored on the lead.
+  - Website events also need the page URL, so a lead without one isn't sent to Meta.
+  - Google gets `adUserData` granted and `adPersonalization` denied: the consent covers measurement, not personalised ads.
+- **Isolation:** queuing never calls a platform, so the sales email is never retried because of an ad API. Each platform's send has its own retries, and a refusal marks only that send dead, with a code-only message.
+  - Meta's throttling codes (1, 2, 4, 17, 32, 341, 613, 80004, or `is_transient`) are retried, not marked dead.
+  - Timeouts are short (3 s to connect, 5 s in all), because a send runs inside the drain's batch.
+  - Google gets one click id per event, `gclid` first.
+  - `drain_soon` now delivers one event per transaction, not ten. A batch keeps all its rows locked until the last handler returns, so one slow call (a revalidation, an ad API) held other events back. This is what made the invite-email e2e test flaky after D-054. Three full runs afterwards: 160/160 each, none retried.
+  - An independent review on 7 Nov found these points. Its other findings were checked and found sound: time zones; no double send on a retry, because the drain's savepoint rolls back queued sends; and erasure.
+- **Secrets:**
+  - The Meta token goes in the request body, never the URL, because URLs reach logs.
+  - The Google client secret and refresh token go only to Google's token endpoint.
+

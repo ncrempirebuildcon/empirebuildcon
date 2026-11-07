@@ -64,7 +64,9 @@ def _public(**extra: Any) -> dict[str, Any]:
 def submit_lead(
     body: LeadCreate, request: Request, background: BackgroundTasks, db: Db
 ) -> LeadAccepted:
-    result = intake.submit(db, body, client_ip(request), "enquiry")
+    result = intake.submit(
+        db, body, client_ip(request), "enquiry", request.headers.get("user-agent")
+    )
     drain_soon(background)
     return LeadAccepted(reference=result.reference, message=result.message)
 
@@ -82,7 +84,9 @@ def submit_lead(
 def request_site_visit(
     body: SiteVisitRequest, request: Request, background: BackgroundTasks, db: Db
 ) -> LeadAccepted:
-    result = intake.submit(db, body, client_ip(request), "site_visit")
+    result = intake.submit(
+        db, body, client_ip(request), "site_visit", request.headers.get("user-agent")
+    )
     drain_soon(background)
     return LeadAccepted(reference=result.reference, message=result.message)
 
@@ -103,7 +107,9 @@ def request_site_visit(
 def request_brochure(
     body: BrochureRequest, request: Request, background: BackgroundTasks, db: Db
 ) -> BrochureLink:
-    result = intake.submit(db, body, client_ip(request), "brochure")
+    result = intake.submit(
+        db, body, client_ip(request), "brochure", request.headers.get("user-agent")
+    )
     drain_soon(background)
     assert result.brochure_url is not None  # noqa: S101 — intake refuses a missing brochure
     return BrochureLink(url=result.brochure_url, expires_at=None, reference=result.reference)

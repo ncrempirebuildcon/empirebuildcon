@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from empire_api.content.schedule import schedule_tick
 from empire_api.db import get_engine, get_sessionmaker, rows_affected
 from empire_api.integrations import handlers as integration_handlers
+from empire_api.integrations.conversions import handlers as conversion_handlers
 from empire_api.integrations.handlers import PermanentDeliveryError, handlers_for
 from empire_api.leads.erasure import anonymise_inactive
 from empire_api.logs import get_logger
@@ -56,7 +57,7 @@ _CLEANUP_SETTING = "system.cleanup"
 
 log = get_logger(__name__)
 # Modules whose outbox handlers register on import (handlers.on); listed so they always load.
-HANDLER_MODULES = (media_handlers, mail_handlers, integration_handlers)
+HANDLER_MODULES = (media_handlers, mail_handlers, integration_handlers, conversion_handlers)
 
 
 @dataclass(frozen=True)
@@ -152,7 +153,12 @@ def _drain_quietly(budget_seconds: float) -> None:
     started = time.monotonic()
     try:
         while time.monotonic() - started < budget_seconds:
-            result = drain(limit=10)
+            # WHY one event per transaction: a batch keeps every row it took locked until the
+            # last handler returns. With CMS writes, lead alerts and ad sends all delivered soon
+            # (D-054, D-057), one slow call (a revalidation, an ad API) held an invite email
+            # back for over 15 s under load. One at a time, each event goes out as soon as its
+            # own handlers finish. The 15-minute sweep still takes full batches.
+            result = drain(limit=1)
             if result.processed + result.failed == 0:
                 break
     except Exception:  # WHY: never fail a request because delivery failed; the sweep retries

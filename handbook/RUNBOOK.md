@@ -169,6 +169,28 @@ Measured in the cloud workspace (2 CPUs, shared with the load generator), with o
 
 **After go-live,** repeat the enquiry row against staging with the real Cloud Run and Neon settings before any big campaign.
 
+## 6b. Switching on server-side conversions (after launch, D-057)
+
+Off until every step below is done. Each one is the owner's call.
+
+1. **The consent text.** The legal reviewer approves a new version of the optional marketing consent text that says hashed contact details may be shared with Google and Meta to measure ads. Publish it in CMS → Consent texts, and note its version number.
+2. **Meta.**
+   - Put the pixel id in CMS → Settings → Tracking.
+   - Make a Conversions API token in Events Manager, and set it as `META_CAPI_ACCESS_TOKEN` in Secret Manager.
+   - First set `META_TEST_EVENT_CODE` from Events Manager → Test Events. Send one enquiry and check it appears, then clear the code.
+   - Check `META_GRAPH_VERSION` against Meta's current version.
+3. **Google Ads.**
+   - Create a conversion action (type: import, from clicks), and set its id as `GOOGLE_ADS_CONVERSION_ACTION_ID`, with `GOOGLE_ADS_CUSTOMER_ID` (and `GOOGLE_ADS_LOGIN_CUSTOMER_ID` for a manager account).
+   - Create a Google Cloud OAuth client with the Data Manager API enabled and the `datamanager` scope. The owner signs in once to give a refresh token, never Claude.
+   - Set `GOOGLE_DM_CLIENT_ID`, `GOOGLE_DM_CLIENT_SECRET` and `GOOGLE_DM_REFRESH_TOKEN`.
+   - Run first with `GOOGLE_DM_VALIDATE_ONLY=true` and check the logs show `conversion_sent`, then set it to `false`.
+4. **Turn it on.** Set `CONVERSIONS_CONSENT_MIN_VERSION` to the version from step 1, and update the privacy policy's "Who sees it" table.
+5. **Watch.**
+   - Logs: `conversion_sent`, `conversion_skipped` and `conversion_not_sendable`.
+   - Dead `conversion.send` events in the outbox. Each one names a code only, such as `meta_190` for an expired token.
+
+**To switch off:** empty `CONVERSIONS_CONSENT_MIN_VERSION`. Queued sends are then skipped.
+
 ## 7. When something breaks
 
 | Symptom | First look |
