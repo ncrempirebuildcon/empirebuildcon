@@ -156,6 +156,9 @@ for (const viewport of VIEWPORTS) {
     for (const path of paths) {
       await visitor.goto(path);
       await expect(visitor.locator("#main-content")).toBeVisible();
+      // WHY: Next.js streams some metadata (the 404 page's title) after the body, so axe could
+      // run a moment before the <title> exists (flaky document-title, 7 Nov 2026).
+      await expect(visitor).toHaveTitle(/\S/);
       const axe = await new AxeBuilder({ page: visitor })
         .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
         .analyze();

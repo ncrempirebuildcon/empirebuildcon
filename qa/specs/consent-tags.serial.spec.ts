@@ -66,6 +66,8 @@ test.afterAll(async ({ browser }) => {
   await admin.goto("/admin");
   await apiCall(admin, "PATCH", "/api/v1/admin/settings/tracking", {
     ga4_id: "",
+    gtm_id: "",
+    google_ads_id: "",
     meta_pixel_id: "",
   });
 });
