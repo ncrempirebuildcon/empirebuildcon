@@ -138,6 +138,9 @@ test("every settings section saves, and the API's format checks show at the fiel
   await expect(page.getByLabel("Tagline")).toHaveValue(tagline);
   await openSection(page, /^Tracking/);
   await expect(page.getByLabel("Google Tag Manager container")).toHaveValue(gtm);
+  // Leave the launch state (no tracking IDs) for the other specs and the next run.
+  const cleared = await apiCall(page, "PATCH", "/api/v1/admin/settings/tracking", { gtm_id: "" });
+  expect(cleared.status()).toBe(200);
 });
 
 test("unsaved settings ask before leaving, and switching sections keeps the typing", async ({

@@ -357,12 +357,16 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
 - Campaign landing pages are CMS pages of kind `landing` built from blocks, with their own lead form and `noindex` option.
 - WhatsApp click-to-chat on every page (mobile sticky bar) with a prefilled message naming the page.
 
-## 18. AI-ready layer (Phase 7, structure now)
+## 18. AI assistant (Phase 7, D-059)
 
-- A chat-widget slot in the layout, lazy-loaded only when flag `chat_widget` is on (off by default).
-- `/api/v1/ai/chat` answers 404 while the flag is off.
-- Knowledge index (`knowledge_chunk` with embeddings) built from published projects, FAQs, pages and brochures on publish events.
-- Tools the assistant may call: search projects, get RERA details, request a site visit, capture a lead with consent, hand over to WhatsApp or a person. Guardrails: no price promises, no legal or financial advice, every answer cites a page. Model provider behind an interface so it can be swapped.
+The plan, dry run and API contract are in [`tasks/phase-7/PLAN.md`](tasks/phase-7/PLAN.md).
+
+- **Off by default.** `AI_PROVIDER` empty means no model is called and nothing is indexed. The chat widget renders only when flag `chat_widget` is on, and `/api/v1/ai/chat` answers 404 while it is off (task 7.2).
+- **Provider interface** (`ai/providers/`): `embed(texts)` and `chat(messages, max_tokens)`. `cloudflare` (Workers AI on the Free plan: `@cf/baai/bge-m3` embeddings, 1024 dimensions; `@cf/qwen/qwen3-30b-a3b-fp8` answers) and `fake` (deterministic, no network, for tests). Limits, timeouts and 5xx raise `ProviderBusyError`; a refused request raises `ProviderError`. Errors carry codes only.
+- **Knowledge index** (`ai/knowledge.py`, `ai/indexer.py`, table `knowledge_chunk`, pgvector HNSW cosine). Text is built from the **public API's own builders**, so only what a visitor can see is indexed: live projects (with configurations, amenities and their FAQs), live pages (with their FAQ blocks) and posts. Legal pages are left out. COMPLIANCE: prices, rates, RERA numbers, ids, links and media are dropped from the text by field name, and every line is also scrubbed by value (₹/Rs amounts, lakh and crore, per-area rates, RERA-style numbers → "[see the project page]"), so free text such as a description or an FAQ answer can't carry them either. The widget shows RERA and prices from the database on the project's card. English only for now; Hindi after the live dry run (7.4).
+- **Kept fresh by the outbox** (`ai/handlers.py`): project, configuration, page, post and FAQ events queue one `ai.reindex` event per item they name (no network), and `ai.reindex` does the work. WHY two steps: a busy provider then retries only its own event, never the content event, so the website's revalidation doesn't wait for the AI. Project, FAQ, offer and testimonial events also re-check every page, because pages show them; the daily clean-up queues every item once as a backstop for changes no event announces (a city or amenity renamed). One writer per item at a time (an advisory lock, and a unique position per item). A content hash per chunk means unchanged text is never embedded again, so retries and repeated events are free. An item that is no longer live loses its chunks. A busy provider is retried on the outbox schedule; a refused request is dead at once. `empire-api ai reindex` rebuilds everything (unchanged items free) and removes chunks of deleted items; `empire-api ai status` shows the counts.
+- **Daily guard** (`ai_usage_day`): one row per day (IST) with counts only (answers, no answer, busy) and estimated neurons. Indexing and answering stop at `AI_DAILY_NEURON_GUARD` (8,000 of the free 10,000). No message a visitor types is ever stored.
+- **pgvector is optional per database.** Migration 0008 creates `knowledge_chunk` only where the extension exists (or can be created); without it the assistant stays off and everything else works.
 
 ## 19. Environments and hosting
 

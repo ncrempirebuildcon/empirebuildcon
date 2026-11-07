@@ -67,7 +67,7 @@ Publish events (outbox) ─► knowledge indexer: re-chunks and re-embeds only t
 
 | Task | Track (D-040) | What | Depends on | Status |
 |---|---|---|---|---|
-| **7.1** Knowledge index and provider | A (Claude) | `knowledge_chunk` and `ai_usage_day` (migration); a permission-aware pgvector check; chunker for live projects, configurations, amenities, FAQs and pages; outbox consumer on publish events; `ai/providers` (`cloudflare`, `fake`); `empire-api ai reindex` | — | **In progress** |
+| **7.1** Knowledge index and provider | A (Claude) | `knowledge_chunk` and `ai_usage_day` (migration); a permission-aware pgvector check; chunker for live projects, configurations, amenities, FAQs and pages; outbox consumer on publish events; `ai/providers` (`cloudflare`, `fake`); `empire-api ai reindex` and `ai status` | — | **Built** (branch `feat/p7-1-knowledge`) |
 | **7.2** Chat API | A (Claude) | `/api/v1/ai/chat` exactly as in the architecture above: flag, limits, redaction, retrieval, prompt, post-check, fallbacks, counts only | 7.1 | After 7.1 |
 | **7.3** Chat widget | B (developer agent) | A lazy-loaded "Ask about our projects" button and panel, built against the contract below with a mock. Citations, project cards from the API, WhatsApp/Call/enquiry buttons, "AI answers can be wrong" note, accessible, no Lighthouse cost (the code loads on click) | contract only | **Ready**, [7.3-chat-widget.md](7.3-chat-widget.md) |
 | **7.4** Live dry run and switch-on | Owner + Claude | The owner makes a Workers AI token on the Free plan; Claude runs `empire-api ai smoke` (20 questions in English, Hindi and Hinglish) on the owner's computer or on staging; the legal reviewer approves the chat note; then the flag goes on | 7.1–7.3, go-live | After launch |

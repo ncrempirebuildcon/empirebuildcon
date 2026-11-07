@@ -110,6 +110,7 @@ Tested by a Playwright check and a header assertion in API tests.
 | `SESSION_SECRET`, `DATA_ENCRYPTION_KEY`, `INTERNAL_API_KEY`, `REVALIDATE_SECRET` | API, worker, web (revalidate only) |
 | `CLOUDINARY_URL` | API |
 | `EMAIL_API_KEY`, `EMAIL_FROM` (Resend, D-007; staging and production refuse to start without them or with the dev mailbox) | API, worker |
+| `CLOUDFLARE_AI_TOKEN` (the AI assistant, D-059; optional, off when empty; only Workers AI Read + Edit; sent only to api.cloudflare.com in the Authorization header) | API, worker |
 | `META_CAPI_ACCESS_TOKEN`, `GOOGLE_DM_CLIENT_SECRET`, `GOOGLE_DM_REFRESH_TOKEN` (server-side conversions, D-057; optional, off when empty; each is sent only to its own platform: graph.facebook.com in the request body, oauth2.googleapis.com) | API, worker |
 | `SENTRY_DSN_API`, `NEXT_PUBLIC_SENTRY_DSN` | API, web |
 | `API_ORIGIN` | Web (rewrite target) |

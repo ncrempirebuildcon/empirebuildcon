@@ -7,12 +7,35 @@
  *   - /projects has no "Cookie choices" region and no "Cookie settings" button.
  *   - A project detail page has no "Cookie choices" region and no "Cookie settings" button.
  * - Re-verified without extra sign-ins (uses CMS_STATE if needed, or public visitor).
+ *
+ * WHY serial: the launch state is "no tracking IDs", a site-wide setting that settings.spec
+ * (an ID saves) and consent-tags.serial.spec change. Running after the "chromium" project, it
+ * first restores that state, so it can't race them or inherit an earlier run's IDs.
  */
 import { expect, test } from "@playwright/test";
-import { CMS_STATE } from "../lib/auth";
+import { apiCall, CMS_STATE } from "../lib/auth";
 import { catalogueProject } from "../lib/catalogue";
 
 test.use({ storageState: CMS_STATE });
+
+const NO_IDS = { ga4_id: "", gtm_id: "", google_ads_id: "", meta_pixel_id: "" };
+
+test.beforeAll(async ({ browser }) => {
+  const admin = await (await browser.newContext({ storageState: CMS_STATE })).newPage();
+  await admin.goto("/admin");
+  const res = await apiCall(admin, "PATCH", "/api/v1/admin/settings/tracking", NO_IDS);
+  expect(res.status()).toBe(200);
+  // The change reaches the cached pages within seconds (D-054).
+  await expect
+    .poll(
+      async () => {
+        await admin.goto("/");
+        return admin.getByRole("region", { name: "Cookie choices" }).count();
+      },
+      { intervals: [500, 1000, 2000], timeout: 20_000 },
+    )
+    .toBe(0);
+});
 
 test.describe("Consent Banner launch guard (Task 6.1)", () => {
   test("with today's API, the consent banner and cookie settings button remain hidden on public pages", async ({

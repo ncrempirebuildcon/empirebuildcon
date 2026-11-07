@@ -40,6 +40,7 @@ Generate a fresh set for each environment, on the owner's own computer: `uv --di
 | `EMAIL_FROM` | `alerts@empirebuildcon.com` | same | no |
 | `SENTRY_DSN_API` | Sentry API project | same | no |
 | `CORS_ALLOWED_ORIGINS` | empty | empty | no (same-origin proxy) |
+| `AI_PROVIDER`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_TOKEN`, `AI_DAILY_NEURON_GUARD` | empty until §6d | empty until §6d | the token only (§6d, D-059) |
 
 ### Website (Netlify, Site configuration → Environment variables)
 
@@ -202,6 +203,22 @@ Off until both steps are done. Each step is the owner's call.
 5. **Tag Manager:** it loads only for visitors who allow both analytics and marketing. Every tag in the container should still check consent (Consent Mode), and only hosts in the CSP are reachable. A tag for another platform needs its hosts added in `lib/tracking/platforms.ts` first.
 
 **To switch off:** empty the IDs in the CMS. The banner and the tags go within a minute.
+
+## 6d. The AI assistant (after launch, D-059, task 7.4)
+
+Off until all steps are done. The full plan is in `handbook/tasks/phase-7/PLAN.md`.
+
+1. **Plan.** In Cloudflare, Workers & Pages → Plans shows **Free**. On the Free plan the 10,000 daily neurons are a hard cap, so the assistant can never create a bill.
+2. **Token.** The owner creates an API token with only "Workers AI: Read" and "Workers AI: Edit" for the account, and puts it in Secret Manager as `CLOUDFLARE_AI_TOKEN`, with `CLOUDFLARE_ACCOUNT_ID` (not secret). Never paste it in chat.
+3. **Switch the provider on.** Set `AI_PROVIDER=cloudflare` on the API and the worker, and redeploy. From now on, content changes are indexed.
+4. **Build the index once:** `empire-api ai reindex` (a Cloud Run job, or locally against the database). It prints how many items and chunks it wrote and the estimated neurons (about 160 for a full site). `empire-api ai status` shows the chunks and today's neurons.
+5. **Live dry run** (task 7.4) and the legal reviewer's approval of the chat note, then turn on `chat_widget` in CMS → Settings → Feature flags.
+
+**To switch off:** turn off `chat_widget` (the widget and `/api/v1/ai/chat` go within a minute). To stop indexing too, empty `AI_PROVIDER`.
+
+**pgvector added later.** Migration 0008 creates `knowledge_chunk` only where pgvector exists when it runs. Neon, CI and the Docker image have it from the start. A database that gets pgvector afterwards needs a new migration; `empire-api ai status` says when the table is missing.
+
+**"AI busy" events in the outbox** (`last_error` `RuntimeError: ai_busy_…`) are normal when the day's guard or Cloudflare's allocation is reached: they retry on the usual schedule and succeed the next day.
 
 ## 7. When something breaks
 

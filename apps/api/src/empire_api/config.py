@@ -125,6 +125,23 @@ class Settings(BaseSettings):
     google_ads_conversion_action_id: str = ""
     google_dm_validate_only: bool = False
 
+    # AI assistant (Phase 7, D-059). Off unless AI_PROVIDER is "cloudflare" (with the account and
+    # token) or "fake" (tests, local). SECURITY: the token goes only to api.cloudflare.com.
+    ai_provider: str = ""
+    cloudflare_account_id: str = ""
+    cloudflare_ai_token: SecretStr = SecretStr("")
+    ai_chat_model: str = "@cf/qwen/qwen3-30b-a3b-fp8"
+    ai_embed_model: str = "@cf/baai/bge-m3"
+    # Stop at 80 % of the Free plan's 10,000 daily neurons (PLAN.md dry run).
+    ai_daily_neuron_guard: int = Field(default=8000, ge=0, le=10000)
+
+    @property
+    def cloudflare_ai_ready(self) -> bool:
+        return bool(
+            self.cloudflare_account_id.strip()
+            and self.cloudflare_ai_token.get_secret_value().strip()
+        )
+
     @field_validator("conversions_consent_min_version", mode="before")
     @classmethod
     def _blank_version_is_unset(cls, value: object) -> object:

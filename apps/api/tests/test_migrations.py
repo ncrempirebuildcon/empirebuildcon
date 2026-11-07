@@ -14,12 +14,14 @@ from sqlalchemy.engine import make_url
 
 from empire_api.config import get_settings
 from empire_api.db import get_engine
-from empire_api.models import Base
+from empire_api.models import Base, include_object
 
 
 def test_models_match_the_migrated_database() -> None:
     with get_engine().connect() as conn:
-        context = MigrationContext.configure(conn, opts={"compare_type": True})
+        context = MigrationContext.configure(
+            conn, opts={"compare_type": True, "include_object": include_object}
+        )
         assert compare_metadata(context, Base.metadata) == []
 
 
@@ -74,9 +76,14 @@ def test_migration_0007_upgrade_downgrade_cycle() -> None:
                 ).scalars()
             )
             assert "search_vector" not in col_names
+            # 0008 (D-059) went down too
+            assert conn.scalar(text("SELECT to_regclass('public.ai_usage_day')")) is None
+            assert conn.scalar(text("SELECT to_regclass('public.knowledge_chunk')")) is None
 
         # 3. Upgrade back to head (recreates search_vector and indexes)
         command.upgrade(cfg, "head")
+        with throwaway_engine.connect() as conn:
+            assert conn.scalar(text("SELECT to_regclass('public.ai_usage_day')")) is not None
 
         with throwaway_engine.connect() as conn:
             col_names = set(
@@ -93,3 +100,13 @@ def test_migration_0007_upgrade_downgrade_cycle() -> None:
         with admin_engine.connect() as conn:
             conn.execute(text(f'DROP DATABASE IF EXISTS "{db_name}" WITH (FORCE)'))
         admin_engine.dispose()
+
+
+def test_knowledge_table_follows_pgvector() -> None:
+    """Migration 0008 (D-059): the AI table exists exactly where pgvector does."""
+    with get_engine().connect() as conn:
+        has_vector = bool(conn.scalar(text("SELECT 1 FROM pg_extension WHERE extname = 'vector'")))
+        table = conn.scalar(text("SELECT to_regclass('public.knowledge_chunk') IS NOT NULL"))
+        usage = conn.scalar(text("SELECT to_regclass('public.ai_usage_day') IS NOT NULL"))
+    assert table is has_vector
+    assert usage is True

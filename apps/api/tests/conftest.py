@@ -95,6 +95,7 @@ TABLES = (
     "password_reset_token",
     "audit_log",
     "outbox_event",
+    "ai_usage_day",
     "rate_limit_bucket",
     "feature_flag",
     "setting",
@@ -131,6 +132,9 @@ def database() -> Iterator[None]:
 def clean_tables(database: None) -> None:
     with get_engine().begin() as conn:
         conn.execute(text(f"TRUNCATE {', '.join(TABLES)} RESTART IDENTITY CASCADE"))
+        # Only where pgvector is installed (migration 0008); CI's database has it.
+        if conn.scalar(text("SELECT to_regclass('public.knowledge_chunk') IS NOT NULL")):
+            conn.execute(text("TRUNCATE knowledge_chunk"))
     with get_sessionmaker()() as db:
         seed_flags(db)
         db.commit()
