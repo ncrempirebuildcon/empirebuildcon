@@ -230,4 +230,30 @@ A separate reviewer checked all 30 boards for invented facts, RERA display, urge
 - **Wording rule:**
   - All copy strings live in `CONSENT_COPY` and begin with `[DRAFT]` until formally approved by legal counsel (D-017).
 
+## 14. Chat widget (Task 7.3, D-059)
+
+- **Launcher:**
+  - Rendered only when feature flag `chat_widget` is on.
+  - Small floating button: fixed bottom-right (`md:bottom-6 md:right-6`) on desktop, and above the sticky `MobileActionBar` on mobile (`bottom-[calc(64px+env(safe-area-inset-bottom)+12px)] right-4`).
+  - Min touch target 44×44 px. Labelled "Ask about our projects".
+  - Lazy-loads the chat panel chunk via `next/dynamic` only when the button is first pressed, keeping initial bundle size minimal with zero Lighthouse cost.
+- **Panel:**
+  - Non-modal dialog (`role="dialog"`, `aria-modal="false"`, `aria-labelledby`) with an explicit close button.
+  - Non-blocking: background content remains interactive and scrollable (no backdrop overlay, no focus trap).
+  - Disclaimer notice under heading reminding visitors that answers are AI-generated and personal data should not be shared.
+- **Answer presentation (COMPLIANCE):**
+  - Rendered strictly as plain text. Only `[n]` citation markers convert to links pointing to `citations[n-1].url`.
+  - Raw HTML and Markdown tags from model output are strictly escaped.
+  - Project cards are populated exclusively from `/api/v1/public/projects/{slug}`, never from the model's text.
+- **Fallbacks & Actions:**
+  - Fallbacks (no_answer, busy, 429, error) offer WhatsApp, Call, and Request a call back buttons.
+  - The same three buttons sit permanently at the bottom of the panel.
+- **Accessibility:**
+  - Polite live region announces incoming assistant replies.
+  - Text input features a live character count (max 500 chars). Enter sends; Shift+Enter creates a new line.
+  - Escape closes the panel, returning focus to the launcher button.
+- **Wording:**
+  - All copy strings live in `CHAT_COPY` and begin with `[DRAFT]`.
+
+
 
