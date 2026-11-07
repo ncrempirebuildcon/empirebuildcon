@@ -210,3 +210,24 @@ A separate reviewer checked all 30 boards for invented facts, RERA display, urge
 - Feature flags shown in Settings: `locale_hi`, `admin_2fa`, `captcha` and `chat_widget` can be switched. `listings` and `unit_inventory` are locked because they are not built.
 - Only one 3 BHK floor-plan drawing exists in the samples. The 3 BHK Premium tab reuses it with a caption saying its own drawing is to come.
 
+## 13. Consent banner (Task 6.1, D-056)
+
+- **Layout:**
+  - Fixed to the bottom of the viewport: full-width on mobile sitting cleanly above the sticky `MobileActionBar` (`bottom-[calc(64px+env(safe-area-inset-bottom))]`) so actions are never obscured; card at bottom-left on desktop (`md:bottom-6 md:left-6 md:max-w-md`).
+  - Non-blocking: no background overlay, no focus trap, and background content scrolls freely.
+  - Post-hydration render: renders nothing on the server and mounts after hydration to eliminate cumulative layout shift (CLS).
+- **States:**
+  - **Prompt view:** short explanation, privacy policy link, equal **Accept all** and **Reject all** buttons (same variant, side by side, identical visual weight), and a **Choose** action.
+  - **Choose view:** three distinct rows:
+    - *Necessary:* always on, shown as checked and disabled with explanation.
+    - *Analytics:* toggle switch defaulting to off.
+    - *Marketing:* toggle switch defaulting to off.
+    - *Save choices:* primary action button. When re-opened from the footer, switches show current stored values.
+- **Accessibility:**
+  - Landmark `<section role="region" aria-label="Cookie choices">` with an `<h2>` heading.
+  - Every interactive element has a minimum 44×44 px touch target.
+  - When re-opened from the footer, focus moves to the heading; upon saving or closing, focus returns to the "Cookie settings" button.
+- **Wording rule:**
+  - All copy strings live in `CONSENT_COPY` and begin with `[DRAFT]` until formally approved by legal counsel (D-017).
+
+
