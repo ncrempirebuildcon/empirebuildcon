@@ -19,6 +19,8 @@ import OfferBanner from "@/components/shell/OfferBanner";
 import SampleDataRibbon from "@/components/shell/SampleDataRibbon";
 import AttributionCapture from "@/components/leads/AttributionCapture";
 import { ConsentBanner } from "@/components/consent/ConsentBanner";
+import { TagManager } from "@/components/consent/TagManager";
+import { allowedPlatforms, usableIds } from "@/lib/tracking/platforms";
 import { fetchPublicSite, type PublicSite } from "@/lib/public/api";
 
 export const dynamic = "force-dynamic";
@@ -65,10 +67,10 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
   // S7, S-N4: Detect whether current site payload contains sample items
   const hasSample = !isProd && Boolean(site?.has_sample);
 
-  // Phase 6 Task 6.1 (D-056): Consent banner & cookie settings only when tracking IDs exist
-  const trackingEnabled = Boolean(
-    site?.tracking && (site.tracking.gtm_id || site.tracking.ga4_id || site.tracking.meta_pixel_id),
-  );
+  // Consent banner, Cookie settings and tags only when a tag can actually run: its ID is set in
+  // the CMS and its platform is allowed by TRACKING_CSP (tasks 6.1 and 6.3, D-056, D-058).
+  const trackingIds = usableIds(site?.tracking, allowedPlatforms(process.env.TRACKING_CSP));
+  const trackingEnabled = trackingIds !== null;
 
   return (
     <div className="flex min-h-dvh flex-col bg-noir-900 text-body">
@@ -90,6 +92,7 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
       </main>
       <Footer site={site} isProduction={isProd} trackingEnabled={trackingEnabled} />
       <ConsentBanner enabled={trackingEnabled} />
+      {trackingIds && <TagManager ids={trackingIds} />}
       <MobileActionBar company={site?.company} isProduction={isProd} />
     </div>
   );

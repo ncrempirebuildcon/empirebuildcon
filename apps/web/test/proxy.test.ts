@@ -102,3 +102,56 @@ describe("Content-Security-Policy", () => {
     expect(res.headers.get("content-security-policy-report-only")).toContain("script-src");
   });
 });
+
+describe("tracking hosts in the CSP (task 6.3, D-058)", () => {
+  function policy(res: Response): string {
+    return (
+      res.headers.get("content-security-policy") ??
+      res.headers.get("content-security-policy-report-only") ??
+      ""
+    );
+  }
+  function directive(csp: string, name: string): string {
+    return (
+      csp
+        .split(";")
+        .map((d) => d.trim())
+        .find((d) => d.startsWith(`${name} `)) ?? ""
+    );
+  }
+
+  it("adds no ad or analytics host by default (the launch CSP)", async () => {
+    vi.stubEnv("TRACKING_CSP", "");
+    const csp = policy(await proxy(req("/projects"), event));
+    expect(csp).not.toContain("googletagmanager");
+    expect(csp).not.toContain("facebook");
+    expect(directive(csp, "frame-src")).toBe("");
+  });
+
+  it("opens only Google's hosts for TRACKING_CSP=google", async () => {
+    vi.stubEnv("TRACKING_CSP", "google");
+    const csp = policy(await proxy(req("/projects"), event));
+    expect(directive(csp, "script-src")).toContain("https://www.googletagmanager.com");
+    expect(directive(csp, "connect-src")).toContain("https://*.google-analytics.com");
+    expect(directive(csp, "frame-src")).toBe("frame-src 'self' https://www.googletagmanager.com");
+    expect(csp).not.toContain("facebook");
+  });
+
+  it("never opens them on the CMS, where no tag runs", async () => {
+    vi.stubEnv("TRACKING_CSP", "google,meta");
+    for (const path of ["/admin", "/admin/leads"]) {
+      const csp = policy(await proxy(req(path), event));
+      expect(csp, path).not.toContain("googletagmanager");
+      expect(csp, path).not.toContain("facebook");
+    }
+  });
+
+  it("opens Meta's hosts for TRACKING_CSP=meta, and ignores unknown words", async () => {
+    vi.stubEnv("TRACKING_CSP", " Meta , tiktok ");
+    const csp = policy(await proxy(req("/projects"), event));
+    expect(directive(csp, "script-src")).toContain("https://connect.facebook.net");
+    expect(directive(csp, "img-src")).toContain("https://www.facebook.com");
+    expect(csp).not.toContain("googletagmanager");
+    expect(csp).not.toContain("tiktok");
+  });
+});

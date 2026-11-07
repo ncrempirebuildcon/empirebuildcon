@@ -142,6 +142,7 @@ describe("Footer Component (S8)", () => {
       ga4_id: null,
       gtm_id: null,
       meta_pixel_id: null,
+      google_ads_id: null,
     },
   };
 

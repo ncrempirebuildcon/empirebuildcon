@@ -337,12 +337,21 @@ English at launch. `next-intl` routing is set up with `en` as the default (no pr
   - Each redirect served is counted through the signed `POST /api/v1/internal/redirects/hit` (`seo/hits.py`).
 - Pages, posts and projects carry a `seo` JSON; the CMS shows the API's `seo_warnings` as a checklist.
 
-## 17. Marketing and consent hooks (Phase 6, structure now)
+## 17. Marketing and consent (Phase 6, D-055)
 
-- A consent banner with three choices (necessary, analytics, marketing). GTM/GA4 and Meta Pixel load only after the matching consent; IDs come from Settings, so they can be switched on without a deploy.
+- **Consent banner (task 6.1, D-056; `components/consent/ConsentBanner.tsx`, `lib/consent.ts`):**
+  - Three choices: necessary, analytics and marketing. "Accept all" and "Reject all" are equally prominent, and nothing is pre-ticked.
+  - The choice is kept in the browser (`localStorage` `empire.consent`) for 12 months.
+  - **Cookie settings** in the footer re-opens it.
+- **Tags after consent (task 6.3, D-058; `lib/tracking/`, `components/consent/TagManager.tsx`):**
+  - **Two switches before a tag can run:** its ID set in Settings → Tracking, which the public site sends, AND its platform listed in the web's `TRACKING_CSP` environment variable (`google`, `meta`), which also opens that platform's hosts in the CSP. With either missing there is no banner and no tag.
+  - **What each choice loads:** analytics loads GA4; marketing loads Google Ads and the Meta Pixel. Tag Manager needs both, because its container can hold any tag.
+  - **Google Consent Mode v2:** starts with everything denied and is updated to the choice first. `ad_personalization` always stays denied.
+  - **Narrowing a choice** after tags have loaded reloads the page.
+  - **Enquiries:** a sent enquiry fires `generate_lead` to GA4, and Lead to the Pixel with the lead reference as `eventID`. The server's Lead event (6.2) uses the same reference, so Meta counts it once. Google Ads hears about leads only from the server.
 - **Server-side conversions (built in task 6.2, D-057; `integrations/conversions/`):**
   - **Flow:** `lead.created` → `queue_conversions` emits one `conversion.send` event per configured platform → `send_conversion` sends it, with the outbox's retries. A refusal marks only that event dead.
-  - **Platforms:** Meta Conversions API ("Lead" event; `event_id` = lead id for de-duplication with the Pixel) and Google Ads through the **Data Manager API** (`events:ingest`; `transactionId` = lead id). Google closed the Google Ads API's `UploadClickConversions` to new users on 15 June 2026.
+  - **Platforms:** Meta Conversions API ("Lead" event; `event_id` = the lead reference, which the browser Pixel also uses, for de-duplication, D-058) and Google Ads through the **Data Manager API** (`events:ingest`; `transactionId` = lead id). Google closed the Google Ads API's `UploadClickConversions` to new users on 15 June 2026.
   - **Gate (`may_report`, COMPLIANCE):** a live, non-duplicate, non-sample web lead whose marketing consent was given on a text version ≥ `CONVERSIONS_CONSENT_MIN_VERSION`. With that unset, nothing is sent at all.
   - **What is sent:** SHA-256 phone and email (each platform's normalisation, `hashing.py`), the ad click ids, the page URL and time, and, for Meta only, the browser's User-Agent. Meta requires the User-Agent for website events. It is captured only with marketing consent and travels in the events, never on the lead. Never the name or message.
 - Campaign landing pages are CMS pages of kind `landing` built from blocks, with their own lead form and `noindex` option.

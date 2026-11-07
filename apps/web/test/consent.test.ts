@@ -79,6 +79,26 @@ describe("Consent storage layer (Task 6.1 Scope 1)", () => {
     expect(readConsent()).toBeNull();
   });
 
+  it("asks again when the stored choice expires during the visit (6.3 review)", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+      writeConsent({ analytics: true, marketing: true });
+      expect(readConsent()).not.toBeNull();
+      vi.setSystemTime(new Date("2027-01-02T00:00:00Z")); // over 12 months later
+      expect(readConsent()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("asks again when working storage loses the choice (6.3, review Nit 2)", () => {
+    writeConsent({ analytics: true, marketing: false });
+    expect(readConsent()).not.toBeNull();
+    mockStorage.removeItem(CONSENT_STORAGE_KEY); // cleared by the visitor, or expired
+    expect(readConsent()).toBeNull();
+  });
+
   it("returns null for corrupt JSON or wrong version or malformed shape", () => {
     mockStorage.setItem(CONSENT_STORAGE_KEY, "invalid-json{{");
     expect(readConsent()).toBeNull();

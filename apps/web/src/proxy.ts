@@ -13,7 +13,8 @@
  *   4. For page requests: a redirect made in the CMS answers first (301/308, counted; task 5.6,
  *      lib/public/redirects.ts). Otherwise a per-request cryptographically random nonce is made
  *      and Content-Security-Policy is set (enforced in production and when CSP_ENFORCE=true;
- *      report-only otherwise, so staging can collect reports first).
+ *      report-only otherwise, so staging can collect reports first). Ad and analytics hosts are
+ *      added only for the platforms in TRACKING_CSP (task 6.3, D-058, lib/tracking/platforms.ts).
  *   5. On staging and production, an /api/* call whose host gave no client IP is refused (503).
  *
  * SECURITY / DO NOT CHANGE without owner approval:
@@ -26,8 +27,9 @@
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { CLIENT_IP_HEADER, EDGE_KEY_HEADER, edgeHeaders } from "./lib/edge";
 import { findRedirect, reportHit } from "./lib/public/redirects";
+import { allowedPlatforms, cspSources } from "./lib/tracking/platforms";
 
-function buildCsp(options: { nonce?: string }): string {
+function buildCsp(options: { nonce?: string; tracking?: boolean }): string {
   const isDev = process.env.NODE_ENV !== "production";
   const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN || "";
   let sentryHost = "";
@@ -39,18 +41,30 @@ function buildCsp(options: { nonce?: string }): string {
     }
   }
 
+  // Ad and analytics hosts, only for the platforms TRACKING_CSP lists (task 6.3, D-058;
+  // lib/tracking/platforms.ts). Empty by default, so the launch CSP is unchanged.
+  // SECURITY: never on /admin, where no tag runs: an allowed script host is also one an injected
+  // tag could load from, and the CMS holds lead data (6.3 review).
+  const tracking = cspSources(
+    options.tracking ? allowedPlatforms(process.env.TRACKING_CSP) : new Set(),
+  );
+  const extra = (hosts: string[]) => (hosts.length ? ` ${hosts.join(" ")}` : "");
+
   const scriptSrc = options.nonce
-    ? `script-src 'self' 'nonce-${options.nonce}' ${isDev ? "'unsafe-eval'" : ""}`.trim()
-    : `script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ""}`.trim();
+    ? `script-src 'self' 'nonce-${options.nonce}'${extra(tracking.script)} ${isDev ? "'unsafe-eval'" : ""}`.trim()
+    : `script-src 'self' 'unsafe-inline'${extra(tracking.script)} ${isDev ? "'unsafe-eval'" : ""}`.trim();
 
   const directives = [
     "default-src 'self'",
     scriptSrc,
     "style-src 'self' 'unsafe-inline'",
     // OpenStreetMap tiles for the project map (task 5.3, D-041; the map loads only on tap).
-    "img-src 'self' https://res.cloudinary.com data: blob: https://tile.openstreetmap.org",
+    `img-src 'self' https://res.cloudinary.com data: blob: https://tile.openstreetmap.org${extra(tracking.img)}`,
     "font-src 'self'",
-    `connect-src 'self' https://api.cloudinary.com ${sentryHost}`.trim(),
+    `connect-src 'self' https://api.cloudinary.com ${sentryHost}${extra(tracking.connect)}`
+      .replace(/\s+/g, " ")
+      .trim(),
+    ...(tracking.frame.length ? [`frame-src 'self'${extra(tracking.frame)}`] : []),
     "media-src 'self' https://res.cloudinary.com blob:",
     "frame-ancestors 'none'",
     "form-action 'self'",
@@ -157,7 +171,8 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   // base-uri and connect-src are strictly enforced by CSP (R2-M3).
   // Dynamic pages (CMS, public shell, 404) use a cryptographically random per-request nonce.
   const nonce = isStaticAuth ? undefined : Buffer.from(crypto.randomUUID()).toString("base64");
-  const csp = buildCsp({ nonce });
+  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+  const csp = buildCsp({ nonce, tracking: !isAdmin });
   // SECURITY (L2 security review): production enforces the policy unless CSP_ENFORCE=false is
   // set on purpose; staging stays report-only until CSP_ENFORCE=true (D-039's week of reports).
   const enforce =

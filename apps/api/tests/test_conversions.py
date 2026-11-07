@@ -156,7 +156,7 @@ def test_a_consented_lead_reaches_both_platforms_with_hashes_only(
     assert pixel == PIXEL
     [event] = meta_body["data"]
     assert event["event_name"] == "Lead"
-    assert event["event_id"] == str(lead.id)
+    assert event["event_id"] == lead.reference  # matches the browser Pixel's eventID (D-058)
     assert event["action_source"] == "website"
     assert event["event_source_url"] == "https://empirebuildcon.com/contact"
     assert event["user_data"]["client_user_agent"] == UA
@@ -420,6 +420,7 @@ def test_meta_is_transient_flag_is_retried() -> None:
 def _ads_lead(**fields: Any) -> meta.LeadForAds:
     base: dict[str, Any] = {
         "lead_id": "01a1b0af-0000-7000-8000-000000000001",
+        "reference": "EMP-26-000001",
         "created_at": datetime(2026, 11, 7, 10, 30, tzinfo=UTC),
         "phone_e164": "+919876543210",
         "email": None,

@@ -12180,6 +12180,7 @@
         "type": "object"
       },
       "PublicTracking": {
+        "description": "Settings → Tracking, for the tags loaded after consent (task 6.3, D-058).",
         "properties": {
           "ga4_id": {
             "anyOf": [
@@ -12191,6 +12192,17 @@
               }
             ],
             "title": "Ga4 Id"
+          },
+          "google_ads_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Google Ads Id"
           },
           "gtm_id": {
             "anyOf": [
@@ -12218,7 +12230,8 @@
         "required": [
           "gtm_id",
           "ga4_id",
-          "meta_pixel_id"
+          "meta_pixel_id",
+          "google_ads_id"
         ],
         "title": "PublicTracking",
         "type": "object"

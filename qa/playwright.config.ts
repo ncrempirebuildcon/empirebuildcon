@@ -105,6 +105,9 @@ export default defineConfig({
         SITE_URL: WEB_URL,
         EDGE_PROXY_KEY: env.EDGE_PROXY_KEY ?? "",
         CSP_ENFORCE: "true",
+        // Google's and Meta's hosts are allowed in the CSP, as on a site using both (task 6.3).
+        // No tag runs unless a spec sets an ID in the CMS (consent-tags.serial.spec.ts).
+        TRACKING_CSP: "google,meta",
         // CMS redirects reach the website within a second here (lib/public/redirects.ts).
         REDIRECT_CACHE_SECONDS: "1",
         REVALIDATE_SECRET: env.REVALIDATE_SECRET ?? "test-revalidate-secret-minimum-32-chars-long",

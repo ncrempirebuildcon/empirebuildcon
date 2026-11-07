@@ -6569,10 +6569,15 @@ export interface components {
             /** Rating */
             rating: number | null;
         };
-        /** PublicTracking */
+        /**
+         * PublicTracking
+         * @description Settings → Tracking, for the tags loaded after consent (task 6.3, D-058).
+         */
         PublicTracking: {
             /** Ga4 Id */
             ga4_id: string | null;
+            /** Google Ads Id */
+            google_ads_id: string | null;
             /** Gtm Id */
             gtm_id: string | null;
             /** Meta Pixel Id */
