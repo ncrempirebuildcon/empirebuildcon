@@ -1097,3 +1097,23 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - unit tests: which IDs are usable, what each choice loads, the CSP per `TRACKING_CSP`;
   - e2e (`consent-tags.serial.spec.ts`): nothing reaches Google or Meta before a choice or after "Reject all"; "Accept all" loads both tags with no CSP violation; narrowing the choice reloads the page with no Pixel.
 
+## D-059 · The AI assistant runs on Cloudflare Workers AI's free allocation (7 Nov 2026)
+
+- **Context:** the owner asked for the AI work only if a free model can do it, with the architecture designed and dry-run first ([tasks/phase-7/PLAN.md](tasks/phase-7/PLAN.md)).
+- **Decision:**
+  - **Models:** Cloudflare Workers AI on the Workers **Free** plan. Answers come from `@cf/qwen/qwen3-30b-a3b-fp8` and embeddings from `@cf/baai/bge-m3`, which is multilingual, with 1024 dimensions, stored in pgvector.
+  - **What the assistant does:** it answers only from Empire's published content, with citations. It has no tools and takes no actions, and doesn't write RERA numbers or prices.
+  - **Limits:** a daily guard at 8,000 of the free 10,000 neurons, then a WhatsApp or call-back fallback.
+  - **Privacy:** phone numbers and emails are removed from messages first, and no transcripts are stored, only daily counts.
+  - **Swappable:** the provider sits behind an interface, so another one is one new file.
+- **Why Cloudflare:**
+  - its free allocation is a hard cap on the Free plan, so it can never bill;
+  - Cloudflare states that it doesn't use Workers AI content to train models and doesn't keep inputs or outputs after a standard request (Workers AI "Data usage" page, read 7 Nov 2026);
+  - Empire already has the account.
+- **Rejected:**
+  - Google's Gemini API free tier: its terms say free-tier prompts may be used to improve Google's products.
+  - OpenRouter's free models: 50 requests a day, and some upstream providers train on free prompts.
+  - Groq as the default: it is a good fallback candidate, with no retention by default, but it is a second account.
+  - Checked 7 Nov 2026: Cloudflare's Workers AI pricing, limits, data-usage and model pages, and AIReiter's "Best free AI APIs in 2026" (updated 14 Aug 2026).
+- **Dry run:** see PLAN.md. About 250 to 400 answers a day fit under the guard. The migration's pgvector check isn't permission-aware, and task 7.1 fixes that. Answer quality in Hindi and Hinglish, and real latency, are checked live in 7.4 before the flag goes on.
+
