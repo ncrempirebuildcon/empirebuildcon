@@ -128,6 +128,7 @@ apps/api/
 │  │  ├─ visibility.py     visibility helper (published only, D-015 sample isolation, D-038 hero/cover, search)
 │  │  └─ caching.py        Cache-Control, strong SHA-256 ETag / 304, 120 req/min rate limit
 │  ├─ dashboard/           GET /admin/dashboard: counts with links, latest leads, visits, tasks
+│  ├─ ai/                  AI assistant (D-059): providers, knowledge index, outbox handlers
 │  ├─ integrations/        outbox drain + handlers, internal drain endpoint
 │  ├─ worker.py            empire-worker loop (paid always-on hosting)
 │  └─ cli.py               empire-api commands

@@ -24,6 +24,7 @@ from fastapi import BackgroundTasks, Request
 from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.orm import Session
 
+from empire_api.ai import handlers as ai_handlers
 from empire_api.content.schedule import schedule_tick
 from empire_api.db import get_engine, get_sessionmaker, rows_affected
 from empire_api.integrations import handlers as integration_handlers
@@ -57,7 +58,13 @@ _CLEANUP_SETTING = "system.cleanup"
 
 log = get_logger(__name__)
 # Modules whose outbox handlers register on import (handlers.on); listed so they always load.
-HANDLER_MODULES = (media_handlers, mail_handlers, integration_handlers, conversion_handlers)
+HANDLER_MODULES = (
+    media_handlers,
+    mail_handlers,
+    integration_handlers,
+    conversion_handlers,
+    ai_handlers,
+)
 
 
 @dataclass(frozen=True)
@@ -213,6 +220,9 @@ def cleanup(now: datetime | None = None) -> dict[str, int]:
     # token clean-up above (it raises after they are committed, and the next run retries).
     with get_sessionmaker()() as db, db.begin():
         anonymised = anonymise_inactive(db, now)
+    # The AI index's daily backstop (D-059): queue only, no model call here.
+    with get_sessionmaker()() as db, db.begin():
+        ai_queued = ai_handlers.queue_everything(db)
     counts = {
         "sessions": sessions,
         "reset_tokens": tokens,
@@ -220,6 +230,7 @@ def cleanup(now: datetime | None = None) -> dict[str, int]:
         "sign_in_challenges": challenges,
         "unconfirmed_uploads": uploads,
         "leads_anonymised": anonymised,
+        "ai_reindex_queued": ai_queued,
     }
     log.info("cleanup_done", **counts)
     return counts

@@ -33,6 +33,9 @@ import typer
 from cryptography.fernet import Fernet
 from sqlalchemy import select
 
+from empire_api.ai import indexer, store
+from empire_api.ai.providers import get_provider
+from empire_api.ai.providers.base import ProviderBusyError, ProviderError
 from empire_api.config import Settings, get_settings
 from empire_api.content.consent import seed_consent_texts
 from empire_api.content.seed import (
@@ -52,6 +55,8 @@ from empire_api.users.roles import ROLE_KEYS
 from empire_api.users.seed import SampleUsersRefusedError, seed_sample_users
 
 app = typer.Typer(help="Empire API admin commands.", no_args_is_help=True, add_completion=False)
+ai_app = typer.Typer(help="The AI assistant's knowledge index (D-059).", no_args_is_help=True)
+app.add_typer(ai_app, name="ai")
 
 
 def _out(message: str) -> None:
@@ -280,3 +285,42 @@ def gen_secrets() -> None:
 
 if __name__ == "__main__":
     app()
+
+
+@ai_app.command("reindex")
+def ai_reindex() -> None:
+    """Bring the knowledge index up to date with live content. Safe to run again: unchanged
+    items cost nothing. Needs AI_PROVIDER and pgvector (SETUP, RUNBOOK §6d)."""
+    provider = get_provider()
+    if provider is None:
+        _fail("AI is off: set AI_PROVIDER (and its credentials) first.")
+        return
+    with get_sessionmaker()() as db:
+        if not store.available(db):
+            _fail("knowledge_chunk is missing: pgvector isn't installed in this database.")
+            return
+        try:
+            result = indexer.reindex_all(db, provider)
+        except (ProviderBusyError, ProviderError) as exc:
+            _fail(f"Stopped: the provider answered {exc}. Items done so far are kept.")
+            return
+        _out(
+            f"Indexed {result.indexed} items ({result.chunks} chunks, about "
+            f"{result.neurons:.1f} neurons); {result.unchanged} unchanged; "
+            f"{result.removed} removed. Chunks now: {store.count_chunks(db)}."
+        )
+
+
+@ai_app.command("status")
+def ai_status() -> None:
+    """The provider in use, the number of chunks and today's estimated neurons."""
+    provider = get_provider()
+    with get_sessionmaker()() as db:
+        if not store.available(db):
+            _fail("knowledge_chunk is missing: pgvector isn't installed in this database.")
+            return
+        _out(
+            f"Provider: {provider.name if provider else 'off'}. Chunks: {store.count_chunks(db)}. "
+            f"Neurons today: {store.neurons_today(db)} of a "
+            f"{get_settings().ai_daily_neuron_guard} guard."
+        )

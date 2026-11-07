@@ -11,7 +11,7 @@ How to run the website, CMS and API on your own computer, and how to run the sam
 | pnpm | 12.14.0 (`packageManager` in `package.json`; `corepack enable` picks it up) | JavaScript workspace |
 | Python | 3.14 (`.python-version`) | API and worker |
 | uv | 0.13 or newer | Python packages; it installs Python 3.14 for you if needed |
-| PostgreSQL | 18 with pgvector (Docker), or any local 16–18 | Database. Without pgvector everything works until Phase 7 (D-026). |
+| PostgreSQL | 18 with pgvector (Docker), or any local 16–18 | Database. Without pgvector everything works except the AI assistant's index (Phase 7, D-059): its table isn't created and its tests skip. |
 
 You don't need a cloud account to work locally. Shared services (Neon, Cloudinary, Resend, Sentry, Netlify, Google Cloud) belong to the owner.
 
@@ -98,6 +98,8 @@ See the repository map in [README.md](README.md#repository-map) and the README i
 - [`qa`](../qa/README.md)
 
 ## Common problems
+
+**pgvector on a local PostgreSQL (not Docker).** Install the package for your version (Ubuntu: `sudo apt install postgresql-16-pgvector`). The extension can only be created by a superuser, and the tests rebuild the database's schema each run, so on your own computer either make the development user a superuser (`sudo -u postgres psql -c 'ALTER ROLE empire SUPERUSER'`, as in Docker and CI) or accept that the AI index tests skip. The migrations never fail over this: without the right, they print a notice and leave the AI table out (D-059).
 
 | Problem | Fix |
 |---|---|

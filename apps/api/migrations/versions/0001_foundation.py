@@ -31,7 +31,13 @@ def upgrade() -> None:
         DO $$
         BEGIN
             IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'vector') THEN
-                CREATE EXTENSION IF NOT EXISTS vector;
+                -- WHY the handler (Phase 7 dry run, D-059): a database user that may not create
+                -- extensions (a local non-superuser) used to fail the whole migration here.
+                BEGIN
+                    CREATE EXTENSION IF NOT EXISTS vector;
+                EXCEPTION WHEN insufficient_privilege THEN
+                    RAISE NOTICE 'pgvector is available but this user cannot create it';
+                END;
             END IF;
         END
         $$;
