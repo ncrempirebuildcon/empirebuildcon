@@ -50,11 +50,12 @@ export function ChatPanel({ onClose, company, isProduction = false }: ChatPanelP
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
-  // Close on Escape key
+  // Close on Escape key (when focus is within this panel)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && panelRef.current?.contains(document.activeElement)) {
         onClose();
       }
     };
@@ -79,10 +80,13 @@ export function ChatPanel({ onClose, company, isProduction = false }: ChatPanelP
   const effectiveWhatsApp = rawWhatsApp || rawPhone;
   const pagePath = typeof window !== "undefined" ? window.location.pathname : "/";
 
-  const telHref = buildTelLink(rawPhone, isProduction) || "tel:+919876543210";
-  const whatsappHref =
-    buildWhatsAppLink(effectiveWhatsApp, company?.whatsapp_message, pagePath, isProduction) ||
-    "https://wa.me/919876543210";
+  const telHref = buildTelLink(rawPhone, isProduction);
+  const whatsappHref = buildWhatsAppLink(
+    effectiveWhatsApp,
+    company?.whatsapp_message,
+    pagePath,
+    isProduction,
+  );
 
   const handleSend = async () => {
     const trimmed = draft.trim();
@@ -181,15 +185,26 @@ export function ChatPanel({ onClose, company, isProduction = false }: ChatPanelP
               const num = parseInt(match[1], 10);
               const citation = citations.find((c) => c.n === num) || citations[num - 1];
               if (citation) {
+                const isSafe =
+                  typeof citation.url === "string" &&
+                  citation.url.startsWith("/") &&
+                  !citation.url.startsWith("//");
+                if (isSafe) {
+                  return (
+                    <Link
+                      key={index}
+                      href={citation.url}
+                      title={citation.title}
+                      className="inline-flex min-h-[44px] items-center px-0.5 font-bold text-gold-400 underline hover:text-gold-300"
+                    >
+                      [{num}] {citation.title}
+                    </Link>
+                  );
+                }
                 return (
-                  <Link
-                    key={index}
-                    href={citation.url}
-                    title={citation.title}
-                    className="inline-flex min-h-[44px] items-center px-0.5 font-bold text-gold-400 underline hover:text-gold-300"
-                  >
+                  <span key={index}>
                     [{num}] {citation.title}
-                  </Link>
+                  </span>
                 );
               }
             }
@@ -204,16 +219,26 @@ export function ChatPanel({ onClose, company, isProduction = false }: ChatPanelP
               {CHAT_COPY.citationsHeading}:
             </span>
             <ul className="mt-1 space-y-1">
-              {citations.map((c) => (
-                <li key={c.n}>
-                  <Link
-                    href={c.url}
-                    className="inline-flex min-h-[44px] items-center text-gold-400 underline hover:text-gold-300"
-                  >
-                    [{c.n}] {c.title}
-                  </Link>
-                </li>
-              ))}
+              {citations.map((c) => {
+                const isSafe =
+                  typeof c.url === "string" && c.url.startsWith("/") && !c.url.startsWith("//");
+                return (
+                  <li key={c.n}>
+                    {isSafe ? (
+                      <Link
+                        href={c.url}
+                        className="inline-flex min-h-[44px] items-center text-gold-400 underline hover:text-gold-300"
+                      >
+                        [{c.n}] {c.title}
+                      </Link>
+                    ) : (
+                      <span className="inline-flex min-h-[44px] items-center text-sand-300">
+                        [{c.n}] {c.title}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
@@ -230,20 +255,24 @@ export function ChatPanel({ onClose, company, isProduction = false }: ChatPanelP
         {/* Action buttons following any fallback */}
         {msg.fallbackKind && (
           <div className="mt-3 flex flex-wrap gap-2 pt-2">
-            <a
-              href={whatsappHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-[44px] items-center justify-center rounded-pill bg-palm-bg px-3 text-xs font-bold text-palm hover:brightness-110"
-            >
-              {CHAT_COPY.whatsappButton}
-            </a>
-            <a
-              href={telHref}
-              className="inline-flex min-h-[44px] items-center justify-center rounded-pill border border-gold-500/40 px-3 text-xs font-bold text-gold-300 hover:bg-gold-500/10"
-            >
-              {CHAT_COPY.callButton}
-            </a>
+            {whatsappHref && (
+              <a
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-pill bg-palm-bg px-3 text-xs font-bold text-palm hover:brightness-110"
+              >
+                {CHAT_COPY.whatsappButton}
+              </a>
+            )}
+            {telHref && (
+              <a
+                href={telHref}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-pill border border-gold-500/40 px-3 text-xs font-bold text-gold-300 hover:bg-gold-500/10"
+              >
+                {CHAT_COPY.callButton}
+              </a>
+            )}
             <Link
               href="/contact#visit"
               className="inline-flex min-h-[44px] items-center justify-center rounded-pill bg-gold-500 px-3 text-xs font-extrabold text-noir-900 hover:bg-gold-400"
@@ -258,9 +287,16 @@ export function ChatPanel({ onClose, company, isProduction = false }: ChatPanelP
 
   return (
     <div
+      ref={panelRef}
       role="dialog"
       aria-modal="false"
       aria-labelledby="chat-heading"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          onClose();
+        }
+      }}
       className="fixed bottom-[calc(64px+env(safe-area-inset-bottom)+8px)] left-3 right-3 z-40 flex max-h-[calc(100dvh-80px)] flex-col rounded-2xl border border-gold-500/40 bg-noir-800/98 shadow-2xl backdrop-blur-md sm:left-auto sm:right-4 sm:w-96 md:bottom-6 md:right-6 md:max-h-[36rem]"
     >
       {/* Header */}
@@ -326,20 +362,24 @@ export function ChatPanel({ onClose, company, isProduction = false }: ChatPanelP
       {/* Permanent contact buttons at the bottom of the panel */}
       <div className="border-t border-noir-700/60 bg-noir-900/40 p-2.5">
         <div className="flex items-center gap-1.5">
-          <a
-            href={whatsappHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-pill bg-palm-bg px-2 text-[11px] font-bold text-palm hover:brightness-110"
-          >
-            {CHAT_COPY.whatsappButton}
-          </a>
-          <a
-            href={telHref}
-            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-pill border border-gold-500/40 px-2 text-[11px] font-bold text-gold-300 hover:bg-gold-500/10"
-          >
-            {CHAT_COPY.callButton}
-          </a>
+          {whatsappHref && (
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-pill bg-palm-bg px-2 text-[11px] font-bold text-palm hover:brightness-110"
+            >
+              {CHAT_COPY.whatsappButton}
+            </a>
+          )}
+          {telHref && (
+            <a
+              href={telHref}
+              className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-pill border border-gold-500/40 px-2 text-[11px] font-bold text-gold-300 hover:bg-gold-500/10"
+            >
+              {CHAT_COPY.callButton}
+            </a>
+          )}
           <Link
             href="/contact#visit"
             className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-pill bg-gold-500 px-2 text-[11px] font-extrabold text-noir-900 hover:bg-gold-400"

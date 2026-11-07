@@ -14,6 +14,7 @@ import { CHAT_COPY } from "./copy";
 interface ProjectCardData {
   name: string;
   reraNumber?: string | null;
+  reraUrl?: string | null;
 }
 
 export function ProjectCard({ slug }: { slug: string }) {
@@ -34,15 +35,15 @@ export function ProjectCard({ slug }: { slug: string }) {
         }
         const json = await res.json();
         if (!cancelled && json && typeof json === "object") {
-          const rera =
-            json.regulator?.registration_number ||
-            json.regulator?.number ||
-            json.rera?.number ||
-            json.rera_number ||
-            null;
+          const reraNumber = typeof json.rera?.number === "string" ? json.rera.number : null;
+          const reraUrl =
+            typeof json.rera?.url === "string" && json.rera.url
+              ? json.rera.url
+              : "https://www.up-rera.in";
           setData({
             name: typeof json.name === "string" ? json.name : slug,
-            reraNumber: rera,
+            reraNumber,
+            reraUrl,
           });
         }
       } catch {
@@ -72,9 +73,19 @@ export function ProjectCard({ slug }: { slug: string }) {
         </Link>
       </div>
       {data?.reraNumber && (
-        <p className="mt-1 text-[11px] text-sand-400">
-          {CHAT_COPY.reraPrefix} {data.reraNumber}
-        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-sand-400">
+          <span>
+            {CHAT_COPY.reraPrefix} {data.reraNumber}
+          </span>
+          <a
+            href={data.reraUrl || "https://www.up-rera.in"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-[44px] items-center text-gold-400 underline hover:text-gold-300"
+          >
+            {CHAT_COPY.verifyRera}
+          </a>
+        </div>
       )}
     </div>
   );

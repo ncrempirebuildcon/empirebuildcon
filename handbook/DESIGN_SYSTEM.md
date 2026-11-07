@@ -242,12 +242,12 @@ A separate reviewer checked all 30 boards for invented facts, RERA display, urge
   - Non-blocking: background content remains interactive and scrollable (no backdrop overlay, no focus trap).
   - Disclaimer notice under heading reminding visitors that answers are AI-generated and personal data should not be shared.
 - **Answer presentation (COMPLIANCE):**
-  - Rendered strictly as plain text. Only `[n]` citation markers convert to links pointing to `citations[n-1].url`.
+  - Rendered strictly as plain text. Only `[n]` citation markers convert to links pointing to verified same-site paths (`citations[n-1].url`).
   - Raw HTML and Markdown tags from model output are strictly escaped.
-  - Project cards are populated exclusively from `/api/v1/public/projects/{slug}`, never from the model's text.
+  - Project cards are populated exclusively from `/api/v1/public/projects/{slug}`, never from the model's text, and display the official UP-RERA registration number with a verification link to up-rera.in.
 - **Fallbacks & Actions:**
-  - Fallbacks (no_answer, busy, 429, error) offer WhatsApp, Call, and Request a call back buttons.
-  - The same three buttons sit permanently at the bottom of the panel.
+  - Fallbacks (no_answer, busy, 429, error) offer WhatsApp, Call, and Request a call back buttons (Call and WhatsApp appear only when phone/WhatsApp numbers are configured; Request a call back is always present).
+  - The same buttons sit permanently at the bottom of the panel.
 - **Accessibility:**
   - Polite live region announces incoming assistant replies.
   - Text input features a live character count (max 500 chars). Enter sends; Shift+Enter creates a new line.

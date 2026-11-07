@@ -24,4 +24,5 @@ export const CHAT_COPY = {
   citationsHeading: "[DRAFT] Sources",
   viewProject: "[DRAFT] View project",
   reraPrefix: "[DRAFT] UP-RERA:",
+  verifyRera: "[DRAFT] Verify at up-rera.in",
 } as const;

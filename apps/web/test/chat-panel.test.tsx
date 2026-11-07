@@ -202,14 +202,226 @@ describe("ChatLauncher & ChatPanel components (Task 7.3 Scope 1 & 2)", () => {
       expect(fallbackEls.length).toBeGreaterThan(0);
     });
 
-    // Check WhatsApp, Call, and Request a call back buttons
-    const whatsappLinks = screen.getAllByRole("link", { name: /whatsapp/i });
-    expect(whatsappLinks.length).toBeGreaterThan(0);
+    // Check WhatsApp, Call, and Request a call back buttons appear both inline under fallback and in bottom bar
+    const whatsappLinks = screen.getAllByRole("link", { name: CHAT_COPY.whatsappButton });
+    expect(whatsappLinks.length).toBe(2);
 
-    const callLinks = screen.getAllByRole("link", { name: /call/i });
-    expect(callLinks.length).toBeGreaterThan(0);
+    const callLinks = screen.getAllByRole("link", { name: CHAT_COPY.callButton });
+    expect(callLinks.length).toBe(2);
 
-    const callbackLinks = screen.getAllByRole("link", { name: /request a call back/i });
-    expect(callbackLinks.length).toBeGreaterThan(0);
+    const callbackLinks = screen.getAllByRole("link", { name: CHAT_COPY.requestCallbackButton });
+    expect(callbackLinks.length).toBe(2);
+  });
+
+  it("with no company phones, there is no Call or WhatsApp link and Request a call back is still there (H1)", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ fallback: "no_answer" }),
+    });
+
+    render(<ChatPanel onClose={() => {}} company={{ phones: [], whatsapp: null }} />);
+
+    const input = screen.getByRole("textbox", { name: /ask a question/i });
+    fireEvent.change(input, { target: { value: "Where is project X?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText(CHAT_COPY.fallbackNoAnswer).length).toBeGreaterThan(0);
+    });
+
+    expect(screen.queryByRole("link", { name: CHAT_COPY.whatsappButton })).toBeNull();
+    expect(screen.queryByRole("link", { name: CHAT_COPY.callButton })).toBeNull();
+    expect(
+      screen.getAllByRole("link", { name: CHAT_COPY.requestCallbackButton }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("render ChatLauncher, open it, press Escape, and expect launcher button to be document.activeElement (M1)", async () => {
+    render(<ChatLauncher />);
+    const launcherBtn = screen.getByRole("button", { name: /ask about our projects/i });
+
+    // Open panel
+    fireEvent.click(launcherBtn);
+
+    // Panel is opened
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeDefined();
+    });
+
+    // Press Escape
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    // Launcher button should be active element
+    await waitFor(() => {
+      expect(document.activeElement).toBe(launcherBtn);
+    });
+  });
+
+  it("citations with javascript:, https://, and //evil.example render no link (M3)", async () => {
+    const mockAnswer = "Check sources [1], [2], and [3].";
+    const citations = [
+      { n: 1, url: "javascript:alert(1)", title: "Malicious script" },
+      { n: 2, url: "https://example.com/external", title: "External site" },
+      { n: 3, url: "//evil.example/protocol-relative", title: "Protocol relative" },
+    ];
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        answer: mockAnswer,
+        citations,
+        cards: [],
+      }),
+    });
+
+    render(<ChatPanel onClose={() => {}} />);
+
+    const input = screen.getByRole("textbox", { name: /ask a question/i });
+    fireEvent.change(input, { target: { value: "Test unsafe links" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/check sources/i).length).toBeGreaterThan(0);
+    });
+
+    // None of these should be rendered as a link
+    expect(screen.queryByRole("link", { name: /malicious script/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /external site/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /protocol relative/i })).toBeNull();
+
+    // Plain text should still be present
+    expect(screen.getAllByText(/\[1\] Malicious script/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\[2\] External site/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\[3\] Protocol relative/).length).toBeGreaterThan(0);
+  });
+
+  it("ProjectCard uses json.rera.number only and renders verify link to up-rera.in (L2)", async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url === "/api/v1/ai/chat") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            answer: "Check this [1]",
+            citations: [{ n: 1, url: "/projects/grand", title: "Grand" }],
+            cards: [{ slug: "grand" }],
+          }),
+        };
+      }
+      if (url === "/api/v1/public/projects/grand") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            name: "Grand Residences",
+            rera: { number: "UPRERA-999999", url: "https://up-rera.in/projects/999999" },
+            regulator: { number: "IGNORE_ME" }, // Regulator field should be ignored
+          }),
+        };
+      }
+      return { ok: false, status: 404 };
+    });
+
+    render(<ChatPanel onClose={() => {}} />);
+
+    const input = screen.getByRole("textbox", { name: /ask a question/i });
+    fireEvent.change(input, { target: { value: "Show card" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Grand Residences")).toBeDefined();
+      expect(screen.getByText(/UPRERA-999999/)).toBeDefined();
+      expect(screen.queryByText(/IGNORE_ME/)).toBeNull();
+    });
+
+    const verifyLink = screen.getByRole("link", { name: CHAT_COPY.verifyRera });
+    expect(verifyLink.getAttribute("href")).toBe("https://up-rera.in/projects/999999");
+  });
+
+  it("fallback error renders 'Something went wrong.' and contact buttons (L3)", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+    });
+
+    render(
+      <ChatPanel
+        onClose={() => {}}
+        company={{
+          phones: ["+91 98765 43210"],
+          whatsapp: "+91 98765 43210",
+        }}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: /ask a question/i });
+    fireEvent.change(input, { target: { value: "Trigger error" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText(CHAT_COPY.fallbackError).length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getAllByRole("link", { name: CHAT_COPY.whatsappButton }).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByRole("link", { name: CHAT_COPY.callButton }).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole("link", { name: CHAT_COPY.requestCallbackButton }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("chat panel sends at most 2 turns (4 messages) of history after 3 or more exchanges (L3)", async () => {
+    let callCount = 0;
+    const receivedHistories: unknown[] = [];
+
+    global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/api/v1/ai/chat") {
+        callCount++;
+        const body = JSON.parse(init?.body as string);
+        receivedHistories.push(body.history);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            answer: `Answer ${callCount}`,
+            citations: [],
+            cards: [],
+          }),
+        };
+      }
+      return { ok: false, status: 404 };
+    });
+
+    render(<ChatPanel onClose={() => {}} />);
+    const input = screen.getByRole("textbox", { name: /ask a question/i });
+    const sendBtn = screen.getByRole("button", { name: /send/i });
+
+    // Exchange 1
+    fireEvent.change(input, { target: { value: "Question 1" } });
+    fireEvent.click(sendBtn);
+    await waitFor(() => expect(screen.getAllByText("Answer 1").length).toBeGreaterThan(0));
+
+    // Exchange 2
+    fireEvent.change(input, { target: { value: "Question 2" } });
+    fireEvent.click(sendBtn);
+    await waitFor(() => expect(screen.getAllByText("Answer 2").length).toBeGreaterThan(0));
+
+    // Exchange 3
+    fireEvent.change(input, { target: { value: "Question 3" } });
+    fireEvent.click(sendBtn);
+    await waitFor(() => expect(screen.getAllByText("Answer 3").length).toBeGreaterThan(0));
+
+    // Check history sent in 3rd call
+    expect(receivedHistories.length).toBe(3);
+    const thirdCallHistory = receivedHistories[2] as Array<{ role: string; text: string }>;
+    // At most 2 turns = 4 messages (Q1, A1, Q2, A2)
+    expect(thirdCallHistory.length).toBe(4);
+    expect(thirdCallHistory[0].text).toBe("Question 1");
+    expect(thirdCallHistory[1].text).toBe("Answer 1");
+    expect(thirdCallHistory[2].text).toBe("Question 2");
+    expect(thirdCallHistory[3].text).toBe("Answer 2");
   });
 });

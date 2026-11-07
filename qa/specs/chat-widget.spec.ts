@@ -18,11 +18,16 @@ test.describe("Chat Widget launch guard (Task 7.3)", () => {
   test("with chat_widget flag off, the launcher button is absent and no chat panel chunk is requested", async ({
     page,
   }) => {
-    let chatPanelChunkRequested = false;
-    page.on("request", (req) => {
-      const url = req.url();
-      if (url.includes("ChatPanel")) {
-        chatPanelChunkRequested = true;
+    const jsBodies: Array<{ url: string; text: string }> = [];
+    page.on("response", async (res) => {
+      const ct = res.headers()["content-type"] || "";
+      if (ct.includes("javascript")) {
+        try {
+          const text = await res.text();
+          jsBodies.push({ url: res.url(), text });
+        } catch {
+          // Ignore aborted or closed responses
+        }
       }
     });
 
@@ -42,6 +47,8 @@ test.describe("Chat Widget launch guard (Task 7.3)", () => {
     expect(detailRes?.status()).toBe(200);
     await expect(page.getByRole("button", { name: /ask about our projects/i })).toHaveCount(0);
 
-    expect(chatPanelChunkRequested).toBe(false);
+    // M2: verify none of the loaded JavaScript bundles contain chat-panel-specific strings
+    const hasChatPanelCode = jsBodies.some((body) => body.text.includes("resting for today"));
+    expect(hasChatPanelCode).toBe(false);
   });
 });
