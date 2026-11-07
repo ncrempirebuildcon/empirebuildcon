@@ -26,7 +26,7 @@ A small "Ask about our projects" chat on the public site, off until the owner tu
 
 ```
 Visitor ─► /api/v1/ai/chat (FastAPI, Cloud Run)                       flag chat_widget, else 404
-            1. limits: message ≤ 500 chars · 12 messages / 10 min per network · daily neuron guard
+            1. limits: message ≤ 500 chars · 12 messages / 10 min per address · daily neuron guard
             2. redact phone numbers and emails from the message (never sent to the model, never stored)
             3. embed the question ──► Workers AI  @cf/baai/bge-m3 (multilingual, 1024 dims)
             4. top 4 chunks       ──► Postgres pgvector (knowledge_chunk, HNSW cosine), live content only
@@ -39,7 +39,7 @@ Publish events (outbox) ─► knowledge indexer: re-chunks and re-embeds only t
 
 - **The provider sits behind an interface** (`ai/providers/`): `cloudflare` for real use, and `fake` for tests and CI, which is deterministic and needs no network. Another provider (Groq, Gemini, a paid model) is then one new file, with no other change.
 - **No chat transcripts are stored.** The database keeps only daily counts: answers, fallbacks, "no answer" and estimated neurons, in `ai_usage_day`. Nothing a visitor typed is stored.
-- **Timing:** Netlify's synchronous functions time out at 10 s by default. The 7 s model timeout plus about 0.5 s for embedding and retrieval stays inside it. On a timeout the reply is the "busy" fallback, never an error page.
+- **Timing:** Netlify's synchronous functions time out at 10 s by default. The whole answer has one deadline of 7.5 s (task 7.2): embedding gets at most 1.5 s, and the model gets what is left. The deadline is a real total limit, because httpx's read timeout restarts with every chunk. On a timeout, or any unexpected error, the reply is the "busy" fallback, never an error page.
 
 ## Dry run (7 Nov 2026)
 
@@ -67,8 +67,8 @@ Publish events (outbox) ─► knowledge indexer: re-chunks and re-embeds only t
 
 | Task | Track (D-040) | What | Depends on | Status |
 |---|---|---|---|---|
-| **7.1** Knowledge index and provider | A (Claude) | `knowledge_chunk` and `ai_usage_day` (migration); a permission-aware pgvector check; chunker for live projects, configurations, amenities, FAQs and pages; outbox consumer on publish events; `ai/providers` (`cloudflare`, `fake`); `empire-api ai reindex` and `ai status` | — | **Built** (branch `feat/p7-1-knowledge`) |
-| **7.2** Chat API | A (Claude) | `/api/v1/ai/chat` exactly as in the architecture above: flag, limits, redaction, retrieval, prompt, post-check, fallbacks, counts only | 7.1 | After 7.1 |
+| **7.1** Knowledge index and provider | A (Claude) | `knowledge_chunk` and `ai_usage_day` (migration); a permission-aware pgvector check; chunker for live projects, configurations, amenities, FAQs and pages; outbox consumer on publish events; `ai/providers` (`cloudflare`, `fake`); `empire-api ai reindex` and `ai status` | — | **Done** (#47) |
+| **7.2** Chat API | A (Claude) | `/api/v1/ai/chat` exactly as in the architecture above: flag, limits, redaction, retrieval, prompt, post-check, fallbacks, counts only | 7.1 | **Built** (branch `feat/p7-2-chat-api`) |
 | **7.3** Chat widget | B (developer agent) | A lazy-loaded "Ask about our projects" button and panel, built against the contract below with a mock. Citations, project cards from the API, WhatsApp/Call/enquiry buttons, "AI answers can be wrong" note, accessible, no Lighthouse cost (the code loads on click) | contract only | **Ready**, [7.3-chat-widget.md](7.3-chat-widget.md) |
 | **7.4** Live dry run and switch-on | Owner + Claude | The owner makes a Workers AI token on the Free plan; Claude runs `empire-api ai smoke` (20 questions in English, Hindi and Hinglish) on the owner's computer or on staging; the legal reviewer approves the chat note; then the flag goes on | 7.1–7.3, go-live | After launch |
 
@@ -91,7 +91,9 @@ Replies:
 - `422` for a message that is too long or a malformed body.
 - `429` when the rate limit is reached. The body has `retry_after_seconds`.
 
-`answer` is plain text. Only `[n]` markers have meaning, and they are links to `citations[n].url`. The widget renders no HTML or Markdown from the model.
+`answer` is plain text. Only `[n]` markers have meaning: each links to the citation whose `n` is that number. The numbers keep the source order, so an answer can cite [1] and [3] without [2]. The widget renders no HTML or Markdown from the model.
+
+A fallback reply is exactly `{ "fallback": … }`, with no other fields.
 
 ## Owner's part (later, task 7.4)
 

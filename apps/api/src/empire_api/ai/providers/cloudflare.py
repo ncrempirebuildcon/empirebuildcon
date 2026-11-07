@@ -71,6 +71,9 @@ class CloudflareProvider:
     embed_rate = 1075.0
     chat_in_rate = 4625.0
     chat_out_rate = 30475.0
+    # TODO(phase-7): tune with the live dry run (7.4); bge-m3 scores related passages
+    # roughly 0.45–0.75 and unrelated ones below 0.3.
+    min_score = 0.3
 
     def __init__(
         self,

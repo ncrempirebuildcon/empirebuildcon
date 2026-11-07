@@ -745,7 +745,8 @@ paths:
           $ref: '#/components/responses/TooMany'
       security: []
       x-feature-flag: chat_widget
-      x-rate-limit: 20 messages per 10 minutes per visitor
+      x-rate-limit: 12 messages per 10 minutes per address
+      x-public: true
   /api/v1/admin/dashboard:
     get:
       operationId: dashboard
@@ -8539,50 +8540,74 @@ components:
       - ids
     ChatRequest:
       type: object
+      additionalProperties: false
+      description: The widget sends at most the last 2 turns (4 messages). Phone numbers and emails are removed before anything reaches the model; nothing is stored (D-059).
       properties:
-        conversation_id:
-          anyOf:
-          - type: string
-            format: uuid
-          - type: 'null'
         message:
           type: string
-          maxLength: 2000
-        page_url:
-          type: string
+          minLength: 1
+          maxLength: 500
+        history:
+          type: array
+          maxItems: 4
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              role:
+                type: string
+                enum:
+                - user
+                - assistant
+              text:
+                type: string
+                maxLength: 1000
+            required:
+            - role
+            - text
+        page:
+          description: The visitor's current page (a path on this site), used to prefer its sources.
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
       required:
       - message
-      - page_url
     ChatReply:
       type: object
+      description: Either `answer` with `citations` and `cards`, or `fallback`. `answer` is plain text; only its `[n]` markers mean something (links to `citations[n].url`). Cards name projects whose name, RERA number and link the widget loads from the public project API, never from the answer.
       properties:
-        conversation_id:
-          type: string
-          format: uuid
-        reply:
+        answer:
           type: string
         citations:
           type: array
           items:
             type: object
             properties:
+              n:
+                type: integer
+              url:
+                type: string
               title:
                 type: string
-              path:
-                type: string
-        actions:
+            required:
+            - n
+            - url
+            - title
+        cards:
           type: array
           items:
             type: object
             properties:
-              type:
+              slug:
                 type: string
-                enum:
-                - open_whatsapp
-                - show_lead_form
-                - show_visit_form
-              label:
-                type: string
+            required:
+            - slug
+        fallback:
+          type: string
+          enum:
+          - no_answer
+          - busy
     Health:
       type: object
       properties:

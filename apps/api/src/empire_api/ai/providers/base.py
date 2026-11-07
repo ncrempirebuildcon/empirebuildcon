@@ -31,6 +31,8 @@ class AIProvider(Protocol):
     embed_rate: float
     chat_in_rate: float
     chat_out_rate: float
+    # Below this cosine similarity a chunk isn't about the question (depends on the embedder).
+    min_score: float
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """One 1024-number vector per text, in order."""

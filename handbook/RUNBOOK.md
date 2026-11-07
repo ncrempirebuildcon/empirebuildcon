@@ -212,7 +212,8 @@ Off until all steps are done. The full plan is in `handbook/tasks/phase-7/PLAN.m
 2. **Token.** The owner creates an API token with only "Workers AI: Read" and "Workers AI: Edit" for the account, and puts it in Secret Manager as `CLOUDFLARE_AI_TOKEN`, with `CLOUDFLARE_ACCOUNT_ID` (not secret). Never paste it in chat.
 3. **Switch the provider on.** Set `AI_PROVIDER=cloudflare` on the API and the worker, and redeploy. From now on, content changes are indexed.
 4. **Build the index once:** `empire-api ai reindex` (a Cloud Run job, or locally against the database). It prints how many items and chunks it wrote and the estimated neurons (about 160 for a full site). `empire-api ai status` shows the chunks and today's neurons.
-5. **Live dry run** (task 7.4) and the legal reviewer's approval of the chat note, then turn on `chat_widget` in CMS → Settings → Feature flags.
+5. **Live dry run** (task 7.4): `empire-api ai smoke` asks 20 questions in English, Hindi and Hinglish, including ones it must refuse (price, discount, RERA number, loan, a prompt injection), and prints each reply, its latency and a summary. It costs about 650 neurons. Every reply must be correct or a fallback, the summary must say "0 with an amount or registration number", and the slowest reply must be under 7 s.
+6. The legal reviewer approves the chat note and the privacy-policy line. Then turn on `chat_widget` in CMS → Settings → Feature flags.
 
 **To switch off:** turn off `chat_widget` (the widget and `/api/v1/ai/chat` go within a minute). To stop indexing too, empty `AI_PROVIDER`.
 

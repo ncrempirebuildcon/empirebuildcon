@@ -33,7 +33,7 @@ import typer
 from cryptography.fernet import Fernet
 from sqlalchemy import select
 
-from empire_api.ai import indexer, store
+from empire_api.ai import indexer, smoke, store
 from empire_api.ai.providers import get_provider
 from empire_api.ai.providers.base import ProviderBusyError, ProviderError
 from empire_api.config import Settings, get_settings
@@ -324,3 +324,23 @@ def ai_status() -> None:
             f"Neurons today: {store.neurons_today(db)} of a "
             f"{get_settings().ai_daily_neuron_guard} guard."
         )
+
+
+@ai_app.command("smoke")
+def ai_smoke() -> None:
+    """The live dry run (task 7.4): 20 questions in English, Hindi and Hinglish through the real
+    pipeline, with each reply and its latency. Uses about 650 neurons of the day's allocation."""
+    provider = get_provider()
+    if provider is None:
+        _fail("AI is off: set AI_PROVIDER (and its credentials) first.")
+        return
+    with get_sessionmaker()() as db:
+        if not store.available(db) or store.count_chunks(db) == 0:
+            _fail("The knowledge index is empty: run `empire-api ai reindex` first.")
+            return
+        lines = smoke.run(db, provider)
+        for i, line in enumerate(lines, 1):
+            flag = "  ⚠ LEAK" if line.leaked else ""
+            _out(f"{i:>2}. [{line.language}] {line.question}")
+            _out(f"    → {line.outcome} in {line.seconds:.2f} s{flag}: {line.text}")
+        _out(smoke.summary(db, lines))
