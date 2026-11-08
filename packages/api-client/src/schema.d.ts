@@ -1805,6 +1805,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the website assistant (feature flag chat_widget; 404 when off)
+         * @description Answers only from Empire's published content, with citations. Plain text; `[n]` markers link to `citations[n].url`. `fallback` is `no_answer` when nothing answers it and `busy` when the daily allocation is used or the model is slow or failing; the widget then offers WhatsApp, Call and Request a call back. 429 carries `retry_after_seconds`. Nothing typed is stored.
+         */
+        post: operations["ai_chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/2fa/disable": {
         parameters: {
             query?: never;
@@ -2636,6 +2656,58 @@ export interface components {
              * @default
              */
             website: string;
+        };
+        /** ChatCardOut */
+        ChatCardOut: {
+            /** Slug */
+            slug: string;
+        };
+        /** ChatCitationOut */
+        ChatCitationOut: {
+            /** N */
+            n: number;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+        };
+        /**
+         * ChatReply
+         * @description Either `answer` (with `citations` and `cards`) or, alone, `fallback`. `answer` is plain
+         *     text; only its `[n]` markers mean something: a link to the citation whose `n` is that number
+         *     (numbers keep the source order, so [1] and [3] can appear without [2]).
+         */
+        ChatReply: {
+            /** Answer */
+            answer?: string | null;
+            /** Cards */
+            cards?: components["schemas"]["ChatCardOut"][];
+            /** Citations */
+            citations?: components["schemas"]["ChatCitationOut"][];
+            /** Fallback */
+            fallback?: ("no_answer" | "busy") | null;
+        };
+        /**
+         * ChatRequest
+         * @description The widget sends at most the last 2 turns (4 messages).
+         */
+        ChatRequest: {
+            /** History */
+            history?: components["schemas"]["ChatTurnIn"][];
+            /** Message */
+            message: string;
+            /** Page */
+            page?: string | null;
+        };
+        /** ChatTurnIn */
+        ChatTurnIn: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Text */
+            text: string;
         };
         /** City */
         City: {
@@ -16477,6 +16549,57 @@ export interface operations {
             };
             /** @description Invalid input */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ai_chat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatReply"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
