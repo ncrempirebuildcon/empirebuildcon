@@ -19,6 +19,7 @@ import OfferBanner from "@/components/shell/OfferBanner";
 import SampleDataRibbon from "@/components/shell/SampleDataRibbon";
 import AttributionCapture from "@/components/leads/AttributionCapture";
 import { ConsentBanner } from "@/components/consent/ConsentBanner";
+import { ChatLauncher } from "@/components/chat/ChatLauncher";
 import { TagManager } from "@/components/consent/TagManager";
 import { allowedPlatforms, usableIds } from "@/lib/tracking/platforms";
 import { fetchPublicSite, type PublicSite } from "@/lib/public/api";
@@ -93,6 +94,9 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
       <Footer site={site} isProduction={isProd} trackingEnabled={trackingEnabled} />
       <ConsentBanner enabled={trackingEnabled} />
       {trackingIds && <TagManager ids={trackingIds} />}
+      {site?.features?.chat_widget === true && (
+        <ChatLauncher company={site?.company} isProduction={isProd} />
+      )}
       <MobileActionBar company={site?.company} isProduction={isProd} />
     </div>
   );
