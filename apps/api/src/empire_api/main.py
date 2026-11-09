@@ -17,6 +17,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from empire_api import health
+from empire_api.ai import routes as ai_routes
 from empire_api.config import Settings, get_settings
 from empire_api.content import routes as content_routes
 from empire_api.content import routes_marketing as content_marketing_routes
@@ -93,6 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         routes_catalogue.router,
         media_routes.router,
         lead_public_routes.router,
+        ai_routes.router,
         lead_routes.router,
         lead_visit_routes.router,
         dashboard_routes.router,

@@ -668,6 +668,150 @@
         "title": "BrochureRequest",
         "type": "object"
       },
+      "ChatCardOut": {
+        "properties": {
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "title": "ChatCardOut",
+        "type": "object"
+      },
+      "ChatCitationOut": {
+        "properties": {
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "n",
+          "url",
+          "title"
+        ],
+        "title": "ChatCitationOut",
+        "type": "object"
+      },
+      "ChatReply": {
+        "description": "Either `answer` (with `citations` and `cards`) or, alone, `fallback`. `answer` is plain\ntext; only its `[n]` markers mean something: a link to the citation whose `n` is that number\n(numbers keep the source order, so [1] and [3] can appear without [2]).",
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/ChatCardOut"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/ChatCitationOut"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "fallback": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_answer",
+                  "busy"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback"
+          }
+        },
+        "title": "ChatReply",
+        "type": "object"
+      },
+      "ChatRequest": {
+        "additionalProperties": false,
+        "description": "The widget sends at most the last 2 turns (4 messages).",
+        "properties": {
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ChatTurnIn"
+            },
+            "maxItems": 4,
+            "title": "History",
+            "type": "array"
+          },
+          "message": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest",
+        "type": "object"
+      },
+      "ChatTurnIn": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 1000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "text"
+        ],
+        "title": "ChatTurnIn",
+        "type": "object"
+      },
       "City": {
         "properties": {
           "id": {
@@ -28967,6 +29111,72 @@
           "Users"
         ],
         "x-permission": "users.manage"
+      }
+    },
+    "/api/v1/ai/chat": {
+      "post": {
+        "description": "Answers only from Empire's published content, with citations. Plain text; `[n]` markers link to `citations[n].url`. `fallback` is `no_answer` when nothing answers it and `busy` when the daily allocation is used or the model is slow or failing; the widget then offers WhatsApp, Call and Request a call back. 429 carries `retry_after_seconds`. Nothing typed is stored.",
+        "operationId": "ai_chat",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatReply"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid input"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many requests"
+          }
+        },
+        "security": [],
+        "summary": "Ask the website assistant (feature flag chat_widget; 404 when off)",
+        "tags": [
+          "AI"
+        ],
+        "x-feature-flag": "chat_widget",
+        "x-public": true,
+        "x-rate-limit": "12 messages per 10 minutes per address"
       }
     },
     "/api/v1/auth/2fa/disable": {

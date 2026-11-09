@@ -107,6 +107,11 @@ _REGISTRATION: Final = re.compile(
 )
 
 
+def estimate_tokens(text: str) -> int:
+    """About 3.5 characters a token (the dry run's measure; Hinglish is pessimistic)."""
+    return max(1, math.ceil(len(text) / 3.5))
+
+
 def redact(line: str) -> str:
     return _REGISTRATION.sub(REDACTED, _MONEY.sub(REDACTED, line))
 
@@ -165,7 +170,7 @@ def _chunks(
             title=title[:200],
             position=i,
             body=body,
-            tokens=max(1, math.ceil(len(body) / 3.5)),
+            tokens=estimate_tokens(body),
             content_hash=hashlib.sha256(f"{url}\n{body}".encode()).hexdigest(),
         )
         for i, body in enumerate(out)

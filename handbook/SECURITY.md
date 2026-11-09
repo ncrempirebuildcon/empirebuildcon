@@ -35,6 +35,7 @@ Applies from Phase 3. Each item lists where it is enforced and how it is tested.
 
 - Staff writes (`POST/PATCH/PUT/DELETE`) need the `X-CSRF-Token` header matching the token bound to the session (returned by `/auth/me`). SameSite=Lax is the second layer.
 - Public lead endpoints accept no cookies' authority (they don't read the session), so CSRF does not apply; rate limits and the honeypot do.
+- The website assistant (`POST /api/v1/ai/chat`, D-059) is the same: no session, no CSRF, 12 messages per 10 minutes per address (hashed; not per /24, because mobile carriers share networks). It has no tools and changes nothing but a daily counter. Phone numbers and emails are removed before the message reaches Cloudflare, and nothing typed is stored or logged.
 - CORS is closed in production (same-origin through the proxy). Allowed origins come from settings only for local development.
 
 ## 4. HTTP security headers

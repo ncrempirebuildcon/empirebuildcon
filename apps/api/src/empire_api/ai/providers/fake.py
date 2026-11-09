@@ -25,6 +25,7 @@ class FakeProvider:
     embed_rate = 1075.0
     chat_in_rate = 4625.0
     chat_out_rate = 30475.0
+    min_score = 0.05  # bag of words: one shared word in a long chunk scores about 0.1
 
     def __init__(self) -> None:
         self.calls: list[str] = []
