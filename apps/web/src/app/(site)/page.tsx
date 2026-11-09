@@ -64,10 +64,10 @@ function HoldingPage() {
     <section className="grid min-h-[60vh] place-items-center px-4 py-16">
       <div className="flex max-w-xl flex-col items-center gap-5 text-center">
         <Image
-          src="/brand/logo-stacked-noir.svg"
-          alt="Empire — Delivering Happiness"
+          src="/brand/logo-stacked-noir.webp"
+          alt="Empire Buildcon — Delivering Happiness"
           width={320}
-          height={250}
+          height={230}
           priority
           unoptimized
           className="h-auto w-[min(320px,80vw)]"

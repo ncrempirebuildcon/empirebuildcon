@@ -274,7 +274,7 @@ export function AdminShell({ me, section, heading, breadcrumb, children }: Admin
           <div className="flex items-center justify-between gap-3">
             {/* WHY no aria-label: the visible words are the link's name (WCAG 2.5.3 Label in Name). */}
             <Link href="/admin" className="flex items-center gap-2.5 px-2">
-              <Image src="/brand/logo-mark-noir.svg" alt="" width={34} height={34} unoptimized />
+              <Image src="/brand/logo-mark-noir.webp" alt="" width={57} height={34} unoptimized />
               <span className="flex flex-col leading-tight">
                 <span className="font-display text-base font-semibold tracking-[0.2em] text-gold-400">
                   EMPIRE
