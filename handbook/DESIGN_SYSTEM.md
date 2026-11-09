@@ -82,6 +82,24 @@ Formats:
 - **Rising towers:** tower-wise progress bars with the gold gradient, labelled with a percentage and a date.
 - **Palm-leaf line icons:** for amenities and landscape.
 
+### Logo files (9 Nov 2026)
+
+The owner gave a new "Empire Buildcon" logo on 9 Nov 2026. The source file is the owner's PNG on white, kept in the private `docs/brand/` folder. The website uses versions made from it for the dark theme:
+- **Background:** removed, so the logo sits on noir.
+- **Lettering:** the brown lettering is turned to the metallic gold.
+- **Building mark:** lifted slightly, so it reads on noir.
+
+Files in `apps/web/public/brand/`:
+- `logo-horizontal-noir.webp`: the mark beside "EMPIRE BUILDCON", without the tagline, which is too small to read at header size. Used in the header.
+- `logo-stacked-noir.webp`: the full logo with "DELIVERING HAPPINESS". Used on the holding page and the CMS sign-in.
+- `logo-stacked-noir.png`: the same logo as a PNG, for the schema.org `logo`.
+- `logo-mark-noir.webp`: the building mark only. Used in the CMS sidebar.
+- `share-default.png`: the stacked logo on noir, 1200×630.
+
+`app/icon.png` (256 px) and `app/apple-icon.png` (180 px on noir) are the building mark.
+
+These are raster files, so they stay sharp up to about 2× their display size. If a designer supplies vector (SVG) files later, replace these with them; the code references stay the same apart from the file extension.
+
 ## 6. Iconography
 
 - Line icons on a 24 px grid, stroke 1.3–1.8, round joins, `gold-400` on dark backgrounds.

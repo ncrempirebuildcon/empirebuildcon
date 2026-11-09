@@ -102,10 +102,10 @@ export function Header({ site, isProduction }: HeaderProps) {
           {/* Logo */}
           <Link href="/" aria-label="Empire home" className="flex min-h-11 items-center">
             <Image
-              src="/brand/logo-horizontal-noir.svg"
-              alt="Empire — Delivering Happiness"
-              width={160}
-              height={42}
+              src="/brand/logo-horizontal-noir.webp"
+              alt="Empire Buildcon"
+              width={216}
+              height={44}
               priority
               unoptimized
               className="h-9 md:h-11 w-auto"
@@ -223,10 +223,10 @@ export function Header({ site, isProduction }: HeaderProps) {
               className="flex min-h-11 items-center"
             >
               <Image
-                src="/brand/logo-horizontal-noir.svg"
-                alt="Empire — Delivering Happiness"
-                width={140}
-                height={36}
+                src="/brand/logo-horizontal-noir.webp"
+                alt="Empire Buildcon"
+                width={157}
+                height={32}
                 unoptimized
                 className="h-8 w-auto"
               />

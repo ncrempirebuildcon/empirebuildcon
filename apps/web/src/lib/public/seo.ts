@@ -211,7 +211,7 @@ export function organizationLd(company: Company, social: Record<string, string> 
     legalName: real(company.legal_name) ?? undefined,
     slogan: real(company.tagline) ?? undefined,
     url: absoluteUrl("/"),
-    logo: absoluteUrl("/brand/logo-stacked-noir.svg"),
+    logo: absoluteUrl("/brand/logo-stacked-noir.png"),
     telephone: company.phones.map(real).find(Boolean) ?? undefined,
     email: company.emails.map(real).find(Boolean) ?? undefined,
     address: real(company.address) ?? undefined,

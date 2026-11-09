@@ -25,10 +25,10 @@ export function AuthCard({ eyebrow, title, intro, children }: AuthCardProps) {
     <main className="grid min-h-dvh place-items-center px-4 py-10">
       <div className="flex w-full max-w-md flex-col items-center gap-6">
         <Image
-          src="/brand/logo-stacked-noir.svg"
-          alt="Empire — Delivering Happiness"
+          src="/brand/logo-stacked-noir.webp"
+          alt="Empire Buildcon — Delivering Happiness"
           width={180}
-          height={140}
+          height={129}
           priority
           unoptimized
           className="h-auto w-[180px]"
