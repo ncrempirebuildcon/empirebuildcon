@@ -19,6 +19,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Final
 
 from fastapi import BackgroundTasks, Request
 from sqlalchemy import delete, func, or_, select, text
@@ -94,17 +95,26 @@ def _schedule_retry(row: OutboxEvent, exc: BaseException, now: datetime) -> None
         row.available_at = now + RETRY_DELAYS[row.attempts - 1]
 
 
-def drain(*, limit: int = BATCH_SIZE, now: datetime | None = None) -> DrainResult:
+# Events only the scheduled sweep delivers, never `drain_soon` after a request: re-indexing for
+# the AI assistant (D-059) can queue one event per page, and each may call the provider. Taken
+# soon, they queued ahead of revalidation and invite emails and delayed them past 10 s.
+SWEEP_ONLY: Final = frozenset({"ai.reindex"})
+
+
+def drain(
+    *, limit: int = BATCH_SIZE, now: datetime | None = None, skip: frozenset[str] = frozenset()
+) -> DrainResult:
     """Deliver due events once. Safe to run from several processes at the same time."""
     now = now or utcnow()
     processed = failed = 0
     with get_sessionmaker()() as db, db.begin():
+        due = select(OutboxEvent).where(
+            OutboxEvent.status == "pending", OutboxEvent.available_at <= now
+        )
+        if skip:
+            due = due.where(OutboxEvent.type.not_in(skip))
         rows = db.scalars(
-            select(OutboxEvent)
-            .where(OutboxEvent.status == "pending", OutboxEvent.available_at <= now)
-            .order_by(OutboxEvent.id)
-            .limit(limit)
-            .with_for_update(skip_locked=True)
+            due.order_by(OutboxEvent.id).limit(limit).with_for_update(skip_locked=True)
         ).all()
         for row in rows:
             try:
@@ -165,7 +175,7 @@ def _drain_quietly(budget_seconds: float) -> None:
             # (D-054, D-057), one slow call (a revalidation, an ad API) held an invite email
             # back for over 15 s under load. One at a time, each event goes out as soon as its
             # own handlers finish. The 15-minute sweep still takes full batches.
-            result = drain(limit=1)
+            result = drain(limit=1, skip=SWEEP_ONLY)
             if result.processed + result.failed == 0:
                 break
     except Exception:  # WHY: never fail a request because delivery failed; the sweep retries

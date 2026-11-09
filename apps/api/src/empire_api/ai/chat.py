@@ -247,7 +247,8 @@ def answer(
     embed_tokens = knowledge.estimate_tokens(question)
     try:
         vector = _within(lambda: provider.embed([question])[0], EMBED_SECONDS)
-        found = store.search(db, vector, limit=TOP_K, prefer_url=page)
+        # An empty vector (nothing to compare) matches nothing; cosine would be undefined.
+        found = store.search(db, vector, limit=TOP_K, prefer_url=page) if any(vector) else []
         db.commit()
         hits = [h for h in found if h.score >= provider.min_score]
         if not hits:

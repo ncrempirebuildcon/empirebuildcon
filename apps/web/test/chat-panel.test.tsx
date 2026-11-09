@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ChatLauncher } from "../src/components/chat/ChatLauncher";
-import { ChatPanel } from "../src/components/chat/ChatPanel";
+import { ChatPanel, isSameSitePath } from "../src/components/chat/ChatPanel";
 import { CHAT_COPY } from "../src/components/chat/copy";
 import { resetChatDisabledState, setChatDisabledForSession } from "../src/lib/chat";
 
@@ -423,5 +423,23 @@ describe("ChatLauncher & ChatPanel components (Task 7.3 Scope 1 & 2)", () => {
     expect(thirdCallHistory[1].text).toBe("Answer 1");
     expect(thirdCallHistory[2].text).toBe("Question 2");
     expect(thirdCallHistory[3].text).toBe("Answer 2");
+  });
+});
+
+describe("isSameSitePath (SECURITY)", () => {
+  it.each(["/projects/aurum", "/", "/about?x=1#faq"])("links %s", (url) => {
+    expect(isSameSitePath(url)).toBe(true);
+  });
+  it.each([
+    "//evil.example",
+    "/\\evil.example",
+    "/projects\\..\\evil",
+    "https://evil.example",
+    "javascript:alert(1)",
+    "projects/aurum",
+    "",
+    null,
+  ])("refuses %s", (url) => {
+    expect(isSameSitePath(url)).toBe(false);
   });
 });

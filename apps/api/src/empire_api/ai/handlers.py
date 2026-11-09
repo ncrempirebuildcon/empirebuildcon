@@ -103,6 +103,19 @@ def queue_reindex(db: Session, event: OutboxEvent) -> None:
 
 
 def _queue(db: Session, source_type: str, source_id: uuid.UUID) -> None:
+    # One pending re-index per item is enough: it reads the item as it is when it runs.
+    pending = db.scalar(
+        select(OutboxEvent.id)
+        .where(
+            OutboxEvent.type == REINDEX_EVENT,
+            OutboxEvent.status == "pending",
+            OutboxEvent.aggregate_type == source_type,
+            OutboxEvent.aggregate_id == str(source_id),
+        )
+        .limit(1)
+    )
+    if pending is not None:
+        return
     outbox.emit(
         db,
         type_=REINDEX_EVENT,

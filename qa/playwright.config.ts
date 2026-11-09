@@ -90,6 +90,9 @@ export default defineConfig({
       env: {
         ...env,
         DB_POOL_SIZE: "15",
+        // The assistant's deterministic, offline provider (D-059): content is indexed as it is
+        // published, and chat-assistant.serial.spec.ts asks the real API. Off in production.
+        AI_PROVIDER: "fake",
         WEB_REVALIDATE_URL: `${WEB_URL}/_internal/revalidate`,
         REVALIDATE_SECRET: env.REVALIDATE_SECRET ?? "test-revalidate-secret-minimum-32-chars-long",
       },
