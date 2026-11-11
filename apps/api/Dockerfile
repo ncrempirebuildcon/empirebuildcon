@@ -10,7 +10,7 @@
 # Keep uv in step with UV_VERSION in .github/workflows/ci.yml.
 FROM ghcr.io/astral-sh/uv:0.13.7 AS uv
 
-FROM python:3.14.6-slim AS build
+FROM python:3.14.10-slim AS build
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -25,7 +25,7 @@ COPY migrations ./migrations
 COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
 
-FROM python:3.14.6-slim
+FROM python:3.14.10-slim
 # SECURITY: runs as an unprivileged user with no shell login and no write access to the code.
 RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin empire
 WORKDIR /app
