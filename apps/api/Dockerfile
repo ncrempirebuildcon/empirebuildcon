@@ -8,7 +8,7 @@
 # Versions are pinned exactly (D-006); Dependabot's docker ecosystem proposes updates.
 
 # Keep uv in step with UV_VERSION in .github/workflows/ci.yml.
-FROM ghcr.io/astral-sh/uv:0.13.5 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.7 AS uv
 
 FROM python:3.14.6-slim AS build
 COPY --from=uv /uv /usr/local/bin/uv
