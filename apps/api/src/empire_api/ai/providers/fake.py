@@ -15,9 +15,33 @@ def _vector(text: str) -> list[float]:
     """Bag of hashed words, normalised: texts sharing words point the same way."""
     values = [0.0] * EMBEDDING_DIMENSIONS
     for word in _WORD.findall(text.lower()):
-        values[int(hashlib.sha256(word.encode()).hexdigest(), 16) % EMBEDDING_DIMENSIONS] += 1.0
+        if len(word) < 4 or word in _COMMON:
+            continue  # WHY: short and common words would make every chunk look alike
+        values[int(hashlib.sha256(word.encode()).hexdigest(), 16) % EMBEDDING_DIMENSIONS] = 1.0
     norm = math.sqrt(sum(v * v for v in values)) or 1.0
     return [v / norm for v in values]
+
+
+_COMMON = frozenset(
+    {
+        "does",
+        "have",
+        "with",
+        "what",
+        "where",
+        "which",
+        "there",
+        "this",
+        "that",
+        "your",
+        "from",
+        "about",
+        "sample",
+        "page",
+        "project",
+        "e2e",
+    }
+)
 
 
 class FakeProvider:

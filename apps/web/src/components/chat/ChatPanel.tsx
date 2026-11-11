@@ -23,6 +23,14 @@ import { askAssistant, type ChatCard, type ChatCitation, type ChatTurn } from "@
 import { CHAT_COPY } from "./copy";
 import { ProjectCard } from "./ProjectCard";
 
+/**
+ * SECURITY: a citation becomes a link only for a path on this site. Browsers treat "//host" and
+ * "/\\host" (and backslashes anywhere) as another site, so those stay plain text.
+ */
+export function isSameSitePath(url: unknown): url is string {
+  return typeof url === "string" && /^\/(?![/\\])/.test(url) && !url.includes("\\");
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -185,10 +193,7 @@ export function ChatPanel({ onClose, company, isProduction = false }: ChatPanelP
               const num = parseInt(match[1], 10);
               const citation = citations.find((c) => c.n === num) || citations[num - 1];
               if (citation) {
-                const isSafe =
-                  typeof citation.url === "string" &&
-                  citation.url.startsWith("/") &&
-                  !citation.url.startsWith("//");
+                const isSafe = isSameSitePath(citation.url);
                 if (isSafe) {
                   return (
                     <Link
@@ -220,8 +225,7 @@ export function ChatPanel({ onClose, company, isProduction = false }: ChatPanelP
             </span>
             <ul className="mt-1 space-y-1">
               {citations.map((c) => {
-                const isSafe =
-                  typeof c.url === "string" && c.url.startsWith("/") && !c.url.startsWith("//");
+                const isSafe = isSameSitePath(c.url);
                 return (
                   <li key={c.n}>
                     {isSafe ? (

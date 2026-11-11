@@ -317,13 +317,13 @@ def test_search_finds_the_nearest_chunk_and_prefers_the_current_page(
     db: Session, ai_on: FakeProvider
 ) -> None:
     a = knowledge._chunks("page", uuid.uuid4(), "/a", "A", ["text: swimming pool and gym"])
-    b = knowledge._chunks("page", uuid.uuid4(), "/b", "B", ["text: metro station nearby"])
+    b = knowledge._chunks("page", uuid.uuid4(), "/b", "B", ["text: metro station"])
     store.insert_chunks(db, a + b, ai_on.embed([c.body for c in a + b]))
     db.commit()
     query = ai_on.embed(["is there a swimming pool"])[0]
     hits = store.search(db, query, limit=2)
     assert [h.url for h in hits] == ["/a", "/b"]
-    close = ai_on.embed(["A B text"])[0]
+    close = ai_on.embed(["swimming metro"])[0]  # equally near both
     assert store.search(db, close, limit=1, prefer_url="/b")[0].url == "/b"
 
 
@@ -553,3 +553,24 @@ def test_the_daily_clean_up_queues_everything_once(
     reindex = db.scalars(select(OutboxEvent).where(OutboxEvent.type == "ai.reindex")).all()
     assert all(e.status == "delivered" for e in reindex)
     assert len([c for c in ai_on.calls if c.startswith("embed")]) == embeds  # unchanged: free
+
+
+def test_reindex_waits_for_the_sweep_and_is_queued_once(
+    owner: SignedIn, db: Session, qr_present: None, ai_on: FakeProvider
+) -> None:
+    """drain_soon never takes ai.reindex (it would hold revalidation and emails back), and
+    an item already waiting isn't queued twice."""
+    project = live_project(owner)
+    outbox_drain._drain_quietly(10.0)  # what drain_soon runs after a request
+    db.expire_all()
+    pending = db.scalars(
+        select(OutboxEvent).where(
+            OutboxEvent.type == "ai.reindex",
+            OutboxEvent.status == "pending",
+            OutboxEvent.aggregate_id == project["id"],
+        )
+    ).all()
+    assert len(pending) == 1  # published + updated events: one re-index
+    assert chunks(db) == []
+    drain()  # the sweep
+    assert chunks(db)

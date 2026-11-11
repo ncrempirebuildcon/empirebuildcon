@@ -30,3 +30,9 @@ updates:
   - package-ecosystem: docker # apps/api/Dockerfile base images (task L3)
     directory: "/apps/api"
     schedule: { interval: monthly }
+    ignore:
+      # WHY: the API pins requires-python ">=3.14,<3.15" (pyproject.toml), so a 3.15 image can't
+      # install it (Dependabot PR #37, Nov 2026). Patch updates (3.14.x) still come. Move to the
+      # next Python by hand, together with pyproject.toml, uv.lock and CI's PYTHON_VERSION.
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
