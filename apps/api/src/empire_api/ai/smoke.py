@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from empire_api.ai import chat, knowledge, store
 from empire_api.ai.providers.base import AIProvider
 from empire_api.projects.models import Project
+from empire_api.public import service as public
 
 QUESTIONS: Final = (
     ("en", "What amenities does {p} have?"),
@@ -54,7 +55,11 @@ class SmokeLine:
 
 def run(db: Session, provider: AIProvider) -> list[SmokeLine]:
     # A project a visitor can see (the public builders' own rules, as the index uses).
-    live = [item for kind, item in knowledge.all_sources(db) if kind == "project"]
+    live = [
+        item
+        for kind, item in knowledge.all_sources(db)
+        if kind == "project" and public.get_public_project(db, item.slug) is not None
+    ]
     project: Project | None = min(live, key=lambda p: p.name) if live else None
     name = project.name if project else "your projects"
     page = f"/projects/{project.slug}" if project else None
