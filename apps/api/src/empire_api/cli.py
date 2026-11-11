@@ -33,6 +33,7 @@ import typer
 from cryptography.fernet import Fernet
 from sqlalchemy import select
 
+from empire_api import golive
 from empire_api.ai import indexer, smoke, store
 from empire_api.ai.providers import get_provider
 from empire_api.ai.providers.base import ProviderBusyError, ProviderError
@@ -344,3 +345,23 @@ def ai_smoke() -> None:
             _out(f"{i:>2}. [{line.language}] {line.question}")
             _out(f"    → {line.outcome} in {line.seconds:.2f} s{flag}: {line.text}")
         _out(smoke.summary(db, lines))
+
+
+@app.command("golive-check")
+def golive_check(
+    as_json: bool = typer.Option(False, "--json", help="Print the checks as JSON."),
+) -> None:
+    """Is this database ready to be the live site? Read-only; exit code 1 when anything fails
+    (RUNBOOK §4, task L8)."""
+    with get_sessionmaker()() as db:
+        checks = golive.run(db)
+    if as_json:
+        _out(json.dumps(golive.as_json(checks), indent=2))
+    else:
+        for check in checks:
+            _out(f"{check.status:<4}  {check.name}: {check.detail}")
+        failed = sum(c.status == "FAIL" for c in checks)
+        warned = sum(c.status == "WARN" for c in checks)
+        _out(f"\n{failed} to fix, {warned} to look at, {len(checks) - failed - warned} fine.")
+    if any(c.status == "FAIL" for c in checks):
+        raise typer.Exit(code=1)

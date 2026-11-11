@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["specs", "lib", "playwright.config.ts", "global-setup.ts"]
+  "include": ["specs", "lib", "scripts", "playwright.config.ts", "global-setup.ts"]
 }

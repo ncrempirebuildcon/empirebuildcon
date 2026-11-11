@@ -99,6 +99,30 @@ Generate a fresh set for each environment, on the owner's own computer: `uv --di
 
 ## 3. Staging checks (before production)
 
+Two read-only reports do most of the checking for you (task L8). Run both on staging while the content goes in, and again on production before DNS points at it. Each prints PASS, WARN or FAIL per line and exits 1 while anything fails.
+- **The database:** `empire-api golive-check` (a Cloud Run job like `empire-admin`, or locally against the database). It checks:
+  - live projects and their RERA blockers;
+  - legal pages and consent texts approved and published;
+  - contact details;
+  - no sample data shown;
+  - no "[placeholder]" text on a live page;
+  - a super-admin with two-factor sign-in;
+  - the lead-alert inbox;
+  - the chat flag;
+  - no stuck or failed background events.
+
+  Add `--json` for a file.
+- **The deployed site:** `pnpm --filter @empire/qa golive -- https://staging.empirebuildcon.com --api-origin <Cloud Run URL>` from any computer. It checks:
+  - security headers;
+  - robots.txt and the sitemap;
+  - a project page's UP-RERA and up-rera.in;
+  - the API through the site;
+  - the https redirect;
+  - that the API refuses calls without the edge key.
+
+  For production, add `--production` (crawling allowed, HSTS) and one `--alias` per redirecting address (`.in`, `.co.in`, `www`).
+
+
 - [ ] **Client IP** (repeat after any change to Cloudflare's proxy, §4.4): sign in with a wrong password from two different networks (mobile data and Wi-Fi). Each network has its own limit; one network's lock-out must not block the other. In the API log, a request line's `client` must be the visitor's IP, not Netlify's. If `/api/*` answers 503 "Please try again in a minute", the client-IP header is wrong (D-052): fix `CLIENT_IP_SOURCE_HEADER`.
 - [ ] **CSP:** a week of report-only on staging. Read `/_internal/csp-report` lines in the Netlify function log. Then set `CSP_ENFORCE=true` and test every page.
 - [ ] **Media:** a real upload, confirm, delete and video poster on Cloudinary. Check whether a phone video's GPS metadata survives delivery. Also upload a photo of about **9.5 MB** through the CMS. Photos pass through the website's `/api` proxy, and Netlify functions have a request limit of about 6 MB. If it fails, send photos straight to Cloudinary as videos already are, or lower the photo cap.
@@ -120,7 +144,8 @@ Generate a fresh set for each environment, on the owner's own computer: `uv --di
 6. `ALLOW_INDEXING=true` on the production Netlify site, then redeploy. Check `https://empirebuildcon.com/robots.txt` allows crawling and lists the sitemap.
 7. Google Search Console: verify the domain (DNS TXT) and submit `https://empirebuildcon.com/sitemap.xml`.
 8. UptimeRobot: `/` and `/api/health/live` every 5 minutes, alerting the owner.
-9. Smoke test on production:
+9. Both §3 reports on production: `empire-api golive-check` shows no FAIL, and `pnpm --filter @empire/qa golive -- https://empirebuildcon.com --production --alias https://empirebuildcon.in --alias https://empirebuildcon.co.in --alias https://www.empirebuildcon.com --api-origin <Cloud Run URL>` shows no FAIL.
+10. Smoke test on production:
    - home and a project page with RERA, QR and up-rera.in;
    - an enquiry reaches `sales@`;
    - CMS sign-in with two-factor;
