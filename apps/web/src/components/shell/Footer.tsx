@@ -10,9 +10,11 @@
  *   - Placeholders hidden in production.
  *   - Legal links (Privacy, Terms, Disclaimer) and copyright year.
  */
+import Image from "next/image";
 import Link from "next/link";
+import { formatPhone } from "@empire/ui/format";
 import type { PublicSite } from "@/lib/public/api";
-import { buildTelLink, filterPlaceholders, filterValue } from "@/lib/public/format";
+import { buildTelLink, filterPlaceholders, filterValue, isPlaceholder } from "@/lib/public/format";
 import FooterWhatsApp from "./FooterWhatsApp";
 import { CookieSettingsButton } from "@/components/consent/CookieSettingsButton";
 
@@ -26,6 +28,9 @@ export function Footer({
   trackingEnabled?: boolean;
 }) {
   const company = site?.company;
+  // The name visitors know (CMS → Settings → Company → brand name); never a "[placeholder]".
+  const brand = company?.name && !isPlaceholder(company.name) ? company.name : "Empire Buildcon";
+  const legalName = filterValue(company?.legal_name, isProduction);
   const regulator = site?.regulator;
   const social = site?.social || {};
 
@@ -64,16 +69,21 @@ export function Footer({
           <div className="flex flex-col gap-3 md:col-span-1">
             <Link
               href="/"
-              className="inline-flex min-h-11 items-center self-start font-display text-xl font-bold tracking-[0.16em] text-sand-100 uppercase hover:text-gold-300"
+              aria-label={`${brand} home`}
+              className="inline-flex min-h-11 items-center self-start"
             >
-              EMPIRE
+              <Image
+                src="/brand/logo-horizontal-noir.webp"
+                alt=""
+                width={196}
+                height={40}
+                unoptimized
+              />
             </Link>
             {company?.tagline && (
               <p className="text-xs text-sand-400 leading-relaxed">{company.tagline}</p>
             )}
-            {company?.legal_name && (
-              <p className="text-[11px] text-sand-400/80">{company.legal_name}</p>
-            )}
+            {legalName && <p className="text-[11px] text-sand-400/80">{legalName}</p>}
             {company?.gstin && (
               <p className="text-[11px] text-sand-400/80">GSTIN: {company.gstin}</p>
             )}
@@ -89,7 +99,7 @@ export function Footer({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-gold-500/30 text-xs font-semibold text-gold-400 hover:border-gold-400 hover:text-gold-300 capitalize"
-                    aria-label={`Follow Empire on ${platform}`}
+                    aria-label={`Follow ${brand} on ${platform}`}
                   >
                     {platform.slice(0, 2).toUpperCase()}
                   </a>
@@ -135,7 +145,7 @@ export function Footer({
               COMPANY
             </strong>
             <Link href="/about" className="inline-flex min-h-11 items-center hover:text-gold-300">
-              About Empire
+              About us
             </Link>
             <Link href="/contact" className="inline-flex min-h-11 items-center hover:text-gold-300">
               Contact us
@@ -170,7 +180,7 @@ export function Footer({
                   href={tel}
                   className="inline-flex min-h-11 items-center hover:text-gold-300"
                 >
-                  {phone}
+                  {formatPhone(phone)}
                 </a>
               ) : null;
             })}
@@ -194,8 +204,8 @@ export function Footer({
         {/* Official Channels Note */}
         <p className="border-t border-noir-800 pt-5 text-xs text-gold-300/90 leading-relaxed">
           Official channels: empirebuildcon.com
-          {primaryPhone ? ` and ${primaryPhone}` : ""} only. Empire never asks for payments to
-          personal accounts.
+          {primaryPhone ? ` and ${formatPhone(primaryPhone)}` : ""} only. {brand} never asks for
+          payments to personal accounts.
         </p>
 
         {/* UP-RERA Regulator Note */}
@@ -216,7 +226,9 @@ export function Footer({
 
         {/* Bottom Bar: Copyright & Legal */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-noir-800 pt-5 text-xs text-sand-400">
-          <span>© {currentYear} Empire</span>
+          <span>
+            © {currentYear} {brand}
+          </span>
           <div className="flex flex-wrap gap-x-4 sm:gap-x-6">
             <Link
               href="/privacy"

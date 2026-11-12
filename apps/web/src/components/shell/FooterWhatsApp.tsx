@@ -4,6 +4,9 @@
  *
  * Uses usePathname() to dynamically substitute `{page}` in the message
  * template with the visitor's current URL path.
+ *
+ * WHY no aria-label: the visible "WhatsApp us" is the name; a different label fails
+ * WCAG 2.5.3 (label in name), which axe reports once a WhatsApp number is set.
  */
 import { usePathname } from "next/navigation";
 import { buildWhatsAppLink } from "@/lib/public/format";
@@ -28,7 +31,6 @@ export function FooterWhatsApp({
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex min-h-[44px] items-center gap-1.5 text-palm-300 hover:text-palm-200 font-semibold text-xs"
-      aria-label="Contact Empire on WhatsApp"
     >
       <svg
         width="16"

@@ -189,4 +189,45 @@ describe("Footer Component (S8)", () => {
     );
     expect(withTracking).toContain("Cookie settings");
   });
+
+  it("shows the logo and the brand name, never a placeholder name", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(Footer, {
+        site: {
+          ...dummySite,
+          company: { ...sampleCompany, name: "Empire Buildcon", phones: ["+919000000000"] },
+        },
+      }),
+    );
+    expect(html).toContain("/brand/logo-horizontal-noir.webp");
+    expect(html).toContain('aria-label="Empire Buildcon home"');
+    expect(html).toContain(`© ${new Date().getFullYear()} Empire Buildcon`);
+    expect(html).toContain("Follow Empire Buildcon on facebook");
+    expect(html).toContain("Empire Buildcon never asks for");
+    expect(html).not.toContain(">EMPIRE<");
+    // Shown spaced for reading; the tel: link keeps the dialable form.
+    expect(html).toContain("+91 90000 00000");
+    expect(html).toContain('href="tel:+919000000000"');
+
+    const unnamed = renderToStaticMarkup(
+      React.createElement(Footer, {
+        site: { ...dummySite, company: { ...sampleCompany, name: "[Brand name]" } },
+      }),
+    );
+    expect(unnamed).not.toContain("[Brand name]");
+    expect(unnamed).toContain(`© ${new Date().getFullYear()} Empire Buildcon`);
+  });
+
+  it("hides a placeholder legal name in production", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(Footer, {
+        site: {
+          ...dummySite,
+          company: { ...sampleCompany, legal_name: "[Company legal name]" },
+        },
+        isProduction: true,
+      }),
+    );
+    expect(html).not.toContain("[Company legal name]");
+  });
 });

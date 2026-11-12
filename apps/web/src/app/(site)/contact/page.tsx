@@ -10,6 +10,7 @@
  * pages); an unknown slug is ignored.
  */
 import type { Metadata } from "next";
+import { formatPhone } from "@empire/ui/format";
 import { pageMetadata } from "@/lib/public/seo";
 import { Breadcrumbs } from "@/components/catalogue/ListControls";
 import { VisitUnavailable } from "@/components/leads/VisitUnavailable";
@@ -96,7 +97,7 @@ export default async function ContactPage({
                     href={buildTelLink(p, prod) ?? undefined}
                     className="inline-flex min-h-11 items-center font-semibold tabular-nums"
                   >
-                    {p}
+                    {formatPhone(p)}
                   </a>
                 </li>
               ))}

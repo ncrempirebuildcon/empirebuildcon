@@ -1,7 +1,7 @@
 /**
  * Parser for the site's WhatsApp-style formatted text (ARCHITECTURE.md §6 "Formatted text";
- * contract schema `FormattedText`): `*bold*`, `_italic_`, `- ` bullets nested by two spaces, and
- * paragraphs separated by a blank line. Used by `<FormattedText>` in the CMS preview now and on
+ * contract schema `FormattedText`): `*bold*` (or Markdown's `**bold**`), `_italic_`, `- ` bullets
+ * nested by two spaces, and paragraphs separated by a blank line. Used by `<FormattedText>` in the CMS preview now and on
  * the public site in Phase 5.
  *
  * It returns a small tree of plain objects, never HTML. The renderer turns the tree into React
@@ -178,9 +178,47 @@ function parseChars(chars: readonly string[]): InlineNode[] {
   }
 }
 
+/**
+ * Markdown's `**bold**` as bold: staff used to Markdown would otherwise see its stars. A run of
+ * exactly two stars that can open (after the line start, a space or punctuation; before a
+ * non-space) is paired with the nearest later run of two that can close (after a non-space;
+ * before the line end, a space or punctuation), and both become one "*". Anything else, such as
+ * "2 ** 3", "***" or an unpaired "**", is read as typed. Linear: one pass over the line.
+ */
+function collapseDoubleStars(chars: readonly string[]): readonly string[] {
+  const isDouble = (i: number): boolean =>
+    chars[i] === "*" && chars[i + 1] === "*" && chars[i - 1] !== "*" && chars[i + 2] !== "*";
+  const opens = (i: number): boolean => {
+    const before = chars[i - 1];
+    const after = chars[i + 2];
+    if (after === undefined || isSpace(after)) return false;
+    return before === undefined || isSpace(before) || !isWordChar(before);
+  };
+  const closes = (i: number): boolean => {
+    const before = chars[i - 1];
+    const after = chars[i + 2];
+    if (before === undefined || isSpace(before)) return false;
+    return after === undefined || isSpace(after) || !isWordChar(after);
+  };
+  const drop = new Set<number>();
+  let open = -1;
+  for (let i = 0; i < chars.length; i++) {
+    if (!isDouble(i)) continue;
+    if (open >= 0 && closes(i)) {
+      drop.add(open + 1);
+      drop.add(i + 1);
+      open = -1;
+    } else if (opens(i)) {
+      open = i;
+    }
+    i += 1; // skip the run's second star
+  }
+  return drop.size ? chars.filter((_, i) => !drop.has(i)) : chars;
+}
+
 /** Inline content of one line of text: `*bold*` and `_italic_`, everything else as text. */
 export function parseInline(line: string): InlineNode[] {
-  return parseChars([...line]);
+  return parseChars(collapseDoubleStars([...line]));
 }
 
 interface BulletLine {
