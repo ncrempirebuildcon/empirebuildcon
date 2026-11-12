@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { formatPhone } from "@empire/ui/format";
 import { buildTelLink, filterPlaceholders } from "@/lib/public/format";
 import type { PublicSite } from "@/lib/public/api";
 
@@ -31,6 +32,8 @@ export function Header({ site, isProduction }: HeaderProps) {
   const phones = filterPlaceholders(company?.phones ?? [], isProduction);
   const primaryPhone = phones[0];
   const telHref = buildTelLink(primaryPhone, isProduction);
+  // Spaced for reading (+91 90000 00000); the tel: link keeps the dialable form.
+  const phoneLabel = primaryPhone ? formatPhone(primaryPhone) : null;
 
   // Nav items from site settings
   const customNav = site?.nav ?? [];
@@ -165,7 +168,7 @@ export function Header({ site, isProduction }: HeaderProps) {
                 >
                   <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" />
                 </svg>
-                {primaryPhone}
+                {phoneLabel}
               </a>
             )}
 
@@ -311,7 +314,7 @@ export function Header({ site, isProduction }: HeaderProps) {
                 >
                   <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" />
                 </svg>
-                {primaryPhone}
+                {phoneLabel}
               </a>
             )}
           </nav>

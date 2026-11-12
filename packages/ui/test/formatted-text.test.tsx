@@ -25,6 +25,17 @@ describe("parseInline", () => {
     ]);
   });
 
+  it("reads Markdown's **bold** as bold, and leaves other star runs as typed", () => {
+    expect(parseInline("This is **sample content** here")).toEqual([
+      { type: "text", text: "This is " },
+      { type: "bold", children: [{ type: "text", text: "sample content" }] },
+      { type: "text", text: " here" },
+    ]);
+    expect(parseInline("a ***b*** c")).toEqual([{ type: "text", text: "a ***b*** c" }]);
+    expect(parseInline("2 ** 3")).toEqual([{ type: "text", text: "2 ** 3" }]);
+    expect(parseInline("**unclosed")).toEqual([{ type: "text", text: "**unclosed" }]);
+  });
+
   it("nests italic inside bold and bold inside italic", () => {
     expect(parseInline("*very _important_ note*")).toEqual([
       {
@@ -216,6 +227,12 @@ describe("parser performance", () => {
 describe("formattedTextToPlain", () => {
   it("drops the marks and joins the pieces", () => {
     expect(formattedTextToPlain("*Hello* _there_\n\n- one\n  - two")).toBe("Hello there one two");
+  });
+
+  it("drops Markdown's double stars too", () => {
+    expect(formattedTextToPlain("This is **sample content** here")).toBe(
+      "This is sample content here",
+    );
   });
 });
 

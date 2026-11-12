@@ -88,7 +88,7 @@ The `/_internal/revalidate` route lives outside `/api/*` so it is handled by Nex
 - **Money:** whole rupees in `bigint` (`price_min_inr`, `price_max_inr`, `rate_inr`). Display formats as ₹ 85 L, ₹ 1.25 Cr. `price_on_request` hides numbers everywhere, including structured data.
 - **Area:** stored once in **square metres** (`size_min_sqm`, `size_max_sqm`) with `display_unit` (sq ft, sq yd, sq m) and `area_basis` (carpet, built-up, super built-up, plot). RERA pages show carpet area where available.
 - **Ranges:** every price and size is a min/max pair; equal values display as a single figure.
-- **Formatted text:** descriptions, FAQ answers, payment plan notes use WhatsApp-style text (`*bold*`, `_italic_`, `-` bullets, two-space nesting). Stored as plain text; rendered by our own parser into React elements. Raw HTML is never rendered.
+- **Formatted text:** descriptions, FAQ answers, payment plan notes use WhatsApp-style text (`*bold*` or `**bold**`, `_italic_`, `-` bullets, two-space nesting). Stored as plain text; rendered by our own parser into React elements. Raw HTML is never rendered.
 - **Translations (D-014):** English lives in the normal columns. A `translations` JSON column holds overlays per locale, e.g. `{"hi": {"name": "…", "tagline": "…"}}`. Missing translations fall back to English.
 - **SEO:** a `seo` JSON column on projects, configurations, pages, posts and cities: title, description, OG image, noindex, canonical path.
 - **Media links (exclusive arc):** `media_link` has one nullable foreign key per owner type (project, configuration, construction update, page, post) and a check constraint that exactly one is set. Real foreign keys, cascades on delete, one table to query. A partial unique index allows one cover per owner and role.
