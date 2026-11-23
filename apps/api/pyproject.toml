@@ -8,21 +8,21 @@ readme = "README.md"
 requires-python = ">=3.14,<3.15"
 license = { text = "Proprietary" }
 dependencies = [
-    "fastapi==0.162.2",
+    "fastapi==0.165.0",
     "uvicorn[standard]==0.54.0",
-    "sqlalchemy==2.1.8",
+    "sqlalchemy==2.1.9",
     "alembic==1.20.1",
-    "pydantic==2.14.3",
-    "pydantic-settings==2.16.2",
-    "email-validator==2.3.0",
-    "psycopg[binary]==3.3.8",
+    "pydantic==2.14.4",
+    "pydantic-settings==2.16.3",
+    "email-validator==2.4.0",
+    "psycopg[binary]==3.3.9",
     "psycopg-pool==3.3.3",
     "pyjwt==2.15.1",
     "argon2-cffi==25.1.0",
     "structlog==26.1.0",
-    "sentry-sdk==2.74.0",
+    "sentry-sdk==2.75.0",
     "cryptography==50.0.2",
-    "typer==0.28.0",
+    "typer==0.29.2",
     "uuid-utils==1.2.0",
     # The maps resolver follows Google short links on the server (projects/maps.py).
     "httpx==0.28.1",
@@ -31,7 +31,7 @@ dependencies = [
     # the capped upload reader streams through (media/multipart.py).
     "cloudinary==1.47.0",
     "pillow==13.0.0",
-    "python-multipart==0.0.33",
+    "python-multipart==0.0.34",
     # Two-factor set-up (users/qr.py): the QR code as an inline SVG. Pure Python, no
     # dependencies, BSD. 1.6.6 (12 Mar 2025) was the newest on PyPI when checked, 25 Oct 2026.
     "segno==1.6.6",
@@ -44,7 +44,7 @@ empire-worker = "empire_api.worker:main"
 [dependency-groups]
 dev = [
     "pytest==9.2.0",
-    "ruff==0.17.4",
+    "ruff==0.17.6",
     "mypy==2.4.1",
     "pip-audit==2.10.1",
 ]
