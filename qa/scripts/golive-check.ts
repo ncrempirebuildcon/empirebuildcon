@@ -137,7 +137,12 @@ async function main(): Promise<void> {
   });
 
   await attempt("project page", async () => {
-    if (!projectUrl) return add("FAIL", "project page", "no project in the sitemap");
+    if (!projectUrl)
+      return add(
+        "WARN",
+        "project page",
+        "no project in the sitemap yet (company pages only, D-060)",
+      );
     const res = await get(projectUrl);
     const html = await res.text();
     const rera = /UP-?RERA/i.test(html);

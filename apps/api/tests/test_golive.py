@@ -57,8 +57,9 @@ def test_placeholders(text: str, found: list[str]) -> None:
 # ── Projects ───────────────────────────────────────────────────────────────────────────────
 
 
-def test_no_live_project_fails(db: Session) -> None:
-    assert statuses(golive.check_projects(db), "projects") == ["FAIL"]
+def test_no_live_project_warns(db: Session) -> None:
+    """D-060: the site may launch with company pages; projects follow their RERA registration."""
+    assert statuses(golive.check_projects(db), "projects") == ["WARN"]
 
 
 def test_a_ready_project_passes_and_a_placeholder_fails(
@@ -136,6 +137,15 @@ def test_consent_texts_must_be_published_and_approved(db: Session) -> None:
     assert {c.status for c in golive.check_consent(db)} == {"PASS"}
 
 
+def test_phone_and_whatsapp_are_optional(db: Session) -> None:
+    """D-060: enquiries may come through the forms only; email and address stay required."""
+    checks = by_name(golive.check_site(db))["contact details"]
+    assert [c.status for c in checks if "Missing" in c.detail] == ["FAIL"]
+    hidden = [c for c in checks if "buttons stay hidden" in c.detail]
+    assert [c.status for c in hidden] == ["WARN"]
+    assert "phone" in hidden[0].detail and "WhatsApp" in hidden[0].detail
+
+
 # ── People, features, background work ──────────────────────────────────────────────────────
 
 
@@ -176,7 +186,7 @@ def test_cli_fails_on_an_empty_site_and_prints_json(db: Session) -> None:
     runner = CliRunner()
     result = runner.invoke(cli_app, ["golive-check"])
     assert result.exit_code == 1
-    assert "FAIL  projects: No project is live" in result.output
+    assert "WARN  projects: No project is live" in result.output
     assert "to fix" in result.output
     as_json = runner.invoke(cli_app, ["golive-check", "--json"])
     rows: list[dict[str, Any]] = json.loads(as_json.stdout)
