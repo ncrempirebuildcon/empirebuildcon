@@ -1117,3 +1117,13 @@ Building part 1 against the design contract (D-020) needed some choices the cont
   - Checked 7 Nov 2026: Cloudflare's Workers AI pricing, limits, data-usage and model pages, and AIReiter's "Best free AI APIs in 2026" (updated 14 Aug 2026).
 - **Dry run:** see PLAN.md. About 250 to 400 answers a day fit under the guard. The migration's pgvector check isn't permission-aware, and task 7.1 fixes that. Answer quality in Hindi and Hinglish, and real latency, are checked live in 7.4 before the flag goes on.
 
+
+## D-060 · Launch with company pages; a project goes live with its UP-RERA registration (25 Nov 2026)
+
+- **Context:** the first project's content arrived (Signature Spaces, Greater Noida West: three towers, about 2,230 sq m of land, 90+ flats). It has no UP-RERA registration yet. The client says it doesn't need one because the land is freehold. Under RERA section 3(2)(a), only projects up to 500 sq m of land or up to 8 apartments are exempt, and an Allahabad High Court judgment (8 May 2026) treats the sale of units as what brings a project under RERA. The company also has no official phone or WhatsApp number yet; enquiries come through the website's forms.
+- **Decision (owner, 25 Nov 2026):**
+  - The site goes live with company pages: Home, About, Contact, the legal pages and the enquiry forms.
+  - Signature Spaces is entered in the CMS as a **draft**. It goes live when it has its UP-RERA number and QR, as every project must (D-002). If the client's lawyer gives a written opinion that it is exempt, the owner records it as a new decision first.
+  - Phone and WhatsApp are optional. When they are empty, the Call and WhatsApp buttons stay hidden and visitors use the forms.
+  - `golive-check` reports "no live project" and "no phone or WhatsApp" as WARN, not FAIL. A live project without its RERA number, QR or up-rera.in link still FAILs. Email and address are still required.
+- **Not changed:** the publish rule for projects (D-002) and everything it checks.

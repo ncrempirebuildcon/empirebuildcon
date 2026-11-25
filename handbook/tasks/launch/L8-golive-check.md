@@ -20,10 +20,10 @@ Before go-live, one command says whether the database is ready to be the live si
    - Content is judged through the public API's own builders, so "live" means exactly what the website shows.
    - **Checks:**
      - `APP_ENV` and an https `SITE_URL`;
-     - at least one live project, and no live project with a publish blocker (RERA number, QR, configuration; D-002);
+     - no live project with a publish blocker (RERA number, QR, configuration; D-002); no live project at all is a WARN, since the site may launch with company pages (D-060);
      - every legal page published and not a draft (D-017);
      - the consent texts every form needs published and approved: `lead_form`, `marketing` and `brochure`, plus `cookies` with tracking IDs and `chat` with the chat flag (D-034);
-     - contact details (phone, email, address, WhatsApp) set;
+     - contact details: email and address required; no phone or WhatsApp is a WARN, and their buttons stay hidden (D-060);
      - no sample data shown (D-015);
      - no "[placeholder]" text on a live project, page or post, or in the contact details;
      - an active super-admin with two-factor sign-in; admins without it listed (WARN);
@@ -36,7 +36,7 @@ Before go-live, one command says whether the database is ready to be the live si
      - the home page and its security headers (CSP enforced or report-only, nosniff, referrer policy, and HSTS with `--production`);
      - robots.txt: blocked on staging, allowed with `--production`, with the sitemap line;
      - the sitemap's addresses all on the site's host;
-     - a project page from the sitemap showing UP-RERA and up-rera.in;
+     - a project page from the sitemap showing UP-RERA and up-rera.in (WARN when no project is live yet, D-060);
      - `/api/health/live` through the site;
      - the http → https redirect;
      - each `--alias` redirecting permanently;

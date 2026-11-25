@@ -93,7 +93,15 @@ def _live_posts(db: Session) -> list[tuple[Post, str]]:
 def check_projects(db: Session) -> list[Check]:
     live = _live_projects(db)
     if not live:
-        return [Check("FAIL", "projects", "No project is live on the website yet (L5).")]
+        # WHY WARN: the site may launch with company pages only; a project goes live once it has
+        # its UP-RERA registration (D-060). A live project's RERA blockers still FAIL below.
+        return [
+            Check(
+                "WARN",
+                "projects",
+                "No project is live yet: the site launches with company pages (D-060).",
+            )
+        ]
     checks = [Check("PASS", "projects", f"{len(live)} project(s) live.")]
     blockers = publish_blockers_for(db, [p for p, _ in live])
     for project, text in live:
@@ -135,21 +143,31 @@ def check_site(db: Session) -> list[Check]:
     site = public.get_public_site(db)
     company = site.company
     checks: list[Check] = []
+    # Email and address are how visitors reach the company; phone and WhatsApp are optional
+    # (the company may take enquiries through the forms only, D-060). Empty ones stay hidden.
     missing = [
         label
-        for label, value in (
-            ("phone", company.phones),
-            ("email", company.emails),
-            ("address", company.address),
-            ("WhatsApp", company.whatsapp),
-        )
+        for label, value in (("email", company.emails), ("address", company.address))
+        if not value
+    ]
+    optional = [
+        label
+        for label, value in (("phone", company.phones), ("WhatsApp", company.whatsapp))
         if not value
     ]
     if missing:
         checks.append(Check("FAIL", "contact details", "Missing: " + ", ".join(missing) + "."))
+    if optional:
+        checks.append(
+            Check(
+                "WARN",
+                "contact details",
+                "No " + " or ".join(optional) + ": the Call and WhatsApp buttons stay hidden.",
+            )
+        )
     if found := _placeholders(company.model_dump_json()):
         checks.append(Check("FAIL", "contact details", "Placeholder text: " + ", ".join(found)))
-    if not missing and not checks:
+    if not checks:
         checks.append(Check("PASS", "contact details", "Phone, email, address and WhatsApp set."))
     if site.has_sample:
         checks.append(Check("FAIL", "sample data", "The website still shows sample data (D-015)."))
